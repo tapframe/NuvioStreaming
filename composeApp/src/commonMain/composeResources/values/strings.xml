@@ -337,6 +337,10 @@
     <string name="compose_nav_profile">Profile</string>
     <string name="compose_nav_search">Search</string>
     <string name="compose_player_audio_tracks">Audio Tracks</string>
+    <string name="compose_player_load_local_audio">Load local audio file</string>
+    <string name="compose_player_local_audio_active">Local audio file active</string>
+    <string name="compose_player_remove_local_audio">Remove</string>
+    <string name="compose_player_audio_offset">Audio offset</string>
     <string name="compose_player_audio">Audio</string>
     <string name="compose_player_auto_sync">Auto Sync</string>
     <string name="compose_player_bold">Bold</string>

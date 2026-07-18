@@ -120,6 +120,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             PlatformPlayerSurface(
                 sourceUrl = playerSurfaceSourceUrl,
                 sourceAudioUrl = activeSourceAudioUrl,
+                audioDelayMs = audioDelayMs,
                 sourceHeaders = activeSourceHeaders,
                 sourceResponseHeaders = activeSourceResponseHeaders,
                 externalSubtitles = externalSubtitles,
@@ -140,6 +141,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                     }
                 },
                 onError = { message ->
+                    logLocalAudio(null, "PlayerScreenRuntimeUi.onError message=$message")
                     if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
                         return@PlatformPlayerSurface
                     }
@@ -371,6 +373,17 @@ private fun BoxScope.RenderPlaybackOverlays(
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+    val localAudioPickerLauncher = rememberLocalAudioPicker { uri ->
+        val pos = displayedPositionMs
+        activeInitialPositionMs = maxOf(pos, 1L)
+        activeInitialProgressFraction = null
+        initialSeekApplied = false
+        localAudioUri = uri
+        activeSourceAudioUrl = uri
+        showAudioModal = false
+        logLocalAudio(null, "local audio selected uri=$uri")
+    }
+    val showLocalAudioOption = PlayerSettingsRepository.uiState.value.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv
     PlayerScreenModalHosts(
         pendingP2pSwitch = pendingP2pSwitch,
         onPendingP2pSwitchChanged = { pendingP2pSwitch = it },
@@ -394,6 +407,23 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             }
         },
         onAudioModalDismissed = { showAudioModal = false },
+        showLocalAudioOption = showLocalAudioOption,
+        localAudioUri = localAudioUri,
+        audioDelayMs = audioDelayMs,
+        onLocalAudioPicked = { localAudioPickerLauncher() },
+        onLocalAudioRemoved = {
+            val pos = displayedPositionMs
+            activeInitialPositionMs = maxOf(pos, 1L)
+            activeInitialProgressFraction = null
+            initialSeekApplied = false
+            localAudioUri = null
+            activeSourceAudioUrl = args.sourceAudioUrl
+            logLocalAudio(null, "local audio removed, reverted to stream audio")
+        },
+        onAudioDelayChanged = { delayMs ->
+            audioDelayMs = delayMs
+            logLocalAudio(null, "local audio offset set delayMs=$delayMs")
+        },
         showSubtitleModal = showSubtitleModal,
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,

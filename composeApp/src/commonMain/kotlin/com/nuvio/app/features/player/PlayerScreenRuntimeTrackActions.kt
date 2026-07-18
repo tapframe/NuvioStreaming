@@ -83,6 +83,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
     }
 
     if (
+        !hasLocalAudio &&
         audioTracks.isNotEmpty() &&
         (!preference.audioTrackId.isNullOrBlank() ||
             !preference.audioLanguage.isNullOrBlank() ||
@@ -93,6 +94,8 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
             playerController?.selectAudioTrack(restoredAudioIndex)
             selectedAudioIndex = restoredAudioIndex
         }
+        preferredAudioSelectionApplied = true
+    } else if (hasLocalAudio) {
         preferredAudioSelectionApplied = true
     }
 
@@ -157,19 +160,23 @@ internal fun PlayerScreenRuntime.refreshTracks() {
     )
 
     if (!preferredAudioSelectionApplied) {
-        if (preferredAudioTargets.isEmpty()) {
+        if (hasLocalAudio) {
             preferredAudioSelectionApplied = true
-        } else if (audioTracks.isNotEmpty()) {
-            val preferredAudioIndex = findPreferredTrackIndex(
-                tracks = audioTracks,
-                targets = preferredAudioTargets,
-                language = ::resolveAudioTrackLanguageTarget,
-            )
-            if (preferredAudioIndex >= 0 && preferredAudioIndex != selectedAudioIndex) {
-                playerController?.selectAudioTrack(preferredAudioIndex)
-                selectedAudioIndex = preferredAudioIndex
+        } else {
+            if (preferredAudioTargets.isEmpty()) {
+                preferredAudioSelectionApplied = true
+            } else if (audioTracks.isNotEmpty()) {
+                val preferredAudioIndex = findPreferredTrackIndex(
+                    tracks = audioTracks,
+                    targets = preferredAudioTargets,
+                    language = ::resolveAudioTrackLanguageTarget,
+                )
+                if (preferredAudioIndex >= 0 && preferredAudioIndex != selectedAudioIndex) {
+                    playerController?.selectAudioTrack(preferredAudioIndex)
+                    selectedAudioIndex = preferredAudioIndex
+                }
+                preferredAudioSelectionApplied = true
             }
-            preferredAudioSelectionApplied = true
         }
     }
 

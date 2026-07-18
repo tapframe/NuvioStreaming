@@ -38,6 +38,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.exoplayer.source.TrackGroupArray
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
@@ -47,11 +48,20 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.ForwardingRenderer
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MediaPeriod
+import androidx.media3.exoplayer.source.WrappingMediaSource
+import androidx.media3.exoplayer.source.SampleStream
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.LoadingInfo
 import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.extractor.DefaultExtractorsFactory
@@ -94,6 +104,7 @@ actual fun PlatformPlayerSurface(
     playWhenReady: Boolean,
     resizeMode: PlayerResizeMode,
     useNativeController: Boolean,
+    audioDelayMs: Int,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
@@ -127,6 +138,7 @@ actual fun PlatformPlayerSurface(
             playWhenReady = playWhenReady,
             resizeMode = resizeMode,
             useNativeController = useNativeController,
+            audioDelayMs = audioDelayMs,
             onControllerReady = onControllerReady,
             onSnapshot = onSnapshot,
             onError = { message ->
@@ -183,6 +195,7 @@ private fun ExoPlayerSurface(
     playWhenReady: Boolean,
     resizeMode: PlayerResizeMode,
     useNativeController: Boolean,
+    audioDelayMs: Int,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
@@ -223,6 +236,7 @@ private fun ExoPlayerSurface(
     var subtitleDelayMs by remember(playerSourceKey) { mutableStateOf(0) }
     var selectedExternalSubtitleMimeType by remember(playerSourceKey) { mutableStateOf<String?>(null) }
     val latestSubtitleDelayMs = rememberUpdatedState(subtitleDelayMs)
+    val latestAudioDelayMs = rememberUpdatedState(audioDelayMs)
     val latestExternalSubtitleMimeType = rememberUpdatedState(selectedExternalSubtitleMimeType)
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
@@ -278,10 +292,21 @@ private fun ExoPlayerSurface(
 
     fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
         if (!sourceAudioUrl.isNullOrBlank()) {
+            val isLocal = sourceAudioUrl.startsWith("content://")
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
-            val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
+            val rawAudioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
+            val audioSource = if (isLocal) {
+                SeekFakingMediaSource(rawAudioSource) {
+                    latestAudioDelayMs.value.toLong() * 1_000L
+                }
+            } else {
+                rawAudioSource
+            }
             val mergedSource = MergingMediaSource(videoSource, audioSource)
+            if (isLocal) {
+                logLocalAudio(context, "local audio merged engine=ExoPlayer uri=$sourceAudioUrl delayMs=$audioDelayMs")
+            }
             if (startPositionMs != null) {
                 setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
             } else {
@@ -309,6 +334,7 @@ private fun ExoPlayerSurface(
             shouldNormalizeCuePositionProvider = {
                 latestExternalSubtitleMimeType.value == MimeTypes.TEXT_VTT
             },
+            audioDelayUsProvider = { latestAudioDelayMs.value.toLong() * 1_000L },
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
@@ -397,6 +423,7 @@ private fun ExoPlayerSurface(
 
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
     val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
+    var userSelectedAudioOverride by remember(exoPlayer) { mutableStateOf(false) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
@@ -451,6 +478,9 @@ private fun ExoPlayerSurface(
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
+                if (sourceAudioUrl?.startsWith("content://") == true) {
+                    logLocalAudio(context, "onPlayerError message=${error.message} errorCodeName=${error.errorCodeName} cause=${error.cause}")
+                }
 
                 val isSourceError = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
                         error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
@@ -503,10 +533,16 @@ private fun ExoPlayerSurface(
                     else -> "UNKNOWN($playbackState)"
                 }
                 Log.d(TAG, "onPlaybackStateChanged: $stateName")
+                if (sourceAudioUrl?.startsWith("content://") == true) {
+                    logLocalAudio(context, "onPlaybackStateChanged state=$stateName isReady=${playbackState == Player.STATE_READY}")
+                }
                 if (playbackState == Player.STATE_READY) {
                     fallbackStartPositionMs = null
                     latestOnError.value(null)
                     exoPlayer.logCurrentTracks("STATE_READY")
+                    if (sourceAudioUrl?.startsWith("content://") == true && !userSelectedAudioOverride) {
+                        exoPlayer.forceLocalAudioOverride(context, sourceAudioUrl)
+                    }
                 }
                 syncPlayerViewKeepScreenOn()
                 dispatchExoPlayerSnapshot()
@@ -528,6 +564,12 @@ private fun ExoPlayerSurface(
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 Log.d(TAG, "onTracksChanged: ${tracks.groups.size} groups total")
                 exoPlayer.logCurrentTracks("onTracksChanged")
+                if (sourceAudioUrl?.startsWith("content://") == true) {
+                    val info = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }.mapIndexed { idx, g ->
+                        "idx=$idx isSelected=${g.isSelected} label=${g.mediaTrackGroup.getFormat(0).label} id=${g.mediaTrackGroup.getFormat(0).id}"
+                    }.joinToString("; ")
+                    logLocalAudio(context, "onTracksChanged totalGroups=${tracks.groups.size} audioGroups=$info")
+                }
                 pendingAudioTrackSelection.firstOrNull()?.let { selection ->
                     if (tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
                         pendingAudioTrackSelection.clear()
@@ -545,6 +587,9 @@ private fun ExoPlayerSurface(
                     if (idx >= 0) {
                         exoPlayer.selectTrackByIndex(C.TRACK_TYPE_TEXT, idx)
                     }
+                }
+                if (sourceAudioUrl?.startsWith("content://") == true && !userSelectedAudioOverride) {
+                    exoPlayer.forceLocalAudioOverride(context, sourceAudioUrl)
                 }
                 dispatchExoPlayerSnapshot()
             }
@@ -603,11 +648,18 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun seekTo(positionMs: Long) {
+                    if (sourceAudioUrl?.startsWith("content://") == true) {
+                        logLocalAudio(context, "PlayerEngineController.seekTo positionMs=$positionMs currentPosition=${exoPlayer.currentPosition}")
+                    }
                     exoPlayer.seekTo(positionMs.coerceAtLeast(0L))
                 }
 
                 override fun seekBy(offsetMs: Long) {
-                    exoPlayer.seekTo((exoPlayer.currentPosition + offsetMs).coerceAtLeast(0L))
+                    val target = (exoPlayer.currentPosition + offsetMs).coerceAtLeast(0L)
+                    if (sourceAudioUrl?.startsWith("content://") == true) {
+                        logLocalAudio(context, "PlayerEngineController.seekBy offsetMs=$offsetMs target=$target currentPosition=${exoPlayer.currentPosition}")
+                    }
+                    exoPlayer.seekTo(target)
                 }
 
                 override fun retry() {
@@ -628,7 +680,7 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun getAudioTracks(): List<AudioTrack> =
-                    exoPlayer.extractAudioTracks(context)
+                    exoPlayer.extractAudioTracks(context, sourceAudioUrl)
 
                 override fun getSubtitleTracks(): List<SubtitleTrack> {
                     val tracks = exoPlayer.extractSubtitleTracks(context)
@@ -640,6 +692,7 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun selectAudioTrack(index: Int) {
+                    userSelectedAudioOverride = true
                     exoPlayer.selectTrackByIndex(C.TRACK_TYPE_AUDIO, index)
                 }
 
@@ -757,6 +810,14 @@ private fun ExoPlayerSurface(
         while (isActive) {
             dispatchExoPlayerSnapshot()
             delay(250L)
+        }
+    }
+
+    LaunchedEffect(audioDelayMs, sourceAudioUrl) {
+        if (sourceAudioUrl?.startsWith("content://") == true) {
+            logLocalAudio(context, "local audio offset changed delayMs=$audioDelayMs")
+            val currentPos = exoPlayer.currentPosition
+            exoPlayer.seekTo(currentPos)
         }
     }
 
@@ -1464,6 +1525,39 @@ private fun ExoPlayer.captureSelectedTrack(trackType: Int): TrackSelectionSnapsh
     return null
 }
 
+private fun ExoPlayer.forceLocalAudioOverride(context: Context, localAudioUrl: String?): Boolean {
+    val audioGroups = currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+    val logInfo = audioGroups.mapIndexed { idx, g ->
+        "idx=$idx isSelected=${g.isSelected} label=${g.mediaTrackGroup.getFormat(0).label} id=${g.mediaTrackGroup.getFormat(0).id}"
+    }.joinToString("; ")
+    logLocalAudio(context, "forceLocalAudioOverride: localAudioUrl=$localAudioUrl audioGroups=$logInfo")
+
+    if (localAudioUrl?.startsWith("content://") != true || audioGroups.isEmpty()) {
+        return false
+    }
+
+    // In remux (e.g. HLS), the local audio track from MergingMediaSource might not be the last group.
+    // It typically has no label, no language, and ID starts with "1:" (as it's a separate renderer source).
+    // We try to match by format first, fallback to last.
+    val localGroup = audioGroups.firstOrNull {
+        it.mediaTrackGroup.getFormat(0).let { f -> f.label.isNullOrBlank() && f.language.isNullOrBlank() }
+    } ?: audioGroups.last()
+
+    val builder = trackSelectionParameters.buildUpon()
+    // By setting the override for TRACK_TYPE_AUDIO to just this specific group, ExoPlayer automatically
+    // deselects the others. We DO NOT send emptyList() to the video's audio groups, because doing so
+    // causes an IllegalStateException ("Children enabled at different positions") in the MergingMediaSource
+    // when playing remux adaptive streams.
+    builder.setOverrideForType(TrackSelectionOverride(localGroup.mediaTrackGroup, listOf(0)))
+
+    trackSelectionParameters = builder.build()
+
+    // Verify using our resolved localGroup
+    val applied = currentTracks.groups.find { it === localGroup }?.isSelected == true
+    logLocalAudio(context, "forceLocalAudioOverride: applied local selected=$applied")
+    return applied
+}
+
 private fun ExoPlayer.restoreTrackSelection(selection: TrackSelectionSnapshot): Boolean {
     selection.id?.takeIf { it.isNotBlank() }?.let { id ->
         val restored = selectTrackByPredicate(selection.trackType, "id=$id") { _, format ->
@@ -1608,15 +1702,25 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState, pipScale: F
     }
 }
 
-private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
+private fun ExoPlayer.extractAudioTracks(context: Context, localAudioUrl: String?): List<AudioTrack> {
     val tracks = mutableListOf<AudioTrack>()
     val trackNameProvider = CustomDefaultTrackNameProvider(context.resources)
-    var idx = 0
-    for (group in currentTracks.groups) {
-        if (group.type != C.TRACK_TYPE_AUDIO) continue
+    val audioGroups = currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+    val localBaseLabel = runBlocking { getString(Res.string.compose_player_local_audio_active) }
+    val hasLocal = localAudioUrl?.startsWith("content://") == true && audioGroups.isNotEmpty()
+    Log.d(TAG, "extractAudioTracks: ${audioGroups.size} audio groups")
+    audioGroups.forEachIndexed { idx, group ->
         val format = group.mediaTrackGroup.getFormat(0)
-        val label = trackNameProvider.getTrackName(format).takeIf { it.isNotBlank() }
-            ?: runBlocking { getString(Res.string.compose_player_track_number, idx + 1) }
+        val isLocal = hasLocal && (idx == audioGroups.lastIndex)
+        val codecName = format.sampleMimeType?.let { CustomDefaultTrackNameProvider.formatNameFromMime(it) }
+            ?: format.codecs?.let { CustomDefaultTrackNameProvider.formatNameFromMime(it) }
+        val label = if (isLocal) {
+            if (codecName != null) "$localBaseLabel ($codecName)" else localBaseLabel
+        } else {
+            trackNameProvider.getTrackName(format).takeIf { it.isNotBlank() }
+                ?: runBlocking { getString(Res.string.compose_player_track_number, idx + 1) }
+        }
+        Log.d(TAG, "  audio[$idx] isLocal=$isLocal label='$label' lang=${format.language} id=${format.id} sel=${group.isSelected}")
         tracks.add(
             AudioTrack(
                 index = idx,
@@ -1626,7 +1730,6 @@ private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
                 isSelected = group.isSelected,
             )
         )
-        idx++
     }
     return tracks
 }
@@ -1716,6 +1819,7 @@ private class SubtitleOffsetRenderersFactory(
     context: Context,
     private val subtitleDelayUsProvider: () -> Long,
     private val shouldNormalizeCuePositionProvider: () -> Boolean,
+    private val audioDelayUsProvider: (() -> Long)? = null,
 ) : DefaultRenderersFactory(context) {
     override fun buildTextRenderers(
         context: Context,
@@ -1734,6 +1838,36 @@ private class SubtitleOffsetRenderersFactory(
             out[index] = SubtitleOffsetRenderer(
                 baseRenderer = out[index],
                 subtitleDelayUsProvider = subtitleDelayUsProvider,
+            )
+        }
+    }
+
+    override fun buildAudioRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        audioSink: AudioSink,
+        eventHandler: android.os.Handler,
+        audioRendererEventListener: AudioRendererEventListener,
+        out: ArrayList<Renderer>,
+    ) {
+        val startIndex = out.size
+        super.buildAudioRenderers(
+            context,
+            extensionRendererMode,
+            mediaCodecSelector,
+            enableDecoderFallback,
+            audioSink,
+            eventHandler,
+            audioRendererEventListener,
+            out,
+        )
+        val provider = audioDelayUsProvider ?: return
+        for (index in startIndex until out.size) {
+            out[index] = AudioOffsetRenderer(
+                baseRenderer = out[index],
+                audioDelayUsProvider = provider,
             )
         }
     }
@@ -1815,6 +1949,17 @@ private class SubtitleOffsetRenderer(
 ) : ForwardingRenderer(baseRenderer) {
     override fun render(positionUs: Long, elapsedRealtimeUs: Long) {
         val adjustedPositionUs = (positionUs - subtitleDelayUsProvider()).coerceAtLeast(0L)
+        super.render(adjustedPositionUs, elapsedRealtimeUs)
+    }
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private class AudioOffsetRenderer(
+    baseRenderer: Renderer,
+    private val audioDelayUsProvider: () -> Long,
+) : ForwardingRenderer(baseRenderer) {
+    override fun render(positionUs: Long, elapsedRealtimeUs: Long) {
+        val adjustedPositionUs = (positionUs - audioDelayUsProvider()).coerceAtLeast(0L)
         super.render(adjustedPositionUs, elapsedRealtimeUs)
     }
 }
@@ -1939,5 +2084,169 @@ internal class SubtitleRequestHeaderDataSource(
 
     override fun close() {
         upstream.close()
+    }
+}
+
+@UnstableApi
+private class SeekFakingSampleStream(
+    val delegate: androidx.media3.exoplayer.source.SampleStream,
+    private val audioDelayUsProvider: () -> Long,
+) : androidx.media3.exoplayer.source.SampleStream {
+    override fun isReady(): Boolean = delegate.isReady
+
+    override fun maybeThrowError() {
+        delegate.maybeThrowError()
+    }
+
+    override fun readData(
+        formatHolder: androidx.media3.exoplayer.FormatHolder,
+        buffer: androidx.media3.decoder.DecoderInputBuffer,
+        readFlags: Int
+    ): Int {
+        val result = delegate.readData(formatHolder, buffer, readFlags)
+        if (result == androidx.media3.common.C.RESULT_BUFFER_READ) {
+            buffer.timeUs = buffer.timeUs + audioDelayUsProvider()
+        }
+        return result
+    }
+
+    override fun skipData(positionUs: Long): Int {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        return delegate.skipData(adjustedPositionUs)
+    }
+}
+
+@UnstableApi
+private class SeekFakingMediaPeriod(
+    val delegate: MediaPeriod,
+    private val audioDelayUsProvider: () -> Long,
+) : MediaPeriod {
+    override fun prepare(callback: MediaPeriod.Callback, positionUs: Long) {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.prepare(object : MediaPeriod.Callback {
+            override fun onPrepared(mediaPeriod: MediaPeriod) {
+                callback.onPrepared(this@SeekFakingMediaPeriod)
+            }
+
+            override fun onContinueLoadingRequested(source: MediaPeriod) {
+                callback.onContinueLoadingRequested(this@SeekFakingMediaPeriod)
+            }
+        }, adjustedPositionUs)
+    }
+
+    override fun maybeThrowPrepareError() {
+        delegate.maybeThrowPrepareError()
+    }
+
+    override fun getTrackGroups(): TrackGroupArray {
+        return delegate.trackGroups
+    }
+
+    override fun selectTracks(
+        selections: Array<out androidx.media3.exoplayer.trackselection.ExoTrackSelection?>,
+        mayRetainStreamFlags: BooleanArray,
+        streams: Array<out androidx.media3.exoplayer.source.SampleStream?>,
+        streamResetFlags: BooleanArray,
+        positionUs: Long
+    ): Long {
+        val delegateStreams = arrayOfNulls<androidx.media3.exoplayer.source.SampleStream>(streams.size)
+        for (i in streams.indices) {
+            val s = streams[i]
+            if (s is SeekFakingSampleStream) {
+                delegateStreams[i] = s.delegate
+            } else {
+                delegateStreams[i] = s
+            }
+        }
+
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        val selectPositionUs = delegate.selectTracks(selections, mayRetainStreamFlags, delegateStreams, streamResetFlags, adjustedPositionUs)
+
+        val streamsCast = streams as Array<androidx.media3.exoplayer.source.SampleStream?>
+        for (i in delegateStreams.indices) {
+            val ds = delegateStreams[i]
+            if (ds != null) {
+                streamsCast[i] = SeekFakingSampleStream(ds, audioDelayUsProvider)
+            } else {
+                streamsCast[i] = null
+            }
+        }
+
+        return selectPositionUs + delayUs
+    }
+
+    override fun discardBuffer(positionUs: Long, toKeyframe: Boolean) {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.discardBuffer(adjustedPositionUs, toKeyframe)
+    }
+
+    override fun readDiscontinuity(): Long {
+        val disc = delegate.readDiscontinuity()
+        if (disc == androidx.media3.common.C.TIME_UNSET) return disc
+        return disc + audioDelayUsProvider()
+    }
+
+    override fun seekToUs(positionUs: Long): Long {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.seekToUs(adjustedPositionUs)
+        return positionUs
+    }
+
+    override fun getAdjustedSeekPositionUs(positionUs: Long, seekParameters: SeekParameters): Long {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        val adjustedResult = delegate.getAdjustedSeekPositionUs(adjustedPositionUs, seekParameters)
+        return adjustedResult + delayUs
+    }
+
+    override fun getBufferedPositionUs(): Long {
+        val buffered = delegate.bufferedPositionUs
+        if (buffered == androidx.media3.common.C.TIME_END_OF_SOURCE) return buffered
+        return buffered + audioDelayUsProvider()
+    }
+
+    override fun getNextLoadPositionUs(): Long {
+        val nextLoad = delegate.nextLoadPositionUs
+        if (nextLoad == androidx.media3.common.C.TIME_END_OF_SOURCE) return nextLoad
+        return nextLoad + audioDelayUsProvider()
+    }
+
+    override fun continueLoading(loadingInfo: LoadingInfo): Boolean {
+        return delegate.continueLoading(loadingInfo)
+    }
+
+    override fun isLoading(): Boolean {
+        return delegate.isLoading
+    }
+
+    override fun reevaluateBuffer(positionUs: Long) {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.reevaluateBuffer(adjustedPositionUs)
+    }
+}
+
+@UnstableApi
+private class SeekFakingMediaSource(
+    delegate: MediaSource,
+    private val audioDelayUsProvider: () -> Long,
+) : WrappingMediaSource(delegate) {
+    override fun createPeriod(
+        id: MediaSource.MediaPeriodId,
+        allocator: androidx.media3.exoplayer.upstream.Allocator,
+        startPositionUs: Long
+    ): MediaPeriod {
+        val originalPeriod = super.createPeriod(id, allocator, startPositionUs)
+        return SeekFakingMediaPeriod(originalPeriod, audioDelayUsProvider)
+    }
+
+    override fun releasePeriod(mediaPeriod: MediaPeriod) {
+        val original = (mediaPeriod as? SeekFakingMediaPeriod)?.delegate ?: mediaPeriod
+        super.releasePeriod(original)
     }
 }

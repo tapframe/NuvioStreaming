@@ -24,6 +24,12 @@ internal fun PlayerScreenModalHosts(
     selectedAudioIndex: Int,
     onAudioTrackSelected: (Int) -> Unit,
     onAudioModalDismissed: () -> Unit,
+    showLocalAudioOption: Boolean = false,
+    localAudioUri: String? = null,
+    audioDelayMs: Int = 0,
+    onLocalAudioPicked: () -> Unit = {},
+    onLocalAudioRemoved: () -> Unit = {},
+    onAudioDelayChanged: (Int) -> Unit = {},
     showSubtitleModal: Boolean,
     subtitleTracks: List<SubtitleTrack>,
     selectedSubtitleIndex: Int,
@@ -120,6 +126,12 @@ internal fun PlayerScreenModalHosts(
         selectedIndex = selectedAudioIndex,
         onTrackSelected = onAudioTrackSelected,
         onDismiss = onAudioModalDismissed,
+        showLocalAudioOption = showLocalAudioOption,
+        localAudioUri = localAudioUri,
+        audioDelayMs = audioDelayMs,
+        onLocalAudioPicked = onLocalAudioPicked,
+        onLocalAudioRemoved = onLocalAudioRemoved,
+        onAudioDelayChanged = onAudioDelayChanged,
     )
 
     SubtitleModal(
