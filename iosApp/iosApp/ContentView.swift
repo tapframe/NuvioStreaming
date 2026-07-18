@@ -18,14 +18,14 @@ private enum NuvioComposeHost {
     static func wrap(
         _ contentController: UIViewController,
         disablesInteractiveContentPopGesture: Bool = false,
-        onTabBarAvailable: ((UITabBar) -> Void)? = nil
+        onTabBarControllerAvailable: ((UITabBarController) -> Void)? = nil
     ) -> RootComposeViewController {
         _ = registerPlayerBridge
         contentController.view.backgroundColor = nuvioBackgroundColor
         return RootComposeViewController(
             contentController: contentController,
             disablesInteractiveContentPopGesture: disablesInteractiveContentPopGesture,
-            onTabBarAvailable: onTabBarAvailable
+            onTabBarControllerAvailable: onTabBarControllerAvailable
         )
     }
 }
@@ -36,16 +36,16 @@ private enum NuvioComposeHost {
 final class RootComposeViewController: UIViewController {
     private let contentController: UIViewController
     private let disablesInteractiveContentPopGesture: Bool
-    private let onTabBarAvailable: ((UITabBar) -> Void)?
+    private let onTabBarControllerAvailable: ((UITabBarController) -> Void)?
 
     init(
         contentController: UIViewController,
         disablesInteractiveContentPopGesture: Bool,
-        onTabBarAvailable: ((UITabBar) -> Void)?
+        onTabBarControllerAvailable: ((UITabBarController) -> Void)?
     ) {
         self.contentController = contentController
         self.disablesInteractiveContentPopGesture = disablesInteractiveContentPopGesture
-        self.onTabBarAvailable = onTabBarAvailable
+        self.onTabBarControllerAvailable = onTabBarControllerAvailable
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -112,8 +112,8 @@ final class RootComposeViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureBackGestures(isVisible: true)
-        if let tabBar = tabBarController?.tabBar {
-            onTabBarAvailable?(tabBar)
+        if let tabBarController {
+            onTabBarControllerAvailable?(tabBarController)
         }
     }
 
@@ -473,8 +473,9 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
     var onLongPress: (() -> Void)?
     private(set) var isHandlingLongPress = false
     private(set) var suppressesProfileSelection = false
-    private weak var tabBar: UITabBar?
-    private var resetWorkItem: DispatchWorkItem?
+    private weak var tabBarController: UITabBarController?
+    private var selectedIndexBeforeLongPress: Int?
+    private let competingRecognizers = NSHashTable<UIGestureRecognizer>.weakObjects()
     private lazy var recognizer: UILongPressGestureRecognizer = {
         let recognizer = UILongPressGestureRecognizer(
             target: self,
@@ -486,11 +487,11 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
         return recognizer
     }()
 
-    func attach(to tabBar: UITabBar) {
-        guard self.tabBar !== tabBar else { return }
-        self.tabBar?.removeGestureRecognizer(recognizer)
-        tabBar.addGestureRecognizer(recognizer)
-        self.tabBar = tabBar
+    func attach(to tabBarController: UITabBarController) {
+        guard self.tabBarController !== tabBarController else { return }
+        self.tabBarController?.tabBar.removeGestureRecognizer(recognizer)
+        tabBarController.tabBar.addGestureRecognizer(recognizer)
+        self.tabBarController = tabBarController
     }
 
     func gestureRecognizer(
@@ -498,10 +499,11 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
         shouldReceive touch: UITouch
     ) -> Bool {
         guard gestureRecognizer === recognizer,
-              let tabBar,
+              let tabBar = tabBarController?.tabBar,
               let profileItem = tabBar.items?.last else {
             return false
         }
+        competingRecognizers.removeAllObjects()
         guard #available(iOS 17.0, *),
               let profileFrame = profileItem.frame(in: tabBar) else { return false }
         return profileFrame.contains(touch.location(in: tabBar))
@@ -511,24 +513,41 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
-        gestureRecognizer === recognizer || otherGestureRecognizer === recognizer
+        guard gestureRecognizer === recognizer || otherGestureRecognizer === recognizer else {
+            return false
+        }
+        competingRecognizers.add(
+            gestureRecognizer === recognizer ? otherGestureRecognizer : gestureRecognizer
+        )
+        return true
     }
 
     @objc private func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
         switch recognizer.state {
         case .began:
-            resetWorkItem?.cancel()
+            selectedIndexBeforeLongPress = tabBarController?.selectedIndex
             isHandlingLongPress = true
             suppressesProfileSelection = true
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             onLongPress?()
-        case .ended, .cancelled, .failed:
-            let workItem = DispatchWorkItem { [weak self] in
-                self?.isHandlingLongPress = false
-                self?.suppressesProfileSelection = false
+            competingRecognizers.allObjects.forEach { competingRecognizer in
+                competingRecognizer.isEnabled = false
+                competingRecognizer.isEnabled = true
             }
-            resetWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: workItem)
+            if let selectedIndexBeforeLongPress {
+                tabBarController?.selectedIndex = selectedIndexBeforeLongPress
+            }
+        case .ended, .cancelled, .failed:
+            let selectedIndex = selectedIndexBeforeLongPress
+            isHandlingLongPress = false
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if let selectedIndex {
+                    self.tabBarController?.selectedIndex = selectedIndex
+                }
+                self.selectedIndexBeforeLongPress = nil
+                self.suppressesProfileSelection = false
+            }
         default:
             break
         }
@@ -552,6 +571,8 @@ final class AppNavigationCoordinator: ObservableObject {
     @Published private(set) var isTabBarVisible = true
     @Published private(set) var isLiveTvTabVisible = false
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
+    @Published private(set) var localizedSwitchProfileTitle = ""
+    @Published private(set) var localizedAddProfileTitle = ""
     @Published var isProfileSwitcherPresented = false
 
     let homeCoordinator = TabNavigationCoordinator()
@@ -637,7 +658,14 @@ final class AppNavigationCoordinator: ObservableObject {
         localizedTabTitles[tab] ?? tab.fallbackTitle
     }
 
-    func updateTabTitles(home: String, search: String, library: String, profile: String) {
+    func updateTabTitles(
+        home: String,
+        search: String,
+        library: String,
+        profile: String,
+        switchProfile: String,
+        addProfile: String
+    ) {
         localizedTabTitles = [
             .home: home,
             .search: search,
@@ -645,6 +673,8 @@ final class AppNavigationCoordinator: ObservableObject {
             .liveTv: NuvioAppTab.liveTv.fallbackTitle,
             .settings: profile,
         ]
+        localizedSwitchProfileTitle = switchProfile
+        localizedAddProfileTitle = addProfile
     }
 
     func updateAppReady(_ ready: Bool) {
@@ -729,20 +759,22 @@ struct NativeNavComposeView: UIViewControllerRepresentable {
             onAppReady: { ready in
                 appCoordinator.updateAppReady(ready.boolValue)
             },
-            onTabTitles: { home, search, library, profile in
+            onTabTitles: { home, search, library, profile, switchProfile, addProfile in
                 appCoordinator.updateTabTitles(
                     home: home,
                     search: search,
                     library: library,
-                    profile: profile
+                    profile: profile,
+                    switchProfile: switchProfile,
+                    addProfile: addProfile
                 )
             },
             nativeProfileSwitcherController: appCoordinator.profileSwitcherController
         )
         return NuvioComposeHost.wrap(
             controller,
-            onTabBarAvailable: { tabBar in
-                appCoordinator.profileTabInteraction.attach(to: tabBar)
+            onTabBarControllerAvailable: { tabBarController in
+                appCoordinator.profileTabInteraction.attach(to: tabBarController)
             }
         )
     }
@@ -1068,7 +1100,7 @@ private struct NativeProfileAvatarView: View {
         }
         .clipShape(Circle())
         .overlay {
-            Circle().stroke(
+            Circle().strokeBorder(
                 Color(uiColor: profile.avatarColor).opacity(profile.active ? 1 : 0.45),
                 lineWidth: profile.active ? 2.5 : 1.5
             )
@@ -1086,21 +1118,27 @@ private struct NativeProfileAvatarView: View {
 private struct NativeProfileSwitcherView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: NativeProfileSwitcherViewModel
+    let title: String
+    let addProfileTitle: String
     let onManageProfiles: () -> Void
 
     init(
         controller: NativeProfileSwitcherController,
+        title: String,
+        addProfileTitle: String,
         onManageProfiles: @escaping () -> Void
     ) {
         _model = StateObject(
             wrappedValue: NativeProfileSwitcherViewModel(controller: controller)
         )
+        self.title = title
+        self.addProfileTitle = addProfileTitle
         self.onManageProfiles = onManageProfiles
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Switch Profile")
+            Text(title)
                 .font(.headline)
 
             if model.isLoaded {
@@ -1142,8 +1180,9 @@ private struct NativeProfileSwitcherView: View {
                                         .font(.system(size: 19, weight: .semibold))
                                         .frame(width: 52, height: 52)
                                         .background(.secondary.opacity(0.12), in: Circle())
-                                    Text("Add")
+                                    Text(addProfileTitle)
                                         .font(.caption)
+                                        .multilineTextAlignment(.center)
                                         .frame(width: 64)
                                 }
                             }
@@ -1223,10 +1262,7 @@ struct NativeNavContentView: View {
             get: { appCoordinator.selectedTab },
             set: { newTab in
                 if newTab == .settings &&
-                    (
-                        appCoordinator.profileTabInteraction.suppressesProfileSelection ||
-                            appCoordinator.isProfileSwitcherPresented
-                    ) {
+                    appCoordinator.profileTabInteraction.suppressesProfileSelection {
                     return
                 }
                 if newTab == appCoordinator.selectedTab {
@@ -1308,6 +1344,8 @@ struct NativeNavContentView: View {
                     ) {
                         NativeProfileSwitcherView(
                             controller: appCoordinator.profileSwitcherController,
+                            title: appCoordinator.localizedSwitchProfileTitle,
+                            addProfileTitle: appCoordinator.localizedAddProfileTitle,
                             onManageProfiles: appCoordinator.openProfileManagement
                         )
                     }

@@ -65,4 +65,24 @@ class MetaDetailsParserTest {
         assertFalse(result.videos[0].available)
         assertTrue(result.videos[1].available)
     }
+
+    @Test
+    fun `parse reads defaultVideoId from behavior hints`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "behaviorHints": {
+                  "defaultVideoId": "show:1:2"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("show:1:2", result.defaultVideoId)
+    }
 }

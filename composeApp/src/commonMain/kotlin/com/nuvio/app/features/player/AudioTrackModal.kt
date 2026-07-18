@@ -1,43 +1,35 @@
 package com.nuvio.app.features.player
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.nuvio
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_audio_tracks
 import nuvio.composeapp.generated.resources.compose_player_no_audio_tracks_available
@@ -52,76 +44,51 @@ fun AudioTrackModal(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-
-    AnimatedVisibility(
+    PlayerOverlayScaffold(
         visible = visible,
-        enter = fadeIn(tween(200)),
-        exit = fadeOut(tween(200)),
+        onDismiss = onDismiss,
+        modifier = modifier,
+        contentPadding = PaddingValues(start = 44.dp, end = 44.dp, top = 28.dp, bottom = 64.dp),
     ) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                    onClick = onDismiss,
-                )
-                .background(colorScheme.scrim.copy(alpha = 0.52f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = slideInVertically(tween(300)) { it / 3 } + fadeIn(tween(300)),
-                exit = slideOutVertically(tween(250)) { it / 3 } + fadeOut(tween(250)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = 420.dp)
-                        .fillMaxWidth(0.9f)
-                        .heightIn(max = 600.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(colorScheme.surface)
-                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(24.dp))
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() },
-                            onClick = {},
-                        ),
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.compose_player_audio_tracks),
-                                color = colorScheme.onSurface,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val railWidth = minOf(maxWidth, 444.dp)
+            val railMaxHeight = (maxHeight - 64.dp).coerceAtLeast(120.dp).coerceAtMost(620.dp)
 
-                        if (audioTracks.isEmpty()) {
-                            AudioEmptyState()
-                        } else {
-                            Column(
-                                modifier = Modifier
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(horizontal = 20.dp)
-                                    .padding(bottom = 20.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                audioTracks.forEachIndexed { idx, track ->
-                                    AudioTrackRow(
-                                        track = track,
-                                        isSelected = track.index == selectedIndex,
-                                        onClick = { onTrackSelected(track.index) },
-                                    )
-                                }
-                            }
+            Column(
+                modifier = Modifier
+                    .width(railWidth)
+                    .fillMaxHeight()
+                    .align(Alignment.BottomStart),
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Text(
+                    text = stringResource(Res.string.compose_player_audio_tracks),
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+
+                if (audioTracks.isEmpty()) {
+                    Text(
+                        text = stringResource(Res.string.compose_player_no_audio_tracks_available),
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = railMaxHeight),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                    ) {
+                        items(audioTracks, key = { "${it.index}:${it.id}" }) { track ->
+                            AudioTrackRow(
+                                track = track,
+                                isSelected = track.index == selectedIndex,
+                                onClick = { onTrackSelected(track.index) },
+                            )
                         }
                     }
                 }
@@ -136,61 +103,54 @@ private fun AudioTrackRow(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val bgColor = if (isSelected) colorScheme.primaryContainer else colorScheme.surfaceVariant.copy(alpha = 0.6f)
-    val textColor = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface
-    val weight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+    val tokens = MaterialTheme.nuvio
+    val primaryColor = if (isSelected) tokens.colors.onAccent else Color.White
+    val secondaryColor = if (isSelected) {
+        tokens.colors.onAccent.copy(alpha = 0.82f)
+    } else {
+        Color.White.copy(alpha = 0.72f)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
+            .background(if (isSelected) tokens.colors.accent else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = localizedTrackDisplayName(track.label, track.language, track.index),
-            color = textColor,
-            fontSize = 15.sp,
-            fontWeight = weight,
-        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = localizedTrackDisplayName(track.label, track.language, track.index),
+                color = primaryColor,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            track.language?.takeIf { it.isNotBlank() && it != "und" }?.let { language ->
+                Text(
+                    text = languageLabelForCode(language),
+                    color = secondaryColor,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         if (isSelected) {
             Icon(
                 imageVector = Icons.Rounded.Check,
                 contentDescription = null,
-                tint = colorScheme.primary,
-                modifier = Modifier.size(18.dp),
+                tint = tokens.colors.onAccent,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(20.dp),
             )
         }
-    }
-}
-
-@Composable
-private fun AudioEmptyState() {
-    val colorScheme = MaterialTheme.colorScheme
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.VolumeOff,
-            contentDescription = null,
-            tint = colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .size(32.dp)
-                .then(Modifier),
-        )
-        Text(
-            text = stringResource(Res.string.compose_player_no_audio_tracks_available),
-            color = colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp),
-        )
     }
 }

@@ -2,6 +2,7 @@ package com.nuvio.app.features.watchprogress
 
 import com.nuvio.app.features.cloud.TorboxCloudLibraryPosterUrl
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.trakt.parseTraktIsoDateTimeToEpochMs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -481,7 +482,7 @@ class WatchProgressRulesTest {
         assertEquals(1779634800000L, t1)
 
         val t2 = parseReleaseDateToEpochMs("2026-05-24")
-        assertEquals(CurrentDateProvider.localStartOfDayEpochMs("2026-05-24"), t2)
+        assertEquals(parseTraktIsoDateTimeToEpochMs("2026-05-24T00:00:00Z"), t2)
 
         assertNull(parseReleaseDateToEpochMs(null))
         assertNull(parseReleaseDateToEpochMs("   "))

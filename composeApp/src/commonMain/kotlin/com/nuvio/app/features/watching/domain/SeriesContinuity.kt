@@ -123,6 +123,7 @@ fun decideSeriesPrimaryAction(
     todayIsoDate: String,
     preferFurthestEpisode: Boolean = true,
     showUnairedNextUp: Boolean = false,
+    defaultVideoId: String? = null,
 ): WatchingSeriesPrimaryAction? {
     val resumeRecord = resumeProgressForSeries(
         content = content,
@@ -158,7 +159,9 @@ fun decideSeriesPrimaryAction(
                 available = episode.available,
             )
         }
-        released.firstOrNull { normalizeSeasonNumber(it.seasonNumber) > 0 } ?: released.firstOrNull()
+        defaultVideoId?.let { videoId -> released.firstOrNull { it.videoId == videoId } }
+            ?: released.firstOrNull { normalizeSeasonNumber(it.seasonNumber) > 0 }
+            ?: released.firstOrNull()
     }
 
     return nextEpisode?.let { episode ->

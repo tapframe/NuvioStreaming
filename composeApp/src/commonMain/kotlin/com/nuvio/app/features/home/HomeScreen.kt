@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
@@ -23,7 +24,9 @@ import com.nuvio.app.core.ui.NativeTabBarScrollEffect
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.rememberHeroStretchState
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.cloud.CloudLibraryContentType
@@ -774,6 +777,9 @@ fun HomeScreen(
     val enabledHomeItems = remember(homeSettingsUiState.items) {
         homeSettingsUiState.items.filter { it.enabled }
     }
+    val keyedEnabledHomeItems = remember(enabledHomeItems) {
+        enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)
+    }
     val visibleSeriesPosterTargets = remember(enabledHomeItems, sectionsMap) {
         enabledHomeItems
             .filterNot { it.isCollection }
@@ -835,8 +841,15 @@ fun HomeScreen(
             }
         }
 
+        val heroStretchState = rememberHeroStretchState(homeListState)
+        val heroStretchModifier = if (showHeroSlot) {
+            Modifier.nestedScroll(heroStretchState.nestedScrollConnection)
+        } else {
+            Modifier
+        }
+
         NuvioScreen(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().then(heroStretchModifier),
             horizontalPadding = 0.dp,
             topPadding = if (showHeroSlot) 0.dp else null,
             listState = homeListState,
@@ -857,6 +870,7 @@ fun HomeScreen(
                             mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
                             artworkSource = homeSettingsUiState.heroArtworkSource,
                             listState = homeListState,
+                            stretchPx = { heroStretchState.stretchPx },
                             onItemClick = onPosterClick,
                         )
 
@@ -963,11 +977,12 @@ fun HomeScreen(
                         }
                     }
 
-                    enabledHomeItems.forEach { settingsItem ->
+                    keyedEnabledHomeItems.forEach { keyedSettingsItem ->
+                        val settingsItem = keyedSettingsItem.value
                         if (settingsItem.isCollection) {
                             val collection = collectionsMap[settingsItem.key]
                             if (collection != null) {
-                                item(key = settingsItem.key) {
+                                item(key = keyedSettingsItem.lazyKey) {
                                     HomeCollectionRowSection(
                                         collection = collection,
                                         modifier = Modifier.padding(bottom = 12.dp),
@@ -980,7 +995,7 @@ fun HomeScreen(
                         } else {
                             val section = sectionsMap[settingsItem.key]
                             if (section != null && section.items.isNotEmpty()) {
-                                item(key = settingsItem.key) {
+                                item(key = keyedSettingsItem.lazyKey) {
                                     HomeCatalogRowSection(
                                         section = section,
                                         entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
