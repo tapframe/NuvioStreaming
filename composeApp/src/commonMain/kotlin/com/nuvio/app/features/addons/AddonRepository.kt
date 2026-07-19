@@ -65,6 +65,7 @@ object AddonRepository {
 
         val storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
         val enabledByUrl = loadLocalEnabledStates()
+        val namesByUrl = loadLocalNameOverrides()
         log.d { "initialize() — local addon count: ${storedUrls.size}" }
         if (storedUrls.isEmpty()) return
 
@@ -73,6 +74,7 @@ object AddonRepository {
             addons = storedUrls.map { manifestUrl ->
                 existingByUrl[manifestUrl].toPendingAddon(
                     manifestUrl = manifestUrl,
+                    userSetName = namesByUrl[manifestUrl],
                     enabled = enabledByUrl[manifestUrl],
                 )
             },
@@ -137,12 +139,14 @@ object AddonRepository {
                     initialize()
                     pulledFromServer = true
                     val enabledByUrl = loadLocalEnabledStates()
+                    val namesByUrl = loadLocalNameOverrides()
                     val addons = localUrls.mapIndexed { index, addonUrl ->
                         val manifestUrl = ensureManifestSuffix(addonUrl)
                         AddonPushItem(
                             url = manifestUrl,
-                            name = _uiState.value.addons
-                                .find { it.manifestUrl == manifestUrl }?.manifest?.name ?: "",
+                            name = namesByUrl[manifestUrl]
+                                ?: _uiState.value.addons.find { it.manifestUrl == manifestUrl }?.manifest?.name
+                                ?: "",
                             enabled = enabledByUrl[manifestUrl]
                                 ?: _uiState.value.addons.find { it.manifestUrl == manifestUrl }?.enabled
                                 ?: true,
@@ -165,11 +169,13 @@ object AddonRepository {
                 if (localUrls.isNotEmpty()) {
                     log.w { "pullFromServer() — remote empty while local has ${localUrls.size} addons; preserving local addons" }
                     val enabledByUrl = loadLocalEnabledStates()
+                    val namesByUrl = loadLocalNameOverrides()
                     val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
                     _uiState.value = AddonsUiState(
                         addons = localUrls.map { url ->
                             existingByUrl[url].toPendingAddon(
                                 manifestUrl = url,
+                                userSetName = namesByUrl[url],
                                 enabled = enabledByUrl[url],
                             )
                         },
@@ -435,10 +441,18 @@ object AddonRepository {
             currentProfileId,
             addons.associate { it.manifestUrl to it.enabled },
         )
+        AddonStorage.saveAddonNameOverridesPayload(
+            currentProfileId,
+            addons.encodeNameOverrides(),
+        )
     }
 
     private fun loadLocalEnabledStates(): Map<String, Boolean> =
         AddonStorage.loadAddonEnabledStates(currentProfileId)
+            .mapKeys { (url, _) -> ensureManifestSuffix(url) }
+
+    private fun loadLocalNameOverrides(): Map<String, String> =
+        decodeAddonNameOverrides(AddonStorage.loadAddonNameOverridesPayload(currentProfileId))
             .mapKeys { (url, _) -> ensureManifestSuffix(url) }
 
     private fun cancelActiveRefreshes() {
@@ -457,7 +471,7 @@ object AddonRepository {
     }
 }
 
-private fun ManagedAddon?.toPendingAddon(
+internal fun ManagedAddon?.toPendingAddon(
     manifestUrl: String,
     userSetName: String? = null,
     enabled: Boolean? = null,

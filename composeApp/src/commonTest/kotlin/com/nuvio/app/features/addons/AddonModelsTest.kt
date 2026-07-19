@@ -36,6 +36,37 @@ class AddonModelsTest {
         assertEquals(listOf(enabled), listOf(enabled, disabled).enabledAddons())
         assertTrue(enabled.isActive)
     }
+
+    @Test
+    fun `addon name overrides survive local storage round trip`() {
+        val manifestUrl = "https://example.test/configured/user\tvalue/manifest.json"
+        val customName = "My renamed addon\nwith a second line"
+        val payload = listOf(
+            ManagedAddon(
+                manifestUrl = manifestUrl,
+                userSetName = customName,
+            ),
+        ).encodeNameOverrides()
+
+        assertEquals(mapOf(manifestUrl to customName), decodeAddonNameOverrides(payload))
+    }
+
+    @Test
+    fun `pending addon restores its locally stored server name`() {
+        val addon = null.toPendingAddon(
+            manifestUrl = "https://example.test/manifest.json",
+            userSetName = "Renamed on the website",
+            enabled = true,
+        )
+
+        assertEquals("Renamed on the website", addon.userSetName)
+        assertEquals("Renamed on the website", addon.displayTitle)
+    }
+
+    @Test
+    fun `malformed addon name cache is ignored`() {
+        assertTrue(decodeAddonNameOverrides("not-json").isEmpty())
+    }
 }
 
 private fun manifest(id: String = "addon") = AddonManifest(

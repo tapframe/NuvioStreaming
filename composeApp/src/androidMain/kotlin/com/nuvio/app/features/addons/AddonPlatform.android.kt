@@ -26,6 +26,7 @@ actual object AddonStorage {
     private const val preferencesName = "nuvio_addons"
     private const val addonUrlsKey = "installed_manifest_urls"
     private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
+    private const val addonNameOverridesKey = "installed_manifest_name_overrides"
 
     private var preferences: SharedPreferences? = null
 
@@ -64,6 +65,18 @@ actual object AddonStorage {
         preferences
             ?.edit()
             ?.putString("${addonEnabledStatesKey}_$profileId", payload)
+            ?.apply()
+    }
+
+    actual fun loadAddonNameOverridesPayload(profileId: Int): String =
+        preferences
+            ?.getString("${addonNameOverridesKey}_$profileId", null)
+            .orEmpty()
+
+    actual fun saveAddonNameOverridesPayload(profileId: Int, payload: String) {
+        preferences
+            ?.edit()
+            ?.putString("${addonNameOverridesKey}_$profileId", payload)
             ?.apply()
     }
 }
