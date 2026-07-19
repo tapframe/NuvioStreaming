@@ -28,6 +28,7 @@ data class WatchingProgressRecord(
     val isCompleted: Boolean = false,
     val episodeTitle: String? = null,
     val episodeThumbnail: String? = null,
+    val identityKey: String = videoId,
 )
 
 data class WatchingReleasedEpisode(

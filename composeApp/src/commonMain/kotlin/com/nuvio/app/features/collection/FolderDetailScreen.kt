@@ -63,6 +63,7 @@ import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -86,6 +87,7 @@ fun FolderDetailScreen(
         WatchedRepository.uiState
     }.collectAsState()
     val folder = uiState.folder
+    val useNativeNavigation = LocalUseNativeNavigation.current
     val coverImageUrl = folder?.coverImageUrl?.takeIf { it.isNotBlank() }
     val density = LocalDensity.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -141,13 +143,15 @@ fun FolderDetailScreen(
             )
         }
 
-        NuvioScreenHeader(
-            title = folder?.title ?: uiState.collectionTitle,
-            modifier = Modifier.padding(horizontal = 16.dp),
-            includeStatusBarPadding = coverImageUrl == null,
-            topPadding = if (coverImageUrl != null) statusBarTop * heroCollapseFraction else null,
-            onBack = onBack,
-        )
+        if (!useNativeNavigation) {
+            NuvioScreenHeader(
+                title = folder?.title ?: uiState.collectionTitle,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                includeStatusBarPadding = coverImageUrl == null,
+                topPadding = if (coverImageUrl != null) statusBarTop * heroCollapseFraction else null,
+                onBack = onBack,
+            )
+        }
 
         if (folder == null && !uiState.isLoading) {
             Box(

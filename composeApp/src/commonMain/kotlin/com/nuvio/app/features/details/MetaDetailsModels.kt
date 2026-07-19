@@ -30,6 +30,7 @@ data class MetaDetails(
     val language: String? = null,
     val website: String? = null,
     val hasScheduledVideos: Boolean = false,
+    val defaultVideoId: String? = null,
     val moreLikeThis: List<MetaPreview> = emptyList(),
     val moreLikeThisSource: MoreLikeThisSource? = null,
     val collectionName: String? = null,

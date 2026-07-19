@@ -37,22 +37,35 @@ fun NuvioModalBottomSheet(
     contentColor: Color = MaterialTheme.nuvio.colors.textPrimary,
     shape: Shape = RoundedCornerShape(topStart = NuvioTokens.Space.s28, topEnd = NuvioTokens.Space.s28),
     showDragHandle: Boolean = true,
+    fullHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-        modifier = modifier,
-        containerColor = containerColor,
-        contentColor = contentColor,
-        shape = shape,
-        dragHandle = if (showDragHandle) {
-            { NuvioBottomSheetDragHandle() }
-        } else {
-            null
-        },
-        content = content,
-    )
+    if (usesNativeNuvioBottomSheet) {
+        NuvioNativeModalBottomSheet(
+            onDismissRequest = onDismissRequest,
+            modifier = modifier,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            showDragHandle = showDragHandle,
+            fullHeight = fullHeight,
+            content = content,
+        )
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismissRequest,
+            sheetState = sheetState,
+            modifier = modifier,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            shape = shape,
+            dragHandle = if (showDragHandle) {
+                { NuvioBottomSheetDragHandle() }
+            } else {
+                null
+            },
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -107,7 +120,9 @@ suspend fun dismissNuvioBottomSheet(
     sheetState: SheetState,
     onDismiss: () -> Unit,
 ) {
-    if (sheetState.isVisible) {
+    if (usesNativeNuvioBottomSheet) {
+        dismissNativeNuvioBottomSheet()
+    } else if (sheetState.isVisible) {
         sheetState.hide()
     }
     onDismiss()

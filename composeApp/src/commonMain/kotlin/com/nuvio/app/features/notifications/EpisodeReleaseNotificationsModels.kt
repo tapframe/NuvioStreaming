@@ -1,5 +1,6 @@
 package com.nuvio.app.features.notifications
 
+import com.nuvio.app.core.time.parseEpisodeReleaseLocalDate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import nuvio.composeapp.generated.resources.Res
@@ -62,11 +63,7 @@ internal fun normalizeSeriesType(type: String): String = when (type.trim().lower
 internal fun isSeriesLibraryType(type: String): Boolean = normalizeSeriesType(type) == "series"
 
 internal fun releaseDateIso(rawValue: String?): String? {
-    val value = rawValue
-        ?.substringBefore('T')
-        ?.trim()
-        .orEmpty()
-    return value.takeIf { it.length == 10 }
+    return parseEpisodeReleaseLocalDate(rawValue)
 }
 
 internal fun buildEpisodeReleaseNotificationId(

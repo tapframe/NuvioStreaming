@@ -239,20 +239,18 @@ object LibraryRepository {
 
         nuvioPullMutex.withLock {
             val serializedToken = activeOperationToken(profileId) ?: return@withLock
-            if (localState.markPullStarted(serializedToken) == null) return@withLock
+            val pullSnapshot = localState.markPullStarted(serializedToken) ?: return@withLock
 
-            var completedSuccessfully = false
             var appliedItems = false
             try {
                 val serverItems = pullAllLibrarySyncItems(profileId).map { it.toLibraryItem() }
-                val applyResult = localState.applyServerItems(serializedToken, serverItems)
+                val applyResult = localState.applyServerItems(pullSnapshot, serverItems)
                     ?: return@withLock
-                completedSuccessfully = true
                 appliedItems = true
                 if (applyResult.preservedLocalItems) {
                     log.w {
-                        "Remote library is empty while local has ${applyResult.snapshot.items.size} entries; " +
-                            "preserving local library"
+                        "Preserving ${applyResult.snapshot.items.size} local library items because the remote " +
+                            "snapshot is empty or local changes are pending"
                     }
                 } else {
                     persist(applyResult.snapshot)
@@ -261,11 +259,6 @@ object LibraryRepository {
                 throw error
             } catch (error: Throwable) {
                 log.e(error) { "Failed to pull library from server" }
-            } finally {
-                localState.finishPull(
-                    token = serializedToken,
-                    completedSuccessfully = completedSuccessfully,
-                )
             }
 
             if (appliedItems) publish()
@@ -466,23 +459,14 @@ object LibraryRepository {
             log.w { "Skipping library push: anonymous auth user=${authState.userId} profile=$profileId" }
             return
         }
-        if (snapshot.isPullingNuvioSyncFromServer) {
-            log.i { "Skipping library push: server pull is active profile=$profileId localItems=$itemCount" }
-            return
-        }
-        if (!snapshot.hasCompletedInitialNuvioSyncPull) {
-            log.w { "Skipping library push: initial Nuvio sync pull not completed profile=$profileId localItems=$itemCount" }
-            return
-        }
-
         val pushJob = syncScope.launch(start = CoroutineStart.LAZY) {
             delay(500)
-            if (!localState.isCurrent(snapshot)) {
+            if (!localState.isContentCurrent(snapshot)) {
                 val current = localState.snapshot()
                 log.w {
                     "Skipping stale debounced library push: scheduled=${snapshot.token} " +
-                        "current=${current.token} scheduledRevision=${snapshot.revision} " +
-                        "currentRevision=${current.revision}"
+                        "current=${current.token} scheduledContentRevision=${snapshot.contentRevision} " +
+                        "currentContentRevision=${current.contentRevision}"
                 }
                 return@launch
             }
@@ -502,6 +486,7 @@ object LibraryRepository {
                 true
             }.onSuccess { pushed ->
                 if (pushed) {
+                    localState.markPushCompleted(snapshot)
                     log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
                 }
             }.onFailure { e ->

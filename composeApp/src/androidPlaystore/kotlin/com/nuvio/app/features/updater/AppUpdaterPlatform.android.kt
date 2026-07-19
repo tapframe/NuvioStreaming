@@ -7,6 +7,7 @@ import org.jetbrains.compose.resources.getString
 
 actual object AppUpdaterPlatform {
     actual val isSupported: Boolean = false
+    actual val isDebugBuild: Boolean = false
 
     actual fun getSupportedAbis(): List<String> = emptyList()
 

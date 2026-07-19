@@ -14,6 +14,130 @@ class SeriesContinuityTest {
     )
 
     @Test
+    fun continueWatchingProgressEntries_drops_older_resume_when_latest_series_progress_is_completed() {
+        val result = continueWatchingProgressEntries(
+            progressRecords = listOf(
+                WatchingProgressRecord(
+                    content = show,
+                    videoId = "show:1:4",
+                    seasonNumber = 1,
+                    episodeNumber = 4,
+                    lastUpdatedEpochMs = 100L,
+                    lastPositionMs = 10_000L,
+                ),
+                WatchingProgressRecord(
+                    content = show,
+                    videoId = "show:1:5",
+                    seasonNumber = 1,
+                    episodeNumber = 5,
+                    lastUpdatedEpochMs = 200L,
+                    isCompleted = true,
+                ),
+            ),
+        )
+
+        assertEquals(emptyList(), result)
+    }
+
+    @Test
+    fun continueWatchingProgressEntries_keeps_newer_resume_and_independent_movies() {
+        val movieA = WatchingContentRef(type = "movie", id = "movie-a")
+        val movieB = WatchingContentRef(type = "movie", id = "movie-b")
+        val result = continueWatchingProgressEntries(
+            progressRecords = listOf(
+                WatchingProgressRecord(
+                    content = show,
+                    videoId = "show:1:4",
+                    seasonNumber = 1,
+                    episodeNumber = 4,
+                    lastUpdatedEpochMs = 100L,
+                    isCompleted = true,
+                ),
+                WatchingProgressRecord(
+                    content = show,
+                    videoId = "show:1:5",
+                    seasonNumber = 1,
+                    episodeNumber = 5,
+                    lastUpdatedEpochMs = 400L,
+                    lastPositionMs = 10_000L,
+                ),
+                WatchingProgressRecord(
+                    content = movieA,
+                    videoId = "movie-a",
+                    lastUpdatedEpochMs = 300L,
+                    lastPositionMs = 10_000L,
+                ),
+                WatchingProgressRecord(
+                    content = movieB,
+                    videoId = "movie-b",
+                    lastUpdatedEpochMs = 200L,
+                    lastPositionMs = 10_000L,
+                ),
+            ),
+        )
+
+        assertEquals(listOf("show:1:5", "movie-a", "movie-b"), result.map { it.videoId })
+    }
+
+    @Test
+    fun resumeProgressForSeries_coalesces_series_type_variants_independent_of_input_order() {
+        val staleResume = WatchingProgressRecord(
+            content = WatchingContentRef(type = "SeRiEs", id = "show"),
+            videoId = "show:1:4",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            lastUpdatedEpochMs = 100L,
+            lastPositionMs = 10_000L,
+        )
+        val completed = WatchingProgressRecord(
+            content = WatchingContentRef(type = "tV", id = "show"),
+            videoId = "show:1:5",
+            seasonNumber = 1,
+            episodeNumber = 5,
+            lastUpdatedEpochMs = 200L,
+            isCompleted = true,
+        )
+        val inputOrders = listOf(
+            listOf(staleResume, completed),
+            listOf(completed, staleResume),
+        )
+
+        listOf("series", "TV", "Show", "TvShow").forEach { requestedType ->
+            inputOrders.forEach { progressRecords ->
+                assertNull(
+                    resumeProgressForSeries(
+                        content = WatchingContentRef(type = requestedType, id = "show"),
+                        progressRecords = progressRecords,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun resumeProgressForSeries_keeps_non_series_content_types_exact() {
+        val movieResume = WatchingProgressRecord(
+            content = WatchingContentRef(type = "movie", id = "shared"),
+            videoId = "shared",
+            lastUpdatedEpochMs = 100L,
+            lastPositionMs = 10_000L,
+        )
+        val differentlyCasedMovie = movieResume.copy(
+            content = WatchingContentRef(type = "Movie", id = "shared"),
+            lastUpdatedEpochMs = 200L,
+            isCompleted = true,
+        )
+
+        assertEquals(
+            movieResume,
+            resumeProgressForSeries(
+                content = WatchingContentRef(type = "movie", id = "shared"),
+                progressRecords = listOf(differentlyCasedMovie, movieResume),
+            ),
+        )
+    }
+
+    @Test
     fun decideSeriesPrimaryAction_prefers_up_next_when_completed_is_newer_than_resume() {
         val action = decideSeriesPrimaryAction(
             content = show,

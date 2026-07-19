@@ -17,6 +17,8 @@ internal expect object TmdbSettingsStorage {
     fun saveUseBasicInfo(enabled: Boolean)
     fun loadUseDetails(): Boolean?
     fun saveUseDetails(enabled: Boolean)
+    fun loadUseReleaseDates(): Boolean?
+    fun saveUseReleaseDates(enabled: Boolean)
     fun loadUseCredits(): Boolean?
     fun saveUseCredits(enabled: Boolean)
     fun loadUseProductions(): Boolean?

@@ -66,7 +66,8 @@ object WatchingActions {
         if (isCurrentlyWatched) {
             WatchedRepository.unmarkWatched(seriesItems)
             WatchProgressRepository.clearProgress(
-                releasedMainEpisodes.map(meta::episodePlaybackId),
+                videoIds = releasedMainEpisodes.map(meta::episodePlaybackId),
+                parentMetaId = meta.id,
             )
             WatchedRepository.updateFullyWatchedSeries(
                 id = meta.id,
@@ -81,7 +82,8 @@ object WatchingActions {
                 isFullyWatched = true,
             )
             WatchProgressRepository.clearProgress(
-                releasedMainEpisodes.map(meta::episodePlaybackId),
+                videoIds = releasedMainEpisodes.map(meta::episodePlaybackId),
+                parentMetaId = meta.id,
             )
         }
     }
@@ -94,10 +96,16 @@ object WatchingActions {
         val watchedItem = meta.toEpisodeWatchedItem(episode)
         if (isCurrentlyWatched) {
             WatchedRepository.unmarkWatched(watchedItem)
-            WatchProgressRepository.clearProgress(meta.episodePlaybackId(episode))
+            WatchProgressRepository.clearProgress(
+                videoId = meta.episodePlaybackId(episode),
+                parentMetaId = meta.id,
+            )
         } else {
             WatchedRepository.markWatched(watchedItem)
-            WatchProgressRepository.clearProgress(meta.episodePlaybackId(episode))
+            WatchProgressRepository.clearProgress(
+                videoId = meta.episodePlaybackId(episode),
+                parentMetaId = meta.id,
+            )
         }
         reconcileSeriesWatchedState(meta)
     }
@@ -136,7 +144,12 @@ object WatchingActions {
             meta = meta,
             todayIsoDate = todayIsoDate,
             isEpisodeCompleted = { episode ->
-                WatchProgressRepository.progressForVideo(meta.episodePlaybackId(episode))?.isCompleted == true
+                WatchProgressRepository.progressForVideo(
+                    videoId = meta.episodePlaybackId(episode),
+                    parentMetaId = meta.id,
+                    seasonNumber = episode.season,
+                    episodeNumber = episode.episode,
+                )?.isCompleted == true
             },
         )
     }
@@ -177,10 +190,16 @@ object WatchingActions {
         val watchedItems = episodes.map(meta::toEpisodeWatchedItem)
         if (areCurrentlyWatched) {
             WatchedRepository.unmarkWatched(watchedItems)
-            WatchProgressRepository.clearProgress(episodes.map(meta::episodePlaybackId))
+            WatchProgressRepository.clearProgress(
+                videoIds = episodes.map(meta::episodePlaybackId),
+                parentMetaId = meta.id,
+            )
         } else {
             WatchedRepository.markWatched(watchedItems)
-            WatchProgressRepository.clearProgress(episodes.map(meta::episodePlaybackId))
+            WatchProgressRepository.clearProgress(
+                videoIds = episodes.map(meta::episodePlaybackId),
+                parentMetaId = meta.id,
+            )
         }
         reconcileSeriesWatchedState(meta)
     }

@@ -129,6 +129,7 @@ fun NuvioPosterZoomActionOverlay(
     title: String,
     subtitle: String?,
     isWatched: Boolean = false,
+    depthSurface: NuvioCardDepthSurface = NuvioCardDepthSurface.Posters,
     anchor: PosterZoomAnchor?,
     actions: List<PosterZoomOverlayAction>,
     hazeState: HazeState,
@@ -136,6 +137,7 @@ fun NuvioPosterZoomActionOverlay(
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
+    val previewShape = RoundedCornerShape(PosterZoomFinalCornerRadius)
     val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
@@ -385,7 +387,11 @@ fun NuvioPosterZoomActionOverlay(
                             shape = RoundedCornerShape(posterCornerRadiusPx(anchor, clamped, scale))
                             clip = true
                         }
-                        .background(tokens.colors.surfaceCard),
+                        .background(tokens.colors.surfaceCard)
+                        .nuvioCardDepth(
+                            shape = previewShape,
+                            surface = depthSurface,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (imageUrl != null) {

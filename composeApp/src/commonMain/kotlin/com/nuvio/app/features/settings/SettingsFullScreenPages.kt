@@ -79,6 +79,7 @@ fun HomescreenSettingsScreen(
         homescreenSettingsContent(
             isTablet = false,
             heroEnabled = homescreenSettingsUiState.heroEnabled,
+            showCatalogType = homescreenSettingsUiState.showCatalogType,
             hideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
             hideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
             items = homescreenSettingsUiState.items,

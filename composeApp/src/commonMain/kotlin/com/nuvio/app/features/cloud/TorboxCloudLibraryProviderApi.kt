@@ -62,17 +62,35 @@ internal class TorboxCloudLibraryProviderApi : CloudLibraryProviderApi {
 
     private fun com.nuvio.app.features.debrid.DebridApiResponse<com.nuvio.app.features.debrid.TorboxEnvelopeDto<List<TorboxCloudItemDto>>>.itemsOrThrow(
         type: CloudLibraryItemType,
-    ): List<CloudLibraryItem> {
-        if (!isSuccessful || body?.success == false) {
-            throw IllegalStateException(body?.detail ?: body?.error ?: rawBody.takeIf { it.isNotBlank() })
-        }
-        return body?.data.orEmpty().mapNotNull { dto ->
-            dto.toCloudLibraryItem(
-                providerId = provider.id,
-                providerName = provider.displayName,
-                type = type,
-            )
-        }
+    ): List<CloudLibraryItem> =
+        toCloudLibraryItemsOrThrow(
+            providerId = provider.id,
+            providerName = provider.displayName,
+            type = type,
+        )
+}
+
+internal fun com.nuvio.app.features.debrid.DebridApiResponse<com.nuvio.app.features.debrid.TorboxEnvelopeDto<List<TorboxCloudItemDto>>>.toCloudLibraryItemsOrThrow(
+    providerId: String,
+    providerName: String,
+    type: CloudLibraryItemType,
+): List<CloudLibraryItem> {
+    if (!isSuccessful || body?.success == false) {
+        throw IllegalStateException(
+            body?.detail
+                ?: body?.error
+                ?: rawBody.takeIf { it.isNotBlank() }
+                ?: "Torbox request failed (HTTP $status).",
+        )
+    }
+    val envelope = body
+        ?: throw IllegalStateException("Unexpected response from Torbox (HTTP $status).")
+    return envelope.data.orEmpty().mapNotNull { dto ->
+        dto.toCloudLibraryItem(
+            providerId = providerId,
+            providerName = providerName,
+            type = type,
+        )
     }
 }
 

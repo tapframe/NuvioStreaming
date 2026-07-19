@@ -354,6 +354,7 @@
     <string name="compose_player_font_size_value">%1$dsp</string>
     <string name="compose_player_lock_controls">Lock player controls</string>
     <string name="compose_player_loading_lines">Loading subtitle lines...</string>
+    <string name="compose_player_languages">Languages</string>
     <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
     <string name="compose_player_subtitle_lines_load_error">Unable to load subtitle lines</string>
     <string name="compose_player_no_audio_tracks_available">No audio tracks available</string>
@@ -567,6 +568,12 @@
     <string name="settings_appearance_app_language">App Language</string>
     <string name="settings_appearance_app_language_device">Device language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
+    <string name="settings_appearance_nav_bar_style">Navigation Bar</string>
+    <string name="settings_appearance_nav_bar_style_sheet_title">Navigation Bar Style</string>
+    <string name="settings_nav_bar_style_adaptive">Adaptive</string>
+    <string name="settings_nav_bar_style_expanded">Always Expanded</string>
+    <string name="settings_nav_bar_style_compact">Always Compact</string>
+    <string name="settings_nav_bar_style_classic">Classic</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
     <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later.</string>
@@ -598,6 +605,8 @@
     <string name="settings_homescreen_show_hero_description">Display hero carousel at top of home.</string>
     <string name="layout_hide_unreleased">Hide Unreleased Content</string>
     <string name="layout_hide_unreleased_sub">Hide movies and shows that haven't been released yet.</string>
+    <string name="layout_catalog_type">Show Catalog Type</string>
+    <string name="layout_catalog_type_sub">Show type suffix next to catalog name (Movie/Series).</string>
     <string name="settings_homescreen_hide_catalog_underline">Hide Catalog Underline</string>
     <string name="settings_homescreen_hide_catalog_underline_description">Remove the accent line under catalog and collection titles throughout the app.</string>
     <string name="settings_homescreen_summary">%1$d of %2$d catalogs visible • %3$d hero sources selected</string>
@@ -672,6 +681,9 @@
     <string name="settings_continue_watching_sort_mode_default_desc">Sort all items by recency</string>
     <string name="settings_continue_watching_sort_mode_streaming">Streaming Style</string>
     <string name="settings_continue_watching_sort_mode_streaming_desc">Released items first, upcoming at the end</string>
+    <string name="settings_continue_watching_sort_mode_split_upcoming">Separate Upcoming Row</string>
+    <string name="settings_continue_watching_sort_mode_split_upcoming_desc">Move unaired episodes to a separate Upcoming row</string>
+    <string name="upcoming_section_title">Upcoming</string>
     <string name="settings_continue_watching_section_card_style">Poster Card Style</string>
     <string name="settings_continue_watching_section_on_launch">ON LAUNCH</string>
     <string name="settings_continue_watching_section_up_next_behavior">NEXT UP BEHAVIOR</string>
@@ -1015,7 +1027,7 @@
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
     <string name="settings_playback_subtitle_text_color">Text Color</string>
     <string name="settings_playback_subtitle_use_forced">Use Forced Subtitles</string>
-    <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when matching your subtitle language settings.</string>
+    <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when audio matches the subtitle language; if unavailable, select nothing.</string>
     <string name="settings_playback_subtitle_vertical_offset">Vertical Offset</string>
     <string name="settings_playback_skip_intro_outro_recap">Skip Intro</string>
     <string name="settings_playback_skip_intro_outro_recap_description">Use introdb.app to detect intros and recaps.</string>
@@ -1065,6 +1077,8 @@
     <string name="settings_tmdb_module_credits_description">Cast with photos, director, and writer from TMDB</string>
     <string name="settings_tmdb_module_details">Details</string>
     <string name="settings_tmdb_module_details_description">Runtime, status, country, and language from TMDB</string>
+    <string name="settings_tmdb_module_release_dates">Release dates</string>
+    <string name="settings_tmdb_module_release_dates_description">Use TMDB broadcaster air dates instead of precise add-on release times</string>
     <string name="settings_tmdb_module_episodes">Episodes</string>
     <string name="settings_tmdb_module_episodes_description">Episode titles, overviews, thumbnails, and runtime from TMDB</string>
     <string name="settings_tmdb_module_more_like_this">More Like This</string>
@@ -1406,6 +1420,9 @@
     <string name="updates_download_empty_body">Empty download body</string>
     <string name="updates_download_file_missing">Downloaded update file is missing.</string>
     <string name="updates_downloading_progress">Downloading %1$d%</string>
+    <string name="updates_debug_test_complete">Banner test complete</string>
+    <string name="updates_debug_test_description">Preview the banner and simulated download progress.</string>
+    <string name="updates_debug_test_title">Test update banner</string>
     <string name="updates_install_failed">Unable to start installation</string>
     <string name="updates_latest_version">You&apos;re using the latest version.</string>
     <string name="updates_message_allow_installs">Enable app installs for Nuvio, then come back and continue.</string>
@@ -1413,6 +1430,7 @@
     <string name="updates_message_no_updates">No updates found.</string>
     <string name="updates_message_ready">A new version is ready to install.</string>
     <string name="updates_not_available">In-app updates are not available on this build.</string>
+    <string name="updates_no_release_notes">No release notes were provided.</string>
     <string name="updates_preparing_download">Preparing download</string>
     <string name="updates_release_notes">Release notes</string>
     <string name="updates_title_allow_installs">Allow installs to continue</string>
@@ -1464,6 +1482,7 @@
     <string name="stream_default_name">Stream</string>
     <string name="source_embedded">Embedded</string>
     <string name="trakt_authorization_denied">Authorization denied</string>
+    <string name="trakt_authorization_expired_reconnect">Your Trakt authorization is no longer valid. Reconnect your Trakt account.</string>
     <string name="trakt_complete_sign_in_browser">Complete Trakt sign in in your browser</string>
     <string name="trakt_connected">Connected to Trakt</string>
     <string name="trakt_disconnected">Disconnected from Trakt</string>
@@ -1595,8 +1614,19 @@
     <string name="home_catalog_default_title">%1$s - %2$s</string>
     <string name="library_empty_message">Saved titles will appear here after you tap Save on a details screen.</string>
     <string name="library_empty_title">Your library is empty</string>
+    <string name="library_filter_all_types">All types</string>
+    <string name="library_filter_list">Select list</string>
+    <string name="library_filter_sort">Sort library</string>
+    <string name="library_filter_type">Select type</string>
+    <string name="library_layout_show_horizontal">Show horizontal shelves</string>
+    <string name="library_layout_show_vertical">Show vertical grid</string>
     <string name="library_load_failed">Couldn't load library</string>
     <string name="library_other">Other</string>
+    <string name="library_sort_added_asc">Oldest added</string>
+    <string name="library_sort_added_desc">Recently added</string>
+    <string name="library_sort_title_asc">Title A–Z</string>
+    <string name="library_sort_title_desc">Title Z–A</string>
+    <string name="library_sort_trakt_order">Trakt order</string>
     <string name="library_source_cloud">Cloud</string>
     <string name="library_source_saved">Saved</string>
     <string name="library_title">Library</string>
