@@ -56,6 +56,7 @@ internal fun PlayerScreenRuntime.persistInternalSubtitlePreference(track: Subtit
             addonSubtitleId = null,
             addonSubtitleUrl = null,
             addonSubtitleAddonName = null,
+            addonSubtitleVideoId = null,
         )
     }
 }
@@ -70,6 +71,7 @@ internal fun PlayerScreenRuntime.persistAddonSubtitlePreference(subtitle: AddonS
             addonSubtitleId = subtitle.id,
             addonSubtitleUrl = subtitle.url,
             addonSubtitleAddonName = subtitle.addonName,
+            addonSubtitleVideoId = playbackSession.videoId,
         )
     }
 }
@@ -121,13 +123,21 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
             }
         }
         PersistedSubtitleSelectionType.ADDON -> {
-            val url = preference.addonSubtitleUrl?.takeIf { it.isNotBlank() }
+            val url = persistedAddonSubtitleUrlForVideo(
+                preference = preference,
+                videoId = playbackSession.videoId,
+            )
             if (url != null) {
                 selectedAddonSubtitleId = preference.addonSubtitleId ?: url
                 selectedSubtitleIndex = -1
                 useCustomSubtitles = true
                 playerController?.setSubtitleUri(url)
                 preferredSubtitleSelectionApplied = true
+            } else {
+                playerController?.clearExternalSubtitle()
+                selectedAddonSubtitleId = null
+                selectedSubtitleIndex = -1
+                useCustomSubtitles = false
             }
         }
     }

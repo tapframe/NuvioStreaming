@@ -234,6 +234,38 @@ class PlayerTrackSelectionTest {
         assertEquals(listOf("french", "english"), visibleSubtitles.map { it.id })
     }
 
+    @Test
+    fun addonSubtitleUrlIsRestoredForTheSameEpisode() {
+        val preference = PersistedPlayerTrackPreference(
+            addonSubtitleUrl = "https://example.com/episode-1.srt",
+            addonSubtitleVideoId = "series:1:1",
+        )
+
+        assertEquals(
+            "https://example.com/episode-1.srt",
+            persistedAddonSubtitleUrlForVideo(preference, "series:1:1"),
+        )
+    }
+
+    @Test
+    fun addonSubtitleUrlIsNotReusedForAnotherEpisode() {
+        val preference = PersistedPlayerTrackPreference(
+            addonSubtitleUrl = "https://example.com/episode-1.srt",
+            addonSubtitleVideoId = "series:1:1",
+        )
+
+        assertEquals(null, persistedAddonSubtitleUrlForVideo(preference, "series:1:2"))
+    }
+
+    @Test
+    fun legacyUnscopedAddonSubtitleUrlIsNotRestored() {
+        val preference = PersistedPlayerTrackPreference(
+            addonSubtitleUrl = "https://example.com/episode-1.srt",
+        )
+
+        assertEquals(null, persistedAddonSubtitleUrlForVideo(preference, "series:1:1"))
+    }
+
     private fun subtitleTrack(
         index: Int,
         language: String?,

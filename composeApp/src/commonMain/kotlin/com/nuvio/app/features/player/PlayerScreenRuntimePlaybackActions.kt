@@ -65,6 +65,10 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
     val videoIdentity = "$identity:$activeVideoId:$activeSeasonNumber:$activeEpisodeNumber"
     if (lastResetVideoIdentity != videoIdentity) {
         lastResetVideoIdentity = videoIdentity
+        trackPreferenceRestoreApplied = false
+        preferredSubtitleSelectionApplied = false
+        selectedAddonSubtitleId = null
+        useCustomSubtitles = false
         hasRequestedScrobbleStartForCurrentItem = false
         scrobbleStartRequestGeneration = 0L
         pendingScrobbleStartAfterSeek = false
