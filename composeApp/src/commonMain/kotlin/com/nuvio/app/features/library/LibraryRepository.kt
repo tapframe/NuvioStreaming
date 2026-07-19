@@ -459,6 +459,14 @@ object LibraryRepository {
             log.w { "Skipping library push: anonymous auth user=${authState.userId} profile=$profileId" }
             return
         }
+        val pendingItems = snapshot.pendingItemsForSync()
+        if (pendingItems == null) {
+            log.w {
+                "Skipping library push without a loaded local mutation " +
+                    "profile=$profileId hasLoaded=${snapshot.hasLoaded} pending=${snapshot.hasPendingPush}"
+            }
+            return
+        }
         val pushJob = syncScope.launch(start = CoroutineStart.LAZY) {
             delay(500)
             if (!localState.isContentCurrent(snapshot)) {
@@ -471,11 +479,7 @@ object LibraryRepository {
                 return@launch
             }
             runCatching {
-                val syncItems = snapshot.items.map { it.toSyncItem() }
-                if (syncItems.isEmpty()) {
-                    log.w { "Skipping library push: sync payload is empty profile=$profileId" }
-                    return@runCatching false
-                }
+                val syncItems = pendingItems.map { it.toSyncItem() }
                 val params = buildJsonObject {
                     put("p_profile_id", profileId)
                     put("p_items", json.encodeToJsonElement(syncItems))
@@ -483,12 +487,9 @@ object LibraryRepository {
                 }
                 log.i { "Pushing library to server profile=$profileId itemCount=${syncItems.size}" }
                 SupabaseProvider.client.postgrest.rpc("sync_push_library", params)
-                true
-            }.onSuccess { pushed ->
-                if (pushed) {
-                    localState.markPushCompleted(snapshot)
-                    log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
-                }
+            }.onSuccess {
+                localState.markPushCompleted(snapshot)
+                log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 log.e(e) { "Failed to push library to server profile=$profileId itemCount=$itemCount" }

@@ -280,6 +280,38 @@ class LibraryRepositoryTest {
         assertEquals(listOf("remote-new"), result.snapshot.items.map { it.id })
     }
 
+    @Test
+    fun `removing the last local item produces an empty sync payload`() {
+        val state = LibraryLocalState()
+        val token = state.beginProfileLoad(profileId = 1).snapshot.token
+        state.completeProfileLoad(
+            token = token,
+            activeProfileId = 1,
+            items = listOf(libraryItem(id = "last-item", savedAtEpochMs = 1L)),
+        )
+
+        val mutation = state.remove("last-item", "movie")
+        val pendingItems = assertNotNull(mutation.snapshot.pendingItemsForSync())
+
+        assertEquals(1, mutation.affectedCount)
+        assertTrue(pendingItems.isEmpty())
+    }
+
+    @Test
+    fun `loaded empty library without a local mutation is not pushed`() {
+        val state = LibraryLocalState()
+        val token = state.beginProfileLoad(profileId = 1).snapshot.token
+        val snapshot = assertNotNull(
+            state.completeProfileLoad(
+                token = token,
+                activeProfileId = 1,
+                items = emptyList(),
+            ),
+        )
+
+        assertNull(snapshot.pendingItemsForSync())
+    }
+
     private fun libraryItem(id: String, savedAtEpochMs: Long): LibraryItem =
         LibraryItem(
             id = id,

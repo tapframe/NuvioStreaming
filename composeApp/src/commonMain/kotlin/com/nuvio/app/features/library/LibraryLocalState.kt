@@ -311,5 +311,8 @@ internal class LibraryLocalState {
         isCurrentLocked(snapshot.token) && contentRevision == snapshot.contentRevision
 }
 
+internal fun LibraryLocalSnapshot.pendingItemsForSync(): List<LibraryItem>? =
+    items.takeIf { hasLoaded && hasPendingPush }
+
 private fun libraryItemKey(id: String, type: String): String =
     "${type.trim().lowercase()}:${id.trim()}"
