@@ -50,6 +50,7 @@ import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_AUDIENCE
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_IMDB
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_LETTERBOXD
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_METACRITIC
+import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_MAL
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TMDB
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TOMATOES
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TRAKT
@@ -388,6 +389,14 @@ private val ratingVisuals = listOf(
         logo = Res.drawable.rating_letterboxd,
         logoWidth = 16.dp,
         valueColor = Color(0xFF00E054),
+        format = ::formatOneDecimal,
+    ),
+    RatingVisuals(
+        source = PROVIDER_MAL,
+        displayName = "MyAnimeList",
+        logo = Res.drawable.rating_mal,
+        logoWidth = 16.dp,
+        valueColor = Color(0xFF2E51A2),
         format = ::formatOneDecimal,
     ),
     RatingVisuals(
