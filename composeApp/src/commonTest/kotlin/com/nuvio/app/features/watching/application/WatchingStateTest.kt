@@ -28,7 +28,7 @@ class WatchingStateTest {
     }
 
     @Test
-    fun `visible continue watching keeps active resume when newer episode is completed`() {
+    fun `visible continue watching drops stale resume when newer episode is completed`() {
         val resume = entry(
             videoId = "show:1:4",
             seasonNumber = 1,
@@ -52,7 +52,7 @@ class WatchingStateTest {
             latestCompletedBySeries = latestCompleted,
         )
 
-        assertEquals(listOf("show:1:4"), result.map { it.videoId })
+        assertTrue(result.isEmpty())
     }
 
     @Test

@@ -5,9 +5,12 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:usesCleartextTraffic="true"
@@ -59,6 +62,16 @@
                 <data android:scheme="stremio" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name="com.nuvio.app.features.player.PlayerNowPlayingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false" />
+
+        <receiver
+            android:name="com.nuvio.app.features.player.PlayerNowPlayingActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name="com.nuvio.app.features.downloads.DownloadsNotificationActionReceiver"

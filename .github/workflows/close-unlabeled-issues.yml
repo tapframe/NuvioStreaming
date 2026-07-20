@@ -36,8 +36,23 @@ jobs:
 
             core.info(`Found ${items.length} open unlabeled issues.`);
 
+            async function hasBeenReopened(issueNumber) {
+              const events = await github.paginate(github.rest.issues.listEvents, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+              return events.some(event => event.event === "reopened");
+            }
+
             for (const item of items) {
               const issueNumber = item.number;
+
+              if (await hasBeenReopened(issueNumber)) {
+                core.info(`#${issueNumber}: skipping because it was manually reopened.`);
+                continue;
+              }
 
               if (dryRun) {
                 core.info(`#${issueNumber}: would comment and close.`);

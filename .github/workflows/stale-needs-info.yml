@@ -32,10 +32,27 @@ jobs:
               return github.paginate(github.rest.search.issuesAndPullRequests, { q, per_page: 100 });
             }
 
+            async function hasBeenReopened(issue_number) {
+              const events = await github.paginate(github.rest.issues.listEvents, {
+                owner,
+                repo,
+                issue_number,
+                per_page: 100,
+              });
+              return events.some(event => event.event === "reopened");
+            }
+
             const items = await listOpenNeedsInfoIssues();
             for (const item of items) {
               const issue_number = item.number;
               const updatedAtMs = new Date(item.updated_at).getTime();
+
+              // Reopening is an explicit human decision that overrides automated
+              // closure. Never close a currently open issue that was reopened.
+              if (await hasBeenReopened(issue_number)) {
+                core.info(`#${issue_number}: skipping because it was manually reopened.`);
+                continue;
+              }
 
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner,

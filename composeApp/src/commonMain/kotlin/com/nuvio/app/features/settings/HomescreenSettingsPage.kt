@@ -40,6 +40,8 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_reset
 import nuvio.composeapp.generated.resources.layout_hide_unreleased
 import nuvio.composeapp.generated.resources.layout_hide_unreleased_sub
+import nuvio.composeapp.generated.resources.layout_catalog_type
+import nuvio.composeapp.generated.resources.layout_catalog_type_sub
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_title
 import nuvio.composeapp.generated.resources.settings_homescreen_hide_catalog_underline
@@ -66,6 +68,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
+    showCatalogType: Boolean,
     hideUnreleasedContent: Boolean,
     hideCatalogUnderline: Boolean,
     items: List<HomeCatalogSettingsItem>,
@@ -92,6 +95,14 @@ internal fun LazyListScope.homescreenSettingsContent(
                     checked = heroEnabled,
                     isTablet = isTablet,
                     onCheckedChange = HomeCatalogSettingsRepository::setHeroEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.layout_catalog_type),
+                    description = stringResource(Res.string.layout_catalog_type_sub),
+                    checked = showCatalogType,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setShowCatalogType,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(

@@ -13,7 +13,7 @@ body:
         Please replace the default title with a short summary of the actual problem.
 
         Vague reports such as "not working", "broken", or "same issue" may be labeled `needs-info` and closed after 1 day if the missing details are not added.
-        Bug reports left open for more than 30 days may be closed as stale.
+        Bug reports with no activity for more than 30 days may be closed as stale.
         If the app crashes or force closes, logs are required. Crash reports without logs will be closed.
 
   - type: markdown

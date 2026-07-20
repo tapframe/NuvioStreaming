@@ -2,6 +2,7 @@ package com.nuvio.app.features.updater
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -39,6 +40,11 @@ object AndroidAppUpdaterPlatform {
     }
 
     fun getSupportedAbis(): List<String> = Build.SUPPORTED_ABIS?.toList().orEmpty()
+
+    fun isDebugBuild(): Boolean {
+        val context = appContext ?: return false
+        return context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+    }
 
     fun getIgnoredTag(): String? =
         preferences().getString(ignoredTagKey, null)

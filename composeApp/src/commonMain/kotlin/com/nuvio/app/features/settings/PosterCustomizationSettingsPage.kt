@@ -315,6 +315,7 @@ private fun CardDepthFineTuneSheet(
             onDismiss()
         },
         sheetState = sheetState,
+        fullHeight = true,
     ) {
         Column(
             modifier = Modifier

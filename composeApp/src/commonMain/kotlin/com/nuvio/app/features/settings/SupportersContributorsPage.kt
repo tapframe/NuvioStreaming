@@ -437,10 +437,9 @@ private fun SupportersContributorsBody(
 
     selectedContributor?.let { contributor ->
         val supportUrl = contributorSupportLink(contributor.login)
-        val contributionSummary = contributorContributionSummary(contributor)
         CommunityDetailsDialog(
             title = contributor.login,
-            subtitle = contributionSummary,
+            subtitle = null,
             onDismiss = { selectedContributor = null },
             primaryActionLabel = if (contributor.profileUrl != null) {
                 stringResource(Res.string.community_open_github)
@@ -464,11 +463,6 @@ private fun SupportersContributorsBody(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text(
-                        text = contributionSummary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
                     Text(
                         text = contributor.profileUrl ?: stringResource(Res.string.community_github_profile_unavailable),
                         style = MaterialTheme.typography.bodySmall,
@@ -726,13 +720,6 @@ private fun ContributorRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = contributorContributionSummary(contributor),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
@@ -917,7 +904,7 @@ private fun ErrorState(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 private fun CommunityDetailsDialog(
     title: String,
-    subtitle: String,
+    subtitle: String?,
     onDismiss: () -> Unit,
     primaryActionLabel: String?,
     onPrimaryAction: (() -> Unit)?,
@@ -942,11 +929,13 @@ private fun CommunityDetailsDialog(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    subtitle?.takeIf(String::isNotBlank)?.let { text ->
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 content()
@@ -971,10 +960,6 @@ private fun CommunityDetailsDialog(
         }
     }
 }
-
-@Composable
-private fun contributorContributionSummary(contributor: CommunityContributor): String =
-    stringResource(Res.string.community_total_commits, contributor.totalContributions)
 
 private fun contributorSupportLink(login: String): String? = when (login.lowercase()) {
     "skoruppa" -> "https://ko-fi.com/skoruppa"

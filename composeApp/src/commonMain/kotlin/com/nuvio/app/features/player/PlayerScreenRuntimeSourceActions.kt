@@ -335,7 +335,12 @@ internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: Downloa
         fallbackVideoId = episode.id,
     )
     val resolvedVideoId = episode.id.takeIf { it.isNotBlank() } ?: fallbackVideoId
-    val epEntry = WatchProgressRepository.progressForVideo(resolvedVideoId)
+    val epEntry = WatchProgressRepository.progressForVideo(
+        videoId = resolvedVideoId,
+        parentMetaId = parentMetaId,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
+    )
         ?.takeIf { !it.isCompleted }
     val epResumeFraction = epEntry?.progressPercent
         ?.takeIf { it > 0f }
@@ -439,7 +444,10 @@ private fun PlayerScreenRuntime.resolveEpisodeResume(epVideoId: String, episode:
         fallbackVideoId = epVideoId,
     )
     val epEntry = WatchProgressRepository.progressForVideo(
-        epVideoId.takeIf { it.isNotBlank() } ?: epResumeVideoId,
+        videoId = epVideoId.takeIf { it.isNotBlank() } ?: epResumeVideoId,
+        parentMetaId = parentMetaId,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
     )?.takeIf { !it.isCompleted }
     val epResumeFraction = epEntry?.progressPercent
         ?.takeIf { it > 0f }

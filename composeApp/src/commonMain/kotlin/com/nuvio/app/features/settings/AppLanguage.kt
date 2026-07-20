@@ -7,6 +7,7 @@ import nuvio.composeapp.generated.resources.lang_english
 import nuvio.composeapp.generated.resources.lang_french
 import nuvio.composeapp.generated.resources.lang_german
 import nuvio.composeapp.generated.resources.lang_greek
+import nuvio.composeapp.generated.resources.lang_hebrew
 import nuvio.composeapp.generated.resources.lang_hungarian
 import nuvio.composeapp.generated.resources.lang_indonesian
 import nuvio.composeapp.generated.resources.lang_italian
@@ -35,6 +36,7 @@ enum class AppLanguage(
     FRENCH("fr", Res.string.lang_french),
     GERMAN("de", Res.string.lang_german),
     GREEK("el", Res.string.lang_greek),
+    HEBREW("he", Res.string.lang_hebrew),
     HUNGARIAN("hu", Res.string.lang_hungarian),
     INDONESIAN("id", Res.string.lang_indonesian),
     ITALIAN("it", Res.string.lang_italian),

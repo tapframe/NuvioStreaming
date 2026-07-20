@@ -67,6 +67,7 @@ import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.nuvioCardDepth
+import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
@@ -95,6 +96,7 @@ fun DetailSeriesContent(
     meta: MetaDetails,
     modifier: Modifier = Modifier,
     showHeader: Boolean = true,
+    horizontalScrollPadding: Dp = 0.dp,
     preferredSeasonNumber: Int? = null,
     preferredEpisodeNumber: Int? = null,
     episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
@@ -234,6 +236,7 @@ fun DetailSeriesContent(
                                     meta = meta,
                                     currentSeason = currentSeason,
                                     sizing = sizing,
+                                    horizontalScrollPadding = horizontalScrollPadding,
                                     onSelect = { selectedSeasonOverride = it },
                                     onLongPress = onSeasonLongPress,
                                 )
@@ -241,6 +244,7 @@ fun DetailSeriesContent(
                                     seasons = seasons,
                                     currentSeason = currentSeason,
                                     sizing = sizing,
+                                    horizontalScrollPadding = horizontalScrollPadding,
                                     onSelect = { selectedSeasonOverride = it },
                                     onLongPress = onSeasonLongPress,
                                 )
@@ -251,6 +255,7 @@ fun DetailSeriesContent(
                             seasons = seasons,
                             currentSeason = currentSeason,
                             sizing = sizing,
+                            horizontalScrollPadding = horizontalScrollPadding,
                             onSelect = { selectedSeasonOverride = it },
                             onLongPress = onSeasonLongPress,
                         )
@@ -287,6 +292,7 @@ fun DetailSeriesContent(
                         EpisodeHorizontalRow(
                             episodes = seasonEpisodes,
                             maxWidthDp = containerWidthDp,
+                            horizontalScrollPadding = horizontalScrollPadding,
                             parentMetaId = meta.id,
                             metaType = meta.type,
                             watchedKeys = watchedKeys,
@@ -386,6 +392,7 @@ private fun SeasonTextChipScrollRow(
     seasons: List<Int>,
     currentSeason: Int,
     sizing: SeriesContentSizing,
+    horizontalScrollPadding: Dp,
     onSelect: (Int) -> Unit,
     onLongPress: ((Int) -> Unit)?,
 ) {
@@ -406,7 +413,10 @@ private fun SeasonTextChipScrollRow(
 
     LazyRow(
         state = seasonListState,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .nuvioHorizontalScrollBleed(horizontalScrollPadding)
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
     ) {
         items(seasons, key = { season -> season }) { season ->
@@ -455,6 +465,7 @@ private fun SeasonPosterScrollRow(
     meta: MetaDetails,
     currentSeason: Int,
     sizing: SeriesContentSizing,
+    horizontalScrollPadding: Dp,
     onSelect: (Int) -> Unit,
     onLongPress: ((Int) -> Unit)?,
 ) {
@@ -475,7 +486,10 @@ private fun SeasonPosterScrollRow(
 
     LazyRow(
         state = seasonListState,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .nuvioHorizontalScrollBleed(horizontalScrollPadding)
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
     ) {
         items(seasons, key = { season -> season }) { season ->
@@ -580,6 +594,7 @@ private fun SeasonPosterButton(
 private fun EpisodeHorizontalRow(
     episodes: List<MetaVideo>,
     maxWidthDp: Float,
+    horizontalScrollPadding: Dp,
     parentMetaId: String,
     metaType: String,
     watchedKeys: Set<String>,
@@ -613,8 +628,13 @@ private fun EpisodeHorizontalRow(
 
     LazyRow(
         state = listState,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = rowMetrics.rowHorizontalPadding, vertical = rowMetrics.rowVerticalPadding),
+        modifier = Modifier
+            .nuvioHorizontalScrollBleed(horizontalScrollPadding)
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(
+            horizontal = horizontalScrollPadding + rowMetrics.rowHorizontalPadding,
+            vertical = rowMetrics.rowVerticalPadding,
+        ),
         horizontalArrangement = Arrangement.spacedBy(rowMetrics.itemSpacing),
     ) {
         itemsIndexed(
