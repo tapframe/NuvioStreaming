@@ -34,6 +34,7 @@ import nuvio.composeapp.generated.resources.settings_mdb_section_title
 import nuvio.composeapp.generated.resources.source_audience_score
 import nuvio.composeapp.generated.resources.source_imdb
 import nuvio.composeapp.generated.resources.source_letterboxd
+import nuvio.composeapp.generated.resources.source_mal
 import nuvio.composeapp.generated.resources.source_metacritic
 import nuvio.composeapp.generated.resources.source_rotten_tomatoes
 import nuvio.composeapp.generated.resources.source_tmdb

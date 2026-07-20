@@ -360,22 +360,6 @@ private val ratingVisuals = listOf(
         format = ::formatWhole,
     ),
     RatingVisuals(
-        source = PROVIDER_TOMATOES,
-        displayName = "Rotten Tomatoes",
-        logo = Res.drawable.rating_rotten_tomatoes,
-        logoWidth = 16.dp,
-        valueColor = Color(0xFFFA320A),
-        format = ::formatPercent,
-    ),
-    RatingVisuals(
-        source = PROVIDER_METACRITIC,
-        displayName = "Metacritic",
-        logo = Res.drawable.rating_metacritic,
-        logoWidth = 16.dp,
-        valueColor = Color(0xFFFFCC33),
-        format = ::formatWhole,
-    ),
-    RatingVisuals(
         source = PROVIDER_TRAKT,
         displayName = "Trakt",
         logo = Res.drawable.rating_trakt,
@@ -400,12 +384,28 @@ private val ratingVisuals = listOf(
         format = ::formatOneDecimal,
     ),
     RatingVisuals(
+        source = PROVIDER_TOMATOES,
+        displayName = "Rotten Tomatoes",
+        logo = Res.drawable.rating_rotten_tomatoes,
+        logoWidth = 16.dp,
+        valueColor = Color(0xFFFA320A),
+        format = ::formatPercent,
+    ),
+    RatingVisuals(
         source = PROVIDER_AUDIENCE,
         displayName = runBlocking { getString(Res.string.rating_audience_score) },
         logo = Res.drawable.rating_audience_score,
         logoWidth = 16.dp,
         valueColor = Color(0xFFFA320A),
         format = ::formatPercent,
+    ),
+    RatingVisuals(
+        source = PROVIDER_METACRITIC,
+        displayName = "Metacritic",
+        logo = Res.drawable.rating_metacritic,
+        logoWidth = 16.dp,
+        valueColor = Color(0xFFFFCC33),
+        format = ::formatWhole,
     ),
 )
 
