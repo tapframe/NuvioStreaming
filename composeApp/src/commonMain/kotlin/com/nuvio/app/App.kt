@@ -73,6 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
@@ -102,6 +103,7 @@ import com.nuvio.app.core.ui.NuvioNavBarScrollState
 import com.nuvio.app.core.ui.rememberNuvioNavBarScrollState
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioContinueWatchingActionSheet
+import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
 import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
@@ -159,6 +161,7 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.LibrarySection
+import com.nuvio.app.features.library.LibrarySortOption
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
@@ -767,13 +770,17 @@ private fun MainAppContent(
     onSwitchProfile: () -> Unit = {},
 ) {
         val navBackStack = rememberNavBackStack(navigationSavedStateConfiguration, initialRoute)
+        val routeDisposalDecorator = remember {
+            RouteDisposalNavEntryDecorator<NavKey> { key ->
+                if (key is AppRoute) disposeRoute(key)
+            }
+        }
         val navController = remember(navBackStack, onNavigate, onGoBack, onReplace) {
             NuvioNavigator(
                 backStack = navBackStack,
                 onExternalNavigate = onNavigate,
                 onExternalBack = onGoBack,
                 onExternalReplace = onReplace,
-                onRouteRemoved = ::disposeRoute,
             )
         }
         val appUpdaterController = rememberAppUpdaterController()
@@ -1710,7 +1717,7 @@ private fun MainAppContent(
             stringResource(Res.string.compose_catalog_subtitle_library)
         }
 
-        val onLibrarySectionViewAllClick: (LibrarySection) -> Unit = { section ->
+        val onLibrarySectionViewAllClick: (LibrarySection, LibrarySortOption) -> Unit = { section, sortOption ->
             val launchId = CatalogLaunchStore.put(
                 CatalogLaunch(
                     title = section.displayTitle,
@@ -1718,6 +1725,7 @@ private fun MainAppContent(
                     target = CatalogTarget.Library(
                         contentType = section.items.firstOrNull()?.type ?: "movie",
                         sectionType = section.type,
+                        sortOption = sortOption,
                     ),
                 ),
             )
@@ -1878,8 +1886,12 @@ private fun MainAppContent(
                     backStack = navBackStack,
                     modifier = Modifier.fillMaxSize(),
                     onBack = { navController.popBackStack() },
+                    entryDecorators = listOf(
+                        rememberSaveableStateHolderNavEntryDecorator<NavKey>(),
+                        routeDisposalDecorator,
+                    ),
                     sharedTransitionScope = this@SharedTransitionLayout,
-                    entryProvider = entryProvider {
+                    entryProvider = entryProvider<NavKey> {
                 entry<TabsRoute> {
                     PlatformBackHandler(
                         enabled = true,
@@ -3325,6 +3337,13 @@ private fun MainAppContent(
                         },
                     )
                 }
+                    }.let { provider ->
+                        { key ->
+                            routeDisposalDecorator.register(
+                                key = key,
+                                entry = provider(key),
+                            )
+                        }
                     },
                 )
                 }
@@ -3449,6 +3468,7 @@ private fun MainAppContent(
                             imageUrl = cloudLibraryDisplayArtworkUrl(anchor.imageUrl ?: item.poster ?: item.imageUrl),
                             title = item.title,
                             subtitle = localizedContinueWatchingSubtitle(item),
+                            depthSurface = NuvioCardDepthSurface.ContinueWatching,
                             anchor = anchor,
                             actions = buildList {
                                 if (showDetailsOption) {
@@ -3671,7 +3691,7 @@ private fun AppTabHost(
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
     onLibraryPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)? = null,
-    onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
+    onLibrarySectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
     onLiveTvChannelClick: (LiveTvChannel) -> Unit = {},

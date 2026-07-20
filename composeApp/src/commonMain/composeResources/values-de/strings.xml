@@ -375,6 +375,7 @@
     <string name="compose_settings_page_integrations">Integrationen</string>
     <string name="compose_settings_page_mdblist_ratings">MDBList-Bewertungen</string>
     <string name="compose_settings_page_meta_screen">Meta-Bildschirm</string>
+    <string name="settings_appearance_section_detail_page">META-BILDSCHIRM</string>
     <string name="compose_settings_page_notifications">Benachrichtigungen</string>
     <string name="compose_settings_page_playback">Wiedergabe</string>
     <string name="compose_settings_page_plugins">Plugins</string>

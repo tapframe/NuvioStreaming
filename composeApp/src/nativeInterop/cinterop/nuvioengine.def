@@ -1,0 +1,3 @@
+headers = nuvio_engine/nuvio_engine.h
+package = com.nuvio.app.features.p2p.native
+staticLibraries = libCNuvioEngine.a

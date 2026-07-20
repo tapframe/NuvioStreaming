@@ -418,12 +418,14 @@
     <string name="compose_settings_page_licenses_attributions">Licences et attributions</string>
     <string name="compose_settings_page_mdblist_ratings">Notes MDBList</string>
     <string name="compose_settings_page_meta_screen">Écran méta</string>
+    <string name="settings_appearance_section_detail_page">ÉCRAN MÉTA</string>
     <string name="compose_settings_page_notifications">Notifications</string>
     <string name="compose_settings_page_playback">Lecture</string>
     <string name="compose_settings_page_plugins">Plugins</string>
     <string name="compose_settings_page_poster_customization">Personnalisation des affiches</string>
     <string name="compose_settings_page_root">Paramètres</string>
     <string name="compose_settings_page_streams">Streams</string>
+    <string name="settings_appearance_section_streams">STREAMS</string>
     <string name="compose_settings_page_supporters_contributors">Supporters et contributeurs</string>
     <string name="compose_settings_page_tmdb_enrichment">Enrichissement TMDB</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -661,7 +663,7 @@
     <string name="settings_integrations_tmdb_description">Enrichissez les pages de détails avec de l’art, des crédits, des métadonnées d’épisodes et plus depuis TMDB.</string>
     <string name="settings_integrations_mdblist_description">Ajoutez des notes externes d’IMDb, Rotten Tomatoes, Metacritic et d’autres aux pages de détails.</string>
     <string name="settings_integrations_debrid_description">Connectez des comptes pour les liens et l’accès à la bibliothèque</string>
-    <string name="settings_debrid_section_title">Services connectés</string>
+    <string name="settings_debrid_section_title">SERVICES CONNECTÉS</string>
     <string name="settings_debrid_experimental_notice">Ces intégrations sont expérimentales et peuvent être conservées, modifiées ou supprimées plus tard.</string>
     <string name="settings_debrid_cloud_library">Cloud library</string>
     <string name="settings_debrid_cloud_library_description">Parcourez et lisez les fichiers déjà présents dans vos comptes connectés.</string>
@@ -670,7 +672,7 @@
     <string name="settings_debrid_resolve_with">Résoudre avec</string>
     <string name="settings_debrid_resolve_with_description">Choisissez quel compte connecté gère les liens lisibles.</string>
     <string name="settings_debrid_add_key_first">Connectez d’abord un compte.</string>
-    <string name="settings_debrid_section_providers">Comptes</string>
+    <string name="settings_debrid_section_providers">COMPTES</string>
     <string name="settings_debrid_provider_description">Connectez votre compte %1$s.</string>
     <string name="settings_debrid_provider_device_description">Liez votre compte %1$s dans le navigateur.</string>
     <string name="settings_debrid_dialog_title">Clé API %1$s</string>
@@ -690,26 +692,26 @@
     <string name="settings_debrid_device_auth_failed">Impossible de démarrer la connexion.</string>
     <string name="settings_debrid_device_auth_missing_configuration">Cette méthode de connexion n’est pas configurée dans ce build.</string>
     <string name="settings_debrid_device_auth_expired">Ce code a expiré. Réessayez.</string>
-    <string name="settings_debrid_section_instant_playback">Préparation des liens</string>
+    <string name="settings_debrid_section_instant_playback">PRÉPARATION DES LIENS</string>
     <string name="settings_debrid_prepare_instant_playback">Préparer les liens</string>
     <string name="settings_debrid_prepare_instant_playback_description">Résoudre les liens lisibles avant le démarrage de la lecture.</string>
     <string name="settings_debrid_prepare_stream_count">Liens à préparer</string>
     <string name="settings_debrid_prepare_stream_count_warning">Utilisez un nombre plus faible si possible. Les services connectés peuvent limiter le nombre de liens résolus sur une période donnée. Ouvrir un film ou un épisode peut compter dans ces limites même si vous n’appuyez pas sur Regarder, car les liens sont préparés à l’avance.</string>
     <string name="settings_debrid_prepare_count_one">1 lien</string>
     <string name="settings_debrid_prepare_count_many">%1$d liens</string>
-    <string name="settings_debrid_section_formatting">Mise en forme</string>
+    <string name="settings_debrid_section_formatting">MISE EN FORME</string>
     <string name="settings_debrid_name_template">Modèle de nom</string>
     <string name="settings_debrid_name_template_description">Contrôle la manière dont les noms de résultats apparaissent.</string>
     <string name="settings_debrid_description_template">Modèle de description</string>
     <string name="settings_debrid_description_template_description">Contrôle les métadonnées affichées sous chaque résultat.</string>
     <string name="settings_debrid_formatter_reset_title">Réinitialiser la mise en forme</string>
     <string name="settings_debrid_formatter_reset_subtitle">Restaurer la mise en forme par défaut des résultats.</string>
-    <string name="settings_stream_badges_section">Style Fusion</string>
+    <string name="settings_stream_badges_section">STYLE FUSION</string>
     <string name="settings_stream_size_badges_title">Badges de taille</string>
     <string name="settings_stream_size_badges_description">Affiche les badges de taille de fichier dans les résultats de flux et les panneaux de source du lecteur.</string>
     <string name="settings_stream_addon_logo_title">Logo de l’addon</string>
     <string name="settings_stream_addon_logo_description">Affiche le logo et le nom de l’addon à côté des sources de streams.</string>
-    <string name="settings_stream_display_section">Affichage</string>
+    <string name="settings_stream_display_section">AFFICHAGE</string>
     <string name="settings_stream_badge_position_title">Position des badges</string>
     <string name="settings_stream_badge_position_description">Choisissez si les badges Fusion et de taille apparaissent au-dessus ou en dessous des cartes de flux.</string>
     <string name="settings_stream_badge_position_dialog_title">Position des badges</string>
@@ -1647,7 +1649,7 @@
     <string name="player_ios_preset_custom_desc">Utilisez vos valeurs avancées ci-dessous.</string>
     <string name="player_ios_hardware_decoder_off">Désactivé</string>
     <!-- Playback settings iOS video output -->
-    <string name="settings_playback_ios_video_output">Sortie vidéo iOS</string>
+    <string name="settings_playback_ios_video_output">SORTIE VIDÉO iOS</string>
     <string name="settings_playback_ios_hardware_decoder">Décodeur matériel</string>
     <string name="settings_playback_ios_extended_dynamic_range">Plage dynamique étendue</string>
     <string name="settings_playback_ios_extended_dynamic_range_desc">Mode de sortie Metal par défaut pour les nouvelles sessions de lecture.</string>
@@ -1655,13 +1657,13 @@
     <string name="settings_playback_ios_display_color_hint_desc">Permettre à mpv de cibler par défaut l’espace colorimétrique de l’écran actif.</string>
     <string name="settings_playback_ios_target_primaries">Primaires cibles</string>
     <string name="settings_playback_ios_target_transfer">Transfert cible</string>
-    <string name="settings_playback_ios_audio_output_section">Sortie audio iOS</string>
+    <string name="settings_playback_ios_audio_output_section">SORTIE AUDIO iOS</string>
     <string name="settings_playback_ios_audio_output">Sortie audio</string>
     <string name="settings_playback_ios_audio_output_auto_desc">Utilise AudioUnit tant que la sortie AVFoundation est temporairement désactivée.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Prise en charge expérimentale de l’audio spatial et de la sortie multicanal.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Utilise l’ancienne sortie AudioUnit.</string>
     <!-- Debrid Result Management section -->
-    <string name="settings_debrid_section_result_management">Gestion des résultats</string>
+    <string name="settings_debrid_section_result_management">GESTION DES RÉSULTATS</string>
     <string name="settings_debrid_max_results">Nombre max de résultats</string>
     <string name="settings_debrid_max_results_desc">Limite le nombre de résultats affichés.</string>
     <string name="settings_debrid_sort_results">Tri des résultats</string>
@@ -1945,6 +1947,7 @@
     <string name="p2p_consent_cancel">Annuler</string>
     <string name="p2p_error_unknown">Erreur torrent inconnue</string>
     <string name="settings_p2p_title">Streaming P2P</string>
+    <string name="settings_playback_section_p2p">STREAMING P2P</string>
     <string name="settings_p2p_subtitle">Autoriser les flux pair-à-pair (torrent)</string>
     <string name="settings_p2p_hide_stats_title">Masquer les statistiques torrent</string>
     <string name="settings_p2p_hide_stats_subtitle">Masquer la mémoire tampon, les seeders, les pairs et la vitesse de téléchargement pendant le chargement et la lecture</string>

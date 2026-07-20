@@ -218,6 +218,7 @@
     <string name="compose_settings_page_integrations">Ενσωματώσεις</string>
     <string name="compose_settings_page_mdblist_ratings">Αξιολογήσεις MDBList</string>
     <string name="compose_settings_page_meta_screen">Οθόνη μεταδεδομένων</string>
+    <string name="settings_appearance_section_detail_page">ΟΘΌΝΗ ΜΕΤΑΔΕΔΟΜΈΝΩΝ</string>
     <string name="compose_settings_page_notifications">Ειδοποιήσεις</string>
     <string name="compose_settings_page_playback">Αναπαραγωγή</string>
     <string name="compose_settings_page_plugins">Πρόσθετα εφαρμογών</string>
@@ -349,7 +350,7 @@
     <string name="settings_homescreen_summary_hint">Ανοίξτε έναν κατάλογο μόνο όταν χρειάζεστε να τον μετονομάσετε ή να τον αναδιατάξετε.</string>
     <string name="settings_homescreen_visible">Ορατό</string>
     <string name="settings_playback_subtitle">Αναπαραγωγή, υπότιτλοι και αυτόματη εκκίνηση</string>
-    <string name="settings_card_depth_title">Εφέ βάθους κάρτας</string>
+    <string name="settings_card_depth_title">ΕΦΈ ΒΆΘΟΥΣ ΚΆΡΤΑΣ</string>
     <string name="settings_card_depth_description">Προσθέτει φωτεινό επάνω άκρο και απαλή λάμψη στις κάρτες εικόνας για αίσθηση βάθους.</string>
     <string name="settings_card_depth_enabled">Ενεργοποίηση εφέ βάθους</string>
     <string name="settings_card_depth_edge">Λάμψη άκρου</string>
@@ -1405,6 +1406,7 @@
     <string name="compose_settings_page_debrid">Συνδεδεμένος Services</string>
     <string name="compose_settings_page_licenses_attributions">Άδειες και αποδόσεις</string>
     <string name="compose_settings_page_streams">Ροές</string>
+    <string name="settings_appearance_section_streams">ΡΟΈΣ</string>
     <string name="compose_settings_root_advanced_description">Συμπεριφορά εκκίνησης και προφίλ.</string>
     <string name="compose_settings_root_advanced_section">ΓΙΑ ΠΡΟΧΩΡΗΜΕΝΟΥΣ</string>
     <string name="compose_settings_root_streams_description">Εμφάνιση αποτελεσμάτων ροής και κανόνες URL badge.</string>
@@ -1568,7 +1570,7 @@
     <string name="settings_advanced_clear_cw_cache_subtitle">Κατάργηση αποθηκευμένων δεδομένων Συνέχειας παρακολούθησης και ανανέωση προόδου παρακολούθησης</string>
     <string name="settings_advanced_remember_last_profile">Απομνημόνευση τελευταίου προφίλ</string>
     <string name="settings_advanced_remember_last_profile_description">Απομνημόνευση του τελευταίου επιλεγμένου προφίλ κατά την εκκίνηση</string>
-    <string name="settings_advanced_section_cache">Προσωρινή μνήμη</string>
+    <string name="settings_advanced_section_cache">ΠΡΟΣΩΡΙΝΉ ΜΝΉΜΗ</string>
     <string name="settings_advanced_section_startup">ΕΚΚΙΝΗΣΗ</string>
     <string name="settings_appearance_app_language_device">Γλώσσα συσκευής</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
@@ -1685,11 +1687,11 @@
     <string name="settings_debrid_rule_required_resolutions_desc">Εμφάνιση μόνο των επιλεγμένων αναλύσεων.</string>
     <string name="settings_debrid_rule_required_visual_tags">Απαιτούμενες οπτικές ετικέτες</string>
     <string name="settings_debrid_rule_required_visual_tags_desc">Απαιτεί ετικέτες DV, HDR, 10bit, IMAX, SDR και παρόμοιες.</string>
-    <string name="settings_debrid_section_formatting">Μορφοποίηση</string>
-    <string name="settings_debrid_section_instant_playback">Προετοιμασία συνδέσμων</string>
-    <string name="settings_debrid_section_providers">Λογαριασμοί</string>
-    <string name="settings_debrid_section_result_management">Διαχείριση αποτελεσμάτων</string>
-    <string name="settings_debrid_section_title">Συνδεδεμένος Services</string>
+    <string name="settings_debrid_section_formatting">ΜΟΡΦΟΠΟΊΗΣΗ</string>
+    <string name="settings_debrid_section_instant_playback">ΠΡΟΕΤΟΙΜΑΣΊΑ ΣΥΝΔΈΣΜΩΝ</string>
+    <string name="settings_debrid_section_providers">ΛΟΓΑΡΙΑΣΜΟΊ</string>
+    <string name="settings_debrid_section_result_management">ΔΙΑΧΕΊΡΙΣΗ ΑΠΟΤΕΛΕΣΜΆΤΩΝ</string>
+    <string name="settings_debrid_section_title">ΣΥΝΔΕΔΕΜΈΝΟΣ SERVICES</string>
     <string name="settings_debrid_selection_any">Οποιοδήποτε</string>
     <string name="settings_debrid_selection_count">%1$d επιλεγμένα</string>
     <string name="settings_debrid_size_min">%1$dGB+</string>
@@ -1743,7 +1745,7 @@
     <string name="settings_licenses_attributions_premiumize_title">Premiumize</string>
     <string name="settings_licenses_attributions_section_app">ΑΔΕΙΑ ΕΦΑΡΜΟΓΗΣ</string>
     <string name="settings_licenses_attributions_section_data">ΔΕΔΟΜΕΝΑ &amp; ΥΠΗΡΕΣΙΕΣ</string>
-    <string name="settings_licenses_attributions_section_playback">Αναπαραγωγή LICENSE</string>
+    <string name="settings_licenses_attributions_section_playback">ΑΝΑΠΑΡΑΓΩΓΉ LICENSE</string>
     <string name="settings_licenses_attributions_tmdb_body">Το Nuvio χρησιμοποιεί το API του TMDB για μεταδεδομένα ταινιών και σειρών, εικαστικό υλικό, trailer, συμμετέχοντες, λεπτομέρειες παραγωγής, συλλογές και προτάσεις. Αυτό το προϊόν χρησιμοποιεί το API του TMDB αλλά δεν είναι εγκεκριμένο ούτε πιστοποιημένο από το TMDB.</string>
     <string name="settings_licenses_attributions_tmdb_title">The Ταινία Database (TMDB)</string>
     <string name="settings_licenses_attributions_torbox_body">Το Nuvio συνδέεται με το TorBox για ταυτοποίηση λογαριασμού, πρόσβαση σε cloud βιβλιοθήκη, ελέγχους προσωρινής μνήμης και λειτουργίες αναπαραγωγής από το cloud. Το Nuvio δεν σχετίζεται με το TorBox ούτε έχει την υποστήριξή του.</string>
@@ -1766,6 +1768,7 @@
     <string name="settings_p2p_hide_stats_title">Απόκρυψη torrent stats</string>
     <string name="settings_p2p_subtitle">Επιτρέψτε ροές peer-to-peer (torrent)</string>
     <string name="settings_p2p_title">Ροές P2P</string>
+    <string name="settings_playback_section_p2p">ΡΟΈΣ P2P</string>
     <string name="settings_playback_addon_subtitle_startup_all">Όλοι οι υπότιτλοι</string>
     <string name="settings_playback_addon_subtitle_startup_all_description">Λήψη και εμφάνιση κάθε υπότιτλου πρόσθετου για το βίντεο.</string>
     <string name="settings_playback_addon_subtitle_startup_fast">Γρήγορη εκκίνηση</string>
@@ -1797,7 +1800,7 @@
     <string name="settings_playback_ios_audio_output_auto_desc">Χρήση AudioUnit ενώ η έξοδος AVFoundation είναι προσωρινά απενεργοποιημένη.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Πειραματική υποστήριξη για Spatial Audio και πολυκάναλη έξοδο.</string>
     <string name="settings_playback_ios_audio_output_dialog">Ήχος output</string>
-    <string name="settings_playback_ios_audio_output_section">iOS Ήχος output</string>
+    <string name="settings_playback_ios_audio_output_section">iOS ΉΧΟΣ OUTPUT</string>
     <string name="settings_playback_ios_display_color_hint">Οθόνη color hint</string>
     <string name="settings_playback_ios_display_color_hint_desc">Επιτρέψτε στο mpv να στοχεύει τον ενεργό χρωματικό χώρο της οθόνης από προεπιλογή.</string>
     <string name="settings_playback_ios_extended_dynamic_range">Εκτεταμένο δυναμικό εύρος</string>
@@ -1808,7 +1811,7 @@
     <string name="settings_playback_ios_target_primaries_dialog">Target primaries</string>
     <string name="settings_playback_ios_target_transfer">Target transfer</string>
     <string name="settings_playback_ios_target_transfer_dialog">Target transfer</string>
-    <string name="settings_playback_ios_video_output">iOS Βίντεο output</string>
+    <string name="settings_playback_ios_video_output">iOS ΒΊΝΤΕΟ OUTPUT</string>
     <string name="settings_playback_libmpv_hardware_decoding">libmpv Hardware Decoding</string>
     <string name="settings_playback_libmpv_hardware_decoding_description">Χρήση αποκωδικοποίησης υλικού mpv όταν είναι διαθέσιμη.</string>
     <string name="settings_playback_libmpv_video_output">Renderer libmpv</string>
@@ -1860,8 +1863,8 @@
     <string name="settings_stream_badge_urls_description">Εισαγωγή έως %1$d URL badge ροής τύπου Fusion σε μορφή JSON. Κάθε URL μπορεί να ενημερωθεί ή να διαγραφεί ξεχωριστά.</string>
     <string name="settings_stream_badge_urls_search_description">Διαχείριση εισηγμένων URL badge ροής τύπου Fusion (JSON).</string>
     <string name="settings_stream_badge_urls_title">URL badge Fusion</string>
-    <string name="settings_stream_badges_section">Στυλ Fusion</string>
-    <string name="settings_stream_display_section">Οθόνη</string>
+    <string name="settings_stream_badges_section">ΣΤΥΛ FUSION</string>
+    <string name="settings_stream_display_section">ΟΘΌΝΗ</string>
     <string name="settings_stream_size_badges_description">Εμφάνιση badge μεγέθους αρχείου στα αποτελέσματα ροής και στα πλαίσια πηγών του player.</string>
     <string name="settings_stream_size_badges_title">Badge μεγέθους</string>
     <string name="streams_loading_skip_segments">Loading Παράλειψη segments…</string>

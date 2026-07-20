@@ -426,12 +426,14 @@
     <string name="compose_settings_page_licenses_attributions">ライセンスと帰属</string>
     <string name="compose_settings_page_mdblist_ratings">MDBList評価</string>
     <string name="compose_settings_page_meta_screen">詳細ページ</string>
+    <string name="settings_appearance_section_detail_page">詳細ページ</string>
     <string name="compose_settings_page_notifications">通知</string>
     <string name="compose_settings_page_playback">再生</string>
     <string name="compose_settings_page_plugins">プラグイン</string>
     <string name="compose_settings_page_poster_customization">ポスターカードスタイル</string>
     <string name="compose_settings_page_root">設定</string>
     <string name="compose_settings_page_streams">ストリーム</string>
+    <string name="settings_appearance_section_streams">ストリーム</string>
     <string name="compose_settings_page_supporters_contributors">サポーターとコントリビューター</string>
     <string name="compose_settings_page_tmdb_enrichment">TMDB補完</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -694,7 +696,7 @@
     <string name="settings_debrid_description_template_description">各結果に表示されるメタデータを制御します。空白の場合は元の結果詳細を使用します。</string>
     <string name="settings_debrid_formatter_reset_title">フォーマットをリセット</string>
     <string name="settings_debrid_formatter_reset_subtitle">結果のフォーマットをデフォルトに戻します。</string>
-    <string name="settings_stream_badges_section">Fusionスタイル</string>
+    <string name="settings_stream_badges_section">FUSIONスタイル</string>
     <string name="settings_stream_size_badges_title">サイズバッジ</string>
     <string name="settings_stream_size_badges_description">ストリーム結果とプレーヤーのソースパネルにファイルサイズバッジを表示します。</string>
     <string name="settings_stream_addon_logo_title">アドオンロゴ</string>
@@ -1911,6 +1913,7 @@
     <string name="p2p_consent_cancel">キャンセル</string>
     <string name="p2p_error_unknown">不明なトレントエラー</string>
     <string name="settings_p2p_title">P2Pストリーミング</string>
+    <string name="settings_playback_section_p2p">P2Pストリーミング</string>
     <string name="settings_p2p_subtitle">ピアツーピア（トレント）ストリームを許可する</string>
     <string name="settings_p2p_hide_stats_title">トレント統計を非表示</string>
     <string name="settings_p2p_hide_stats_subtitle">読み込み中および再生中のバッファ・シード数・ピア数・ダウンロード速度を非表示にする</string>

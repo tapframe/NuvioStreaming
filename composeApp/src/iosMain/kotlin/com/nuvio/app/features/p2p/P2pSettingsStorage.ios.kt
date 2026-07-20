@@ -7,6 +7,8 @@ internal actual object P2pSettingsStorage {
     private const val p2pEnabledKey = "p2p_enabled"
     private const val enableUploadKey = "enable_upload"
     private const val hideTorrentStatsKey = "hide_torrent_stats"
+    private const val torrentProfileKey = "torrent_profile"
+    private const val cacheSizeKey = "cache_size"
 
     actual fun loadP2pEnabled(): Boolean? =
         loadBoolean(p2pEnabledKey)
@@ -29,6 +31,18 @@ internal actual object P2pSettingsStorage {
         saveBoolean(hideTorrentStatsKey, enabled)
     }
 
+    actual fun loadTorrentProfile(): String? = loadString(torrentProfileKey)
+
+    actual fun saveTorrentProfile(profile: String) {
+        saveString(torrentProfileKey, profile)
+    }
+
+    actual fun loadCacheSize(): String? = loadString(cacheSizeKey)
+
+    actual fun saveCacheSize(size: String) {
+        saveString(cacheSizeKey, size)
+    }
+
     private fun loadBoolean(keyBase: String): Boolean? {
         val defaults = NSUserDefaults.standardUserDefaults
         val key = ProfileScopedKey.of(keyBase)
@@ -37,5 +51,12 @@ internal actual object P2pSettingsStorage {
 
     private fun saveBoolean(keyBase: String, value: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(value, forKey = ProfileScopedKey.of(keyBase))
+    }
+
+    private fun loadString(keyBase: String): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(keyBase))
+
+    private fun saveString(keyBase: String, value: String) {
+        NSUserDefaults.standardUserDefaults.setObject(value, forKey = ProfileScopedKey.of(keyBase))
     }
 }

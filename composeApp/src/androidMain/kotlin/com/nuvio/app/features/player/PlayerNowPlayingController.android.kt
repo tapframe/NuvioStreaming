@@ -90,7 +90,10 @@ internal class AndroidPlayerNowPlayingController(
 
     private var metadata: AndroidNowPlayingMetadata? = null
     private var snapshot = PlayerPlaybackSnapshot()
-    private var artworkBitmap: Bitmap? = null
+    private var artworkArt: Bitmap? = null
+    private var artworkAlbumArt: Bitmap? = null
+    private var artworkDisplayIcon: Bitmap? = null
+    private var artworkNotificationIcon: Bitmap? = null
     private var released = false
     private var lastPublishedPositionMs = Long.MIN_VALUE
     private var lastPublishedDurationMs = Long.MIN_VALUE
@@ -126,7 +129,10 @@ internal class AndroidPlayerNowPlayingController(
             mediaSession.isActive = true
 
             if (artworkChanged) {
-                artworkBitmap = null
+                artworkArt = null
+                artworkAlbumArt = null
+                artworkDisplayIcon = null
+                artworkNotificationIcon = null
                 loadArtwork(normalized.artworkUrl)
             }
 
@@ -184,7 +190,10 @@ internal class AndroidPlayerNowPlayingController(
         artworkGeneration.incrementAndGet()
         metadata = null
         snapshot = PlayerPlaybackSnapshot()
-        artworkBitmap = null
+        artworkArt = null
+        artworkAlbumArt = null
+        artworkDisplayIcon = null
+        artworkNotificationIcon = null
         resetPublishedPlaybackState()
         mediaSession.setMetadata(null)
         mediaSession.setPlaybackState(
@@ -209,13 +218,23 @@ internal class AndroidPlayerNowPlayingController(
         snapshot.durationMs.takeIf { it > 0L }?.let { durationMs ->
             builder.putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs)
         }
-        artworkBitmap?.let { artwork ->
-            builder.putBitmap(MediaMetadata.METADATA_KEY_ART, artwork)
-            builder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artwork)
-            builder.putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, artwork)
+
+        val base = builder.build()
+        val withArtwork = artworkArt?.takeIf { !it.isRecycled }?.let { art ->
+            MediaMetadata.Builder(base)
+                .putBitmap(MediaMetadata.METADATA_KEY_ART, art)
+                .apply {
+                    artworkAlbumArt?.takeIf { !it.isRecycled }
+                        ?.let { putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, it) }
+                    artworkDisplayIcon?.takeIf { !it.isRecycled }
+                        ?.let { putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, it) }
+                }
+                .build()
         }
 
-        mediaSession.setMetadata(builder.build())
+        if (withArtwork == null || runCatching { mediaSession.setMetadata(withArtwork) }.isFailure) {
+            runCatching { mediaSession.setMetadata(base) }
+        }
     }
 
     private fun publishPlaybackState(force: Boolean) {
@@ -275,7 +294,7 @@ internal class AndroidPlayerNowPlayingController(
             sessionToken = mediaSession.sessionToken,
             metadata = currentMetadata,
             snapshot = snapshot,
-            artwork = artworkBitmap,
+            artwork = artworkNotificationIcon?.takeIf { !it.isRecycled },
         )
         PlayerNowPlayingService.publish(appContext, notification)
     }
@@ -291,10 +310,12 @@ internal class AndroidPlayerNowPlayingController(
 
             mainHandler.post {
                 if (released || generation != artworkGeneration.get() || metadata?.artworkUrl != urlString) {
-                    bitmap?.recycle()
                     return@post
                 }
-                artworkBitmap = bitmap
+                artworkArt = bitmap
+                artworkAlbumArt = bitmap?.let(::copyArtwork)
+                artworkDisplayIcon = bitmap?.let(::copyArtwork)
+                artworkNotificationIcon = bitmap?.let(::copyArtwork)
                 publishMetadata()
                 publishNotification()
             }
@@ -532,6 +553,9 @@ private fun downloadArtwork(urlString: String): Bitmap? {
         connection.disconnect()
     }
 }
+
+private fun copyArtwork(bitmap: Bitmap): Bitmap? =
+    if (bitmap.isRecycled) null else runCatching { bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false) }.getOrNull()
 
 private fun decodeSampledBitmap(bytes: ByteArray, maxEdgePx: Int): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }

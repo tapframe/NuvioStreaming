@@ -26,9 +26,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
 import com.nuvio.app.core.ui.landscapePosterWidth
+import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.collection.Collection
@@ -134,7 +136,11 @@ private fun CollectionFolderCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(aspectRatio),
+                .aspectRatio(aspectRatio)
+                .nuvioCardDepth(
+                    shape = shapeCorner,
+                    surface = NuvioCardDepthSurface.Posters,
+                ),
             shape = shapeCorner,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface,

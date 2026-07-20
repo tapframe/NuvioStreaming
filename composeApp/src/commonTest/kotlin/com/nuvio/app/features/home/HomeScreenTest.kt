@@ -10,6 +10,7 @@ import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.watchprogress.CachedInProgressItem
 import com.nuvio.app.features.watchprogress.CachedNextUpItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
+import com.nuvio.app.features.watchprogress.ContinueWatchingSortMode
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktHistory
 import com.nuvio.app.features.watchprogress.nextUpDismissKey
@@ -160,6 +161,72 @@ class HomeScreenTest {
 
         assertEquals(listOf("show:1:4"), result.map(ContinueWatchingItem::videoId))
         assertEquals("S1E4 • Current", result.single().subtitle)
+    }
+
+    @Test
+    fun `split upcoming mode moves only unaired next up episodes and sorts them by release`() {
+        val nowEpochMs = requireNotNull(parseReleaseDateToEpochMs("2026-07-19T12:00:00Z"))
+        val inProgress = progressEntry(
+            videoId = "movie-1",
+            title = "Movie",
+            lastUpdatedEpochMs = 500L,
+            seasonNumber = null,
+            episodeNumber = null,
+            episodeTitle = null,
+        ).toContinueWatchingItem()
+        val aired = continueWatchingItem(
+            videoId = "aired:1:2",
+            subtitle = "S1E2 • Aired",
+        ).copy(released = "2026-07-19T11:59:59Z")
+        val unknownRelease = continueWatchingItem(
+            videoId = "unknown:1:2",
+            subtitle = "S1E2 • Unknown",
+        )
+        val laterUpcoming = continueWatchingItem(
+            videoId = "later:1:2",
+            subtitle = "S1E2 • Later",
+        ).copy(released = "2026-07-21T00:00:00Z")
+        val soonerUpcoming = continueWatchingItem(
+            videoId = "sooner:1:2",
+            subtitle = "S1E2 • Sooner",
+        ).copy(released = "2026-07-20T00:00:00Z")
+
+        val (main, upcoming) = splitUpcomingItems(
+            items = listOf(laterUpcoming, inProgress, aired, unknownRelease, soonerUpcoming),
+            mode = ContinueWatchingSortMode.SPLIT_UPCOMING,
+            nowEpochMs = nowEpochMs,
+        )
+
+        assertEquals(
+            listOf("movie-1", "aired:1:2", "unknown:1:2"),
+            main.map(ContinueWatchingItem::videoId),
+        )
+        assertEquals(
+            listOf("sooner:1:2", "later:1:2"),
+            upcoming.map(ContinueWatchingItem::videoId),
+        )
+    }
+
+    @Test
+    fun `non split sort modes keep upcoming episodes in continue watching`() {
+        val futureItem = continueWatchingItem(
+            videoId = "future:1:2",
+            subtitle = "S1E2 • Future",
+        ).copy(released = "2099-01-01T00:00:00Z")
+
+        listOf(
+            ContinueWatchingSortMode.DEFAULT,
+            ContinueWatchingSortMode.STREAMING_STYLE,
+        ).forEach { mode ->
+            val (main, upcoming) = splitUpcomingItems(
+                items = listOf(futureItem),
+                mode = mode,
+                nowEpochMs = 0L,
+            )
+
+            assertEquals(listOf(futureItem), main)
+            assertTrue(upcoming.isEmpty())
+        }
     }
 
     @Test

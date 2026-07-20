@@ -416,12 +416,14 @@
     <string name="compose_settings_page_licenses_attributions">Licencie a atribúcie</string>
     <string name="compose_settings_page_mdblist_ratings">Hodnotenia MDBList</string>
     <string name="compose_settings_page_meta_screen">Stránka s podrobnosťami</string>
+    <string name="settings_appearance_section_detail_page">STRÁNKA S PODROBNOSŤAMI</string>
     <string name="compose_settings_page_notifications">Oznámenia</string>
     <string name="compose_settings_page_playback">Prehrávanie</string>
     <string name="compose_settings_page_plugins">Pluginy</string>
     <string name="compose_settings_page_poster_customization">Štýl karty plagátu</string>
     <string name="compose_settings_page_root">Nastavenia</string>
     <string name="compose_settings_page_streams">Streamy</string>
+    <string name="settings_appearance_section_streams">STREAMY</string>
     <string name="compose_settings_page_supporters_contributors">Podporovatelia a prispievatelia</string>
     <string name="compose_settings_page_tmdb_enrichment">Obohatenie TMDB</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -562,8 +564,8 @@
     <string name="settings_homescreen_section_catalogs">KATALÓGY</string>
     <string name="settings_homescreen_section_catalogs_collections">KATALÓGY A KOLEKCIE</string>
     <string name="settings_homescreen_section_collections">KOLEKCIE</string>
-    <string name="settings_homescreen_section_hero">Rozloženie domovskej obrazovky</string>
-    <string name="settings_homescreen_section_hero_sources">Katalógy hero sekcie</string>
+    <string name="settings_homescreen_section_hero">ROZLOŽENIE DOMOVSKEJ OBRAZOVKY</string>
+    <string name="settings_homescreen_section_hero_sources">KATALÓGY HERO SEKCIE</string>
     <string name="settings_homescreen_selected_count">%1$d z %2$d vybraných</string>
     <string name="settings_homescreen_show_hero">Zobraziť hero sekciu</string>
     <string name="settings_homescreen_show_hero_description">Zobraziť hero karusel v hornej časti domovskej obrazovky.</string>
@@ -577,7 +579,7 @@
     <string name="settings_hide_secret">Skryť hodnotu</string>
     <string name="settings_playback_subtitle">Prehrávač, titulky a automatické prehrávanie</string>
     <string name="settings_poster_card_radius">Polomer rohov</string>
-    <string name="settings_poster_card_style">Štýl karty plagátu</string>
+    <string name="settings_poster_card_style">ŠTÝL KARTY PLAGÁTU</string>
     <string name="settings_poster_card_width">Šírka</string>
     <string name="settings_poster_custom">Vlastné</string>
     <string name="settings_poster_description">Nastaviť šírku karty a polomer rohov.</string>
@@ -612,7 +614,7 @@
     <string name="settings_continue_watching_sort_mode_default_desc">Zoradiť všetky položky podľa aktuálnosti</string>
     <string name="settings_continue_watching_sort_mode_streaming">Štýl streamovania</string>
     <string name="settings_continue_watching_sort_mode_streaming_desc">Vydané položky ako prvé, nadchádzajúce na konci</string>
-    <string name="settings_continue_watching_section_card_style">Štýl karty plagátu</string>
+    <string name="settings_continue_watching_section_card_style">ŠTÝL KARTY PLAGÁTU</string>
     <string name="settings_continue_watching_section_on_launch">PRI SPUSTENÍ</string>
     <string name="settings_continue_watching_section_up_next_behavior">SPRÁVANIE ĎALŠEJ EPIZÓDY</string>
     <string name="settings_continue_watching_section_visibility">VIDITEĽNOSŤ</string>
@@ -635,11 +637,11 @@
     <string name="settings_content_discovery_homescreen_description">Upraviť rozloženie domovskej obrazovky, viditeľnosť obsahu a správanie plagátov</string>
     <string name="settings_content_discovery_meta_screen_description">Nastavenia pre obrazovky s podrobnosťami a epizódami.</string>
     <string name="settings_content_discovery_collections_description">Vytvoriť vlastné skupiny katalógov s priečinkami zobrazenými na domovskej obrazovke.</string>
-    <string name="settings_integrations_section_title">Integrácie</string>
+    <string name="settings_integrations_section_title">INTEGRÁCIE</string>
     <string name="settings_integrations_tmdb_description">Ovládacie prvky obohatenia metadát</string>
     <string name="settings_integrations_mdblist_description">Poskytovatelia externých hodnotení</string>
     <string name="settings_integrations_debrid_description">Pripojiť účty pre odkazy a prístup ku knižnici</string>
-    <string name="settings_debrid_section_title">Prepojené služby</string>
+    <string name="settings_debrid_section_title">PREPOJENÉ SLUŽBY</string>
     <string name="settings_debrid_experimental_notice">Tieto integrácie sú experimentálne a môžu byť zachované, zmenené alebo neskôr odstránené.</string>
     <string name="settings_debrid_cloud_library">Cloudová knižnica</string>
     <string name="settings_debrid_cloud_library_description">Prehliadať a prehrávať súbory, ktoré sú už vo vašich prepojených účtoch.</string>
@@ -648,7 +650,7 @@
     <string name="settings_debrid_resolve_with">Riešiť pomocou</string>
     <string name="settings_debrid_resolve_with_description">Vyberte, ktorý prepojený účet spracováva prehrávateľné odkazy.</string>
     <string name="settings_debrid_add_key_first">Najprv pripojte účet.</string>
-    <string name="settings_debrid_section_providers">Účty</string>
+    <string name="settings_debrid_section_providers">ÚČTY</string>
     <string name="settings_debrid_provider_description">Pripojiť váš účet %1$s.</string>
     <string name="settings_debrid_provider_device_description">Prepojiť váš účet %1$s v prehliadači.</string>
     <string name="settings_debrid_dialog_title">API kľúč %1$s</string>
@@ -668,26 +670,26 @@
     <string name="settings_debrid_device_auth_failed">Nepodarilo sa spustiť prihlásenie.</string>
     <string name="settings_debrid_device_auth_missing_configuration">Táto metóda prihlásenia nie je nakonfigurovaná v tejto zostave.</string>
     <string name="settings_debrid_device_auth_expired">Platnosť tohto kódu vypršala. Skúste znova.</string>
-    <string name="settings_debrid_section_instant_playback">Príprava odkazov</string>
+    <string name="settings_debrid_section_instant_playback">PRÍPRAVA ODKAZOV</string>
     <string name="settings_debrid_prepare_instant_playback">Pripraviť odkazy</string>
     <string name="settings_debrid_prepare_instant_playback_description">Riešiť prehrávateľné odkazy pred začatím prehrávania.</string>
     <string name="settings_debrid_prepare_stream_count">Počet odkazov na prípravu</string>
     <string name="settings_debrid_prepare_stream_count_warning">Ak je to možné, použite nižší počet. Prepojené služby môžu obmedzovať počet odkazov, ktoré je možné vyriešiť za určité časové obdobie. Otvorenie filmu alebo epizódy sa môže zarátať do týchto limitov, aj keď nestlačíte Sledovať, pretože sa odkazy pripravujú vopred.</string>
     <string name="settings_debrid_prepare_count_one">1 odkaz</string>
     <string name="settings_debrid_prepare_count_many">%1$d odkazov</string>
-    <string name="settings_debrid_section_formatting">Formátovanie</string>
+    <string name="settings_debrid_section_formatting">FORMÁTOVANIE</string>
     <string name="settings_debrid_name_template">Šablóna názvu</string>
     <string name="settings_debrid_name_template_description">Ovláda, ako sa zobrazujú názvy výsledkov. Nechajte prázdne, aby sa použil pôvodný názov výsledku.</string>
     <string name="settings_debrid_description_template">Šablóna popisu</string>
     <string name="settings_debrid_description_template_description">Ovláda metadáta zobrazené pod každým výsledkom. Nechajte prázdne, aby sa použili pôvodné podrobnosti výsledku.</string>
     <string name="settings_debrid_formatter_reset_title">Obnoviť formátovanie</string>
     <string name="settings_debrid_formatter_reset_subtitle">Obnoviť predvolené formátovanie výsledkov.</string>
-    <string name="settings_stream_badges_section">Štýl Fusion</string>
+    <string name="settings_stream_badges_section">ŠTÝL FUSION</string>
     <string name="settings_stream_size_badges_title">Odznaky veľkosti</string>
     <string name="settings_stream_size_badges_description">Zobraziť odznaky veľkosti súboru vo výsledkoch streamov a paneloch zdrojov prehrávača.</string>
     <string name="settings_stream_addon_logo_title">Logo doplnku</string>
     <string name="settings_stream_addon_logo_description">Zobraziť logo a názov doplnku vedľa zdrojov streamov.</string>
-    <string name="settings_stream_display_section">Zobrazenie</string>
+    <string name="settings_stream_display_section">ZOBRAZENIE</string>
     <string name="settings_stream_badge_position_title">Poloha odznaku</string>
     <string name="settings_stream_badge_position_description">Vyberte, či sa odznaky Fusion a veľkosti zobrazujú nad alebo pod kartami streamov.</string>
     <string name="settings_stream_badge_position_dialog_title">Poloha odznaku</string>
@@ -722,9 +724,9 @@
     <string name="settings_mdb_api_key_title">API kľúč</string>
     <string name="settings_mdb_enable_ratings">Povoliť hodnotenia MDBList</string>
     <string name="settings_mdb_enable_ratings_description">Načítať hodnotenia od externých poskytovateľov na obrazovke s podrobnosťami metadát</string>
-    <string name="settings_mdb_section_api_key">API kľúč</string>
-    <string name="settings_mdb_section_rating_providers">Poskytovatelia externých hodnotení</string>
-    <string name="settings_mdb_section_title">Hodnotenia MDBList</string>
+    <string name="settings_mdb_section_api_key">API KĽÚČ</string>
+    <string name="settings_mdb_section_rating_providers">POSKYTOVATELIA EXTERNÝCH HODNOTENÍ</string>
+    <string name="settings_mdb_section_title">HODNOTENIA MDBList</string>
     <string name="settings_meta_actions">Akcie</string>
     <string name="settings_meta_actions_description">Ovládacie prvky prehrávania a ukladania.</string>
     <string name="settings_meta_cast">Obsadenie</string>
@@ -998,7 +1000,7 @@
     <string name="settings_tmdb_section_credentials">PRIHLASOVACIE ÚDAJE</string>
     <string name="settings_tmdb_section_localization">LOKALIZÁCIA</string>
     <string name="settings_tmdb_section_modules">MODULY</string>
-    <string name="settings_tmdb_section_title">Obohatenie TMDB</string>
+    <string name="settings_tmdb_section_title">OBOHATENIE TMDB</string>
     <string name="settings_trakt_approval_redirect">Po schválení budete automaticky presmerovaný späť.</string>
     <string name="settings_trakt_authentication">AUTENTIFIKÁCIA</string>
     <string name="settings_trakt_comments">Komentáre</string>
@@ -1604,7 +1606,7 @@
     <string name="player_ios_preset_custom_desc">Použiť vaše pokročilé hodnoty nižšie.</string>
     <string name="player_ios_hardware_decoder_off">Vypnuté</string>
     <!-- Playback settings iOS video output -->
-    <string name="settings_playback_ios_video_output">Výstup videa iOS</string>
+    <string name="settings_playback_ios_video_output">VÝSTUP VIDEA iOS</string>
     <string name="settings_playback_ios_hardware_decoder">Hardvérový dekodér</string>
     <string name="settings_playback_ios_extended_dynamic_range">Rozšírený dynamický rozsah</string>
     <string name="settings_playback_ios_extended_dynamic_range_desc">Predvolený režim výstupu Metal pre nové relácie prehrávania.</string>
@@ -1613,13 +1615,13 @@
     <string name="settings_playback_ios_target_primaries">Cieľové primárne farby</string>
     <string name="settings_playback_ios_target_transfer">Cieľový prenos</string>
     <!-- Playback settings iOS audio output -->
-    <string name="settings_playback_ios_audio_output_section">Výstup zvuku iOS</string>
+    <string name="settings_playback_ios_audio_output_section">VÝSTUP ZVUKU iOS</string>
     <string name="settings_playback_ios_audio_output">Výstup zvuku</string>
     <string name="settings_playback_ios_audio_output_auto_desc">Najprv vyskúšať AVFoundation, potom zálohovať na AudioUnit.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Experimentálna podpora priestorového zvuku a viackanálového výstupu.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Použiť starší výstup AudioUnit.</string>
     <!-- Debrid Result Management section -->
-    <string name="settings_debrid_section_result_management">Správa výsledkov</string>
+    <string name="settings_debrid_section_result_management">SPRÁVA VÝSLEDKOV</string>
     <string name="settings_debrid_max_results">Maximálny počet výsledkov</string>
     <string name="settings_debrid_max_results_desc">Obmedziť počet zobrazených výsledkov.</string>
     <string name="settings_debrid_sort_results">Zoradiť výsledky</string>
@@ -1887,6 +1889,7 @@
     <string name="p2p_consent_cancel">Zrušiť</string>
     <string name="p2p_error_unknown">Neznáma chyba torrentu</string>
     <string name="settings_p2p_title">P2P Streamovanie</string>
+    <string name="settings_playback_section_p2p">P2P STREAMOVANIE</string>
     <string name="settings_p2p_subtitle">Povoliť peer-to-peer (torrent) streamy</string>
     <string name="settings_p2p_hide_stats_title">Skryť štatistiky torrentu</string>
     <string name="settings_p2p_hide_stats_subtitle">Skryť buffer, seedy, peery a rýchlosť sťahovania počas načítavania a prehrávania</string>

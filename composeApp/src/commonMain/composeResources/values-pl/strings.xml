@@ -404,6 +404,7 @@
     <string name="compose_settings_page_licenses_attributions">Licencje i atrybucje</string>
     <string name="compose_settings_page_mdblist_ratings">Oceny MDBList</string>
     <string name="compose_settings_page_meta_screen">Ekran metadanych</string>
+    <string name="settings_appearance_section_detail_page">EKRAN METADANYCH</string>
     <string name="compose_settings_page_notifications">Powiadomienia</string>
     <string name="compose_settings_page_playback">Odtwarzanie</string>
     <string name="compose_settings_page_plugins">Wtyczki</string>
@@ -589,6 +590,9 @@
     <string name="settings_continue_watching_sort_mode_default_desc">Sortuj wszystkie elementy według czasu</string>
     <string name="settings_continue_watching_sort_mode_streaming">Styl streamingowy</string>
     <string name="settings_continue_watching_sort_mode_streaming_desc">Wydane najpierw, nadchodzące na końcu</string>
+    <string name="settings_continue_watching_sort_mode_split_upcoming">Oddzielny rząd Nadchodzące</string>
+    <string name="settings_continue_watching_sort_mode_split_upcoming_desc">Przenieś niewydane odcinki do oddzielnego rzędu Nadchodzące</string>
+    <string name="upcoming_section_title">Nadchodzące</string>
     <string name="settings_continue_watching_section_card_style">STYL KARTY</string>
     <string name="settings_continue_watching_section_on_launch">PRZY URUCHOMIENIU</string>
     <string name="settings_continue_watching_section_up_next_behavior">ZACHOWANIE NASTĘPNEGO</string>
@@ -615,7 +619,7 @@
     <string name="settings_integrations_tmdb_description">Wzbogać strony szczegółów grafikami TMDB, obsadą, metadanymi odcinków i nie tylko.</string>
     <string name="settings_integrations_mdblist_description">Dodaj oceny IMDb, Rotten Tomatoes, Metacritic i inne zewnętrzne oceny do stron szczegółów.</string>
     <string name="settings_integrations_debrid_description">Eksperymentalne źródła z kont chmurowych</string>
-    <string name="settings_debrid_section_title">Debrid</string>
+    <string name="settings_debrid_section_title">DEBRID</string>
     <string name="settings_debrid_experimental_notice">Obsługa Debrid jest eksperymentalna i może zostać zachowana, zmieniona lub usunięta w przyszłości.</string>
     <string name="settings_debrid_cloud_library">Biblioteka w chmurze</string>
     <string name="settings_debrid_cloud_library_description">Przeglądaj i odtwarzaj pliki z połączonych kont.</string>
@@ -624,7 +628,7 @@
     <string name="settings_debrid_resolve_with">Rozwiązuj przez</string>
     <string name="settings_debrid_resolve_with_description">Wybierz, które połączone konto obsługuje odtwarzalne linki.</string>
     <string name="settings_debrid_add_key_first">Najpierw dodaj klucz API.</string>
-    <string name="settings_debrid_section_providers">Konto</string>
+    <string name="settings_debrid_section_providers">KONTO</string>
     <string name="settings_debrid_provider_description">Połącz swoje konto %1$s.</string>
     <string name="settings_debrid_provider_device_description">Połącz konto %1$s w przeglądarce.</string>
     <string name="settings_debrid_provider_torbox_description">Połącz swoje konto Torbox.</string>
@@ -645,14 +649,14 @@
     <string name="settings_debrid_device_auth_failed">Nie udało się rozpocząć logowania.</string>
     <string name="settings_debrid_device_auth_missing_configuration">Ta metoda logowania nie jest skonfigurowana w tej wersji.</string>
     <string name="settings_debrid_device_auth_expired">Ten kod wygasł. Spróbuj ponownie.</string>
-    <string name="settings_debrid_section_instant_playback">Natychmiastowe odtwarzanie</string>
+    <string name="settings_debrid_section_instant_playback">NATYCHMIASTOWE ODTWARZANIE</string>
     <string name="settings_debrid_prepare_instant_playback">Przygotuj linki</string>
     <string name="settings_debrid_prepare_instant_playback_description">Rozwiąż pierwsze źródła przed rozpoczęciem odtwarzania.</string>
     <string name="settings_debrid_prepare_stream_count">Źródła do przygotowania</string>
     <string name="settings_debrid_prepare_stream_count_warning">Używaj niższej liczby, gdy to możliwe. Usługi Debrid mogą ograniczać liczbę linków rozwiązywanych w danym okresie. Otwarcie filmu lub odcinka może się wliczać do tych limitów, nawet jeśli nie naciśniesz Odtwórz, ponieważ linki są przygotowywane z wyprzedzeniem.</string>
     <string name="settings_debrid_prepare_count_one">1 źródło</string>
     <string name="settings_debrid_prepare_count_many">%1$d źródeł</string>
-    <string name="settings_debrid_section_formatting">Formatowanie</string>
+    <string name="settings_debrid_section_formatting">FORMATOWANIE</string>
     <string name="settings_debrid_name_template">Szablon nazwy</string>
     <string name="settings_debrid_name_template_description">Kontroluje sposób wyświetlania nazw źródeł.</string>
     <string name="settings_debrid_description_template">Szablon opisu</string>
@@ -1468,7 +1472,7 @@
     <string name="cloud_library_type_web">Web</string>
     <string name="settings_stream_addon_logo_title">Logo dodatku</string>
     <string name="settings_stream_addon_logo_description">Pokazuj logo i nazwę dodatku obok źródeł.</string>
-    <string name="settings_stream_display_section">Wyświetlanie</string>
+    <string name="settings_stream_display_section">WYŚWIETLANIE</string>
     <string name="settings_playback_option_original">Język oryginalny</string>
     <string name="settings_playback_option_original_hint">Wymaga włączonego wzbogacania TMDB</string>
     <string name="settings_appearance_app_language_device">Język urządzenia</string>
@@ -1543,6 +1547,7 @@
     <string name="compose_player_subtitle_lines_load_error">Nie udało się załadować linii napisów</string>
     <string name="compose_settings_page_advanced">Zaawansowane</string>
     <string name="compose_settings_page_streams">Źródła</string>
+    <string name="settings_appearance_section_streams">ŹRÓDŁA</string>
     <string name="compose_settings_root_advanced_description">Uruchamianie i zachowanie profilu.</string>
     <string name="compose_settings_root_advanced_section">ZAAWANSOWANE</string>
     <string name="compose_settings_root_streams_description">Wyświetlanie wyników źródeł i reguły badge URL.</string>
@@ -1730,7 +1735,7 @@
     <string name="settings_debrid_rule_required_resolutions_desc">Pokazuj tylko wybrane rozdzielczości.</string>
     <string name="settings_debrid_rule_required_visual_tags">Wymagane tagi wizualne</string>
     <string name="settings_debrid_rule_required_visual_tags_desc">Wymagaj DV, HDR, 10bit, IMAX, SDR i podobnych tagów.</string>
-    <string name="settings_debrid_section_result_management">Zarządzanie wynikami</string>
+    <string name="settings_debrid_section_result_management">ZARZĄDZANIE WYNIKAMI</string>
     <string name="settings_debrid_selection_any">Dowolne</string>
     <string name="settings_debrid_selection_count">%1$d wybranych</string>
     <string name="settings_debrid_size_min">%1$dGB+</string>
@@ -1767,6 +1772,7 @@
     <string name="settings_p2p_hide_stats_title">Ukryj statystyki torrenta</string>
     <string name="settings_p2p_subtitle">Zezwalaj na strumienie peer-to-peer (torrent)</string>
     <string name="settings_p2p_title">Strumieniowanie P2P</string>
+    <string name="settings_playback_section_p2p">STRUMIENIOWANIE P2P</string>
     <string name="settings_playback_introdb_invalid_api_key">Nieprawidłowy klucz API lub błąd połączenia</string>
     <string name="settings_playback_introdb_invalid_key">Nieprawidłowy klucz API lub błąd połączenia</string>
     <string name="settings_playback_ios_audio_output">Wyjście audio</string>
@@ -1774,7 +1780,7 @@
     <string name="settings_playback_ios_audio_output_auto_desc">Użyj AudioUnit, gdy wyjście AVFoundation jest tymczasowo wyłączone.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Eksperymentalna obsługa Spatial Audio i wielokanałowego wyjścia.</string>
     <string name="settings_playback_ios_audio_output_dialog">Wyjście audio</string>
-    <string name="settings_playback_ios_audio_output_section">Wyjście audio iOS</string>
+    <string name="settings_playback_ios_audio_output_section">WYJŚCIE AUDIO iOS</string>
     <string name="settings_playback_ios_display_color_hint">Wskazówka koloru wyświetlacza</string>
     <string name="settings_playback_ios_display_color_hint_desc">Pozwól mpv celować w aktywną przestrzeń kolorów wyświetlacza.</string>
     <string name="settings_playback_ios_extended_dynamic_range">Rozszerzony zakres dynamiczny</string>
@@ -1785,7 +1791,7 @@
     <string name="settings_playback_ios_target_primaries_dialog">Docelowe kolory podstawowe</string>
     <string name="settings_playback_ios_target_transfer">Docelowy transfer</string>
     <string name="settings_playback_ios_target_transfer_dialog">Docelowy transfer</string>
-    <string name="settings_playback_ios_video_output">Wyjście wideo iOS</string>
+    <string name="settings_playback_ios_video_output">WYJŚCIE WIDEO iOS</string>
     <string name="settings_playback_touch_gestures">Gesty dotykowe</string>
     <string name="settings_playback_touch_gestures_description">Pozwól na przesunięcia i podwójne dotknięcia na powierzchni odtwarzacza do przewijania, regulacji jasności lub głośności.</string>
     <string name="settings_stream_badge_enter_url">Wprowadź URL JSON badge.</string>
@@ -1797,7 +1803,7 @@
     <string name="settings_stream_badge_position_dialog_title">Pozycja badge</string>
     <string name="settings_stream_badge_position_title">Pozycja badge</string>
     <string name="settings_stream_badge_position_top">Na górze</string>
-    <string name="settings_stream_badges_section">Styl Fusion</string>
+    <string name="settings_stream_badges_section">STYL FUSION</string>
     <string name="settings_stream_badge_url_scheme_invalid">URL badge musi zaczynać się od http:// lub https://.</string>
     <string name="settings_stream_badge_urls_description">Importuj do %1$d URL JSON badge Fusion. Każdy URL można aktualizować lub usuwać osobno.</string>
     <string name="settings_stream_badge_urls_search_description">Zarządzaj zaimportowanymi URL JSON badge Fusion.</string>
@@ -1906,7 +1912,7 @@
     <string name="settings_nav_bar_style_expanded">Zawsze rozwinięty</string>
     <string name="settings_nav_bar_style_compact">Zawsze kompaktowy</string>
     <string name="settings_nav_bar_style_classic">Klasyczny</string>
-    <string name="settings_card_depth_title">Efekt głębi karty</string>
+    <string name="settings_card_depth_title">EFEKT GŁĘBI KARTY</string>
     <string name="settings_card_depth_description">Dodaje podświetloną górną krawędź i delikatny połysk do kart graficznych, tworząc subtelne wrażenie głębi.</string>
     <string name="settings_card_depth_enabled">Włącz efekt głębi</string>
     <string name="settings_card_depth_edge">Blask krawędzi</string>

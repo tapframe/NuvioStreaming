@@ -1,172 +1,775 @@
 package com.nuvio.app.features.p2p
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.nuvio.app.core.i18n.localizedP2pUnknownTorrentError
+import com.nuvio.engine.NuvioEngine
+import com.nuvio.engine.NuvioEngineConfig
+import com.nuvio.engine.NuvioEventType
+import com.nuvio.engine.NuvioStream
+import com.nuvio.engine.NuvioTorrentProfile
+import com.nuvio.engine.NuvioUploadMode
+import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
-import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 
 private const val TAG = "P2pStreamingEngine"
-private val VIDEO_EXTENSIONS = setOf("mkv", "mp4", "avi", "webm", "ts", "m4v", "mov", "wmv", "flv")
+private const val DIAGNOSTIC_TAG = "NuvioP2PDiag"
+private const val DIAGNOSTIC_SAMPLE_INTERVAL_MS = 1_000L
+
+internal fun buildNuvioEngineConfig(
+    stateDirectory: File,
+    cacheDirectory: File,
+    uploadEnabled: Boolean,
+    torrentProfile: P2pTorrentProfile,
+    diskCacheCapacityBytes: Long,
+): NuvioEngineConfig = NuvioEngineConfig(
+    dataDirectory = stateDirectory,
+    cacheDirectory = cacheDirectory,
+    diskCacheCapacityBytes = diskCacheCapacityBytes,
+    torrentProfile = when (torrentProfile) {
+        P2pTorrentProfile.SOFT -> NuvioTorrentProfile.Soft
+        P2pTorrentProfile.BALANCED -> NuvioTorrentProfile.Balanced
+        P2pTorrentProfile.FAST -> NuvioTorrentProfile.Fast
+    },
+    uploadMode = if (uploadEnabled) {
+        NuvioUploadMode.Unlimited
+    } else {
+        NuvioUploadMode.Disabled
+    },
+    streamInactivityTimeoutMilliseconds = 0,
+)
+
+internal fun unexpectedStreamStopError(
+    requestId: Long,
+    eventStreamId: String?,
+    currentStreamId: String?,
+    message: String?,
+    fallbackMessage: String,
+): P2pStreamingState.Error? {
+    if (requestId != 0L || currentStreamId == null || eventStreamId != currentStreamId) {
+        return null
+    }
+    return P2pStreamingState.Error(
+        message?.trim()?.takeIf(String::isNotEmpty) ?: fallbackMessage,
+    )
+}
 
 actual object P2pStreamingEngine {
+    private data class EngineConfigurationKey(
+        val uploadEnabled: Boolean,
+        val torrentProfile: P2pTorrentProfile,
+        val diskCacheCapacityBytes: Long,
+    )
+
+    private data class DetachedStream(
+        val engine: NuvioEngine?,
+        val streamId: String?,
+    )
+
     private val _state = MutableStateFlow<P2pStreamingState>(P2pStreamingState.Idle)
     actual val state: StateFlow<P2pStreamingState> = _state.asStateFlow()
+    private val _cacheState = MutableStateFlow(P2pCacheUiState())
+    actual val cacheState: StateFlow<P2pCacheUiState> = _cacheState.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lifecycleLock = Any()
+    private val startMutex = Mutex()
     private var statsJob: Job? = null
     private var cleanupJob: Job? = null
-    private var currentHash: String? = null
+    private var engineEventsJob: Job? = null
     private var streamGeneration = 0L
+    @Volatile
+    private var currentTorrentId: String? = null
+    @Volatile
+    private var currentStreamId: String? = null
     private var appContext: Context? = null
-    private val binary = TorrServerBinary()
-    private val api = TorrServerApi(binary)
+    @Volatile
+    private var engine: NuvioEngine? = null
+    private var engineConfigurationKey: EngineConfigurationKey? = null
+    private val knownTorrentIds = mutableSetOf<String>()
+    private var diagnosticRequestSequence = 0L
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
-        binary.initialize(context.applicationContext)
     }
 
     actual suspend fun startStream(request: P2pStreamRequest): String = withContext(Dispatchers.IO) {
-        stopStreamNow(stopBinary = false)
-        val generation = nextStreamGeneration()
-        _state.value = P2pStreamingState.Connecting
+        startMutex.withLock { startStreamLocked(request) }
+    }
 
-        try {
-            binary.start()
+    actual suspend fun clearCache(): P2pCacheClearResult = withContext(Dispatchers.IO) {
+        startMutex.withLock {
+            check(_state.value !is P2pStreamingState.Streaming &&
+                _state.value !is P2pStreamingState.Connecting) {
+                "Torrent cache cannot be cleared during active playback"
+            }
+            _cacheState.value = _cacheState.value.copy(isClearing = true)
+            try {
+                val activeEngine = ensureEngine()
+                if (!_cacheState.value.hasMeasurement) {
+                    delay(DIAGNOSTIC_SAMPLE_INTERVAL_MS + 100L)
+                    val initial = activeEngine.stats.value
+                    updateCacheState(
+                        initial.diskCacheUsedBytes,
+                        initial.diskCacheProtectedBytes,
+                    )
+                }
+                val before = activeEngine.stats.value
+                activeEngine.reclaimDiskCache(0L)
+                delay(DIAGNOSTIC_SAMPLE_INTERVAL_MS + 100L)
+                val after = activeEngine.stats.value
+                updateCacheState(after.diskCacheUsedBytes, after.diskCacheProtectedBytes)
+                P2pCacheClearResult(
+                    reclaimedBytes = (before.diskCacheUsedBytes - after.diskCacheUsedBytes)
+                        .coerceAtLeast(0L),
+                    remainingBytes = after.diskCacheUsedBytes,
+                    protectedBytes = after.diskCacheProtectedBytes,
+                )
+            } finally {
+                _cacheState.value = _cacheState.value.copy(isClearing = false)
+            }
+        }
+    }
+
+    private suspend fun startStreamLocked(request: P2pStreamRequest): String {
+        val requestSequence = nextDiagnosticRequestSequence()
+        val startedAtMs = SystemClock.elapsedRealtime()
+        val phase = AtomicReference("stop_previous")
+        Log.i(
+            DIAGNOSTIC_TAG,
+            "start request=$requestSequence phase=accepted hash=${diagnosticId(request.infoHash)} " +
+                "fileIndex=${request.fileIdx ?: -1} filenameHint=${!request.filename.isNullOrBlank()} " +
+                "requestTrackers=${request.trackers.size}",
+        )
+        stopStreamNow(shutdownEngine = false)
+        logPhase(requestSequence, startedAtMs, phase.get())
+        val generation = beginStreamGeneration()
+
+        var activeEngine: NuvioEngine? = null
+        var payloadDownloadBaseline = 0L
+        var preparedStream: NuvioStream? = null
+        var attached = false
+        var startupStatsJob: Job? = null
+        return try {
+            phase.set("build_magnet")
+            val magnetUri = buildP2pMagnetUri(
+                request.infoHash,
+                (DEFAULT_TRACKERS + request.trackers).distinct(),
+            )
+            logPhase(requestSequence, startedAtMs, phase.get())
+
+            phase.set("ensure_engine")
+            val resolvedEngine = ensureEngine()
+            activeEngine = resolvedEngine
+            payloadDownloadBaseline = resolvedEngine.stats.value.totalPayloadDownloadBytes
             ensureCurrentGeneration(generation)
+            logPhase(requestSequence, startedAtMs, phase.get())
+            startupStatsJob = startStartupStatsPolling(
+                activeEngine = resolvedEngine,
+                generation = generation,
+                phase = phase,
+                requestSequence = requestSequence,
+                startedAtMs = startedAtMs,
+            )
 
-            val magnetLink = buildMagnetUri(request.infoHash, request.trackers)
-            Log.d(TAG, "Starting stream: $magnetLink")
+            phase.set("add_magnet")
+            val canonicalHash = canonicalP2pInfoHash(request.infoHash)
+            val reusedTorrent = canonicalHash in knownTorrentIds
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=${phase.get()} begin elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "cached=$reusedTorrent hash=${diagnosticId(canonicalHash)}",
+            )
+            val torrentId = if (reusedTorrent) {
+                canonicalHash
+            } else {
+                resolvedEngine.addMagnet(magnetUri).also { knownTorrentIds += it }
+            }
+            ensureCurrentGeneration(generation)
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=${phase.get()} complete elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "torrent=${diagnosticId(torrentId)} cached=$reusedTorrent",
+            )
 
-            val hash = api.addTorrent(magnetLink)
-                ?: throw P2pStreamingException("Failed to add torrent")
-            if (!attachTorrentIfCurrent(generation, hash)) {
-                api.dropTorrent(hash)
+            phase.set("prepare_stream")
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=${phase.get()} begin elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "fileIndex=${request.fileIdx ?: -1}",
+            )
+            val stream = resolvedEngine.prepareStream(
+                torrentId = torrentId,
+                fileIndex = request.fileIdx,
+                filenameHint = request.filename,
+            )
+            preparedStream = stream
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=${phase.get()} complete elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "stream=${diagnosticId(stream.id)} selectedFile=${stream.fileIndex} fileBytes=${stream.fileSize} " +
+                    "url=${diagnosticLoopbackUrl(stream.url)}",
+            )
+            currentCoroutineContext().ensureActive()
+            phase.set("attach_route")
+            if (!attachStreamIfCurrent(generation, torrentId, stream.id)) {
+                withContext(NonCancellable) {
+                    stopPreparedStream(resolvedEngine, stream.id)
+                }
+                preparedStream = null
                 throw CancellationException("P2P stream start was cancelled")
             }
+            attached = true
+            logPhase(requestSequence, startedAtMs, phase.get())
 
-            val resolvedIdx = resolveFileIndex(
-                hash = hash,
-                requestedIdx = request.fileIdx,
-                filename = request.filename,
+            startStatsPolling(
+                activeEngine = resolvedEngine,
+                stream = stream,
+                generation = generation,
+                requestSequence = requestSequence,
+                startedAtMs = startedAtMs,
+                payloadDownloadBaseline = payloadDownloadBaseline,
             )
-            ensureCurrentGeneration(generation)
-
-            val streamUrl = api.getStreamUrl(magnetLink, resolvedIdx)
-            Log.d(TAG, "Stream URL: $streamUrl")
-
-            startStatsPolling(hash, generation)
-
-            ensureCurrentGeneration(generation)
-            _state.value = P2pStreamingState.Streaming(
-                localUrl = streamUrl,
-                downloadSpeed = 0,
-                uploadSpeed = 0,
-                peers = 0,
-                seeds = 0,
-                bufferProgress = 0f,
-                totalProgress = 0f,
-            )
-
-            streamUrl
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (isCurrentGeneration(generation)) {
-                _state.value = P2pStreamingState.Error(e.message ?: localizedP2pUnknownTorrentError())
+            val initialAggregate = resolvedEngine.stats.value
+            if (!publishStreamingIfCurrent(
+                    generation = generation,
+                    state = P2pStreamingState.Streaming(
+                        localUrl = stream.url,
+                        downloadSpeed = initialAggregate.downloadRateBytesPerSecond,
+                        uploadSpeed = initialAggregate.uploadRateBytesPerSecond,
+                        peers = initialAggregate.connectedPeers,
+                        seeds = initialAggregate.connectedSeeds,
+                        bufferProgress = 0f,
+                        totalProgress = 0f,
+                        downloadedBytes = (initialAggregate.totalPayloadDownloadBytes -
+                            payloadDownloadBaseline).coerceAtLeast(0L),
+                    ),
+                )) {
+                throw CancellationException("P2P stream start was cancelled")
             }
-            throw e
+            Log.i(TAG, "Nuvio Engine stream ready: ${stream.url}")
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=route_ready elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "generation=$generation stream=${diagnosticId(stream.id)}",
+            )
+            stream.url
+        } catch (cancellation: CancellationException) {
+            Log.w(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=${phase.get()} cancelled elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "generation=$generation",
+            )
+            withContext(NonCancellable) {
+                cleanupFailedStart(
+                    generation = generation,
+                    activeEngine = activeEngine,
+                    preparedStream = preparedStream,
+                    attached = attached,
+                    terminalState = P2pStreamingState.Idle,
+                )
+            }
+            throw cancellation
+        } catch (error: Exception) {
+            Log.e(
+                DIAGNOSTIC_TAG,
+                "start request=$requestSequence phase=${phase.get()} failed elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "generation=$generation error=${diagnosticMessage(error.message)}",
+                error,
+            )
+            val terminalState = P2pStreamingState.Error(
+                error.message ?: localizedP2pUnknownTorrentError()
+            )
+            withContext(NonCancellable) {
+                cleanupFailedStart(
+                    generation = generation,
+                    activeEngine = activeEngine,
+                    preparedStream = preparedStream,
+                    attached = attached,
+                    terminalState = terminalState,
+                )
+            }
+            throw error
+        } finally {
+            startupStatsJob?.cancel()
         }
     }
 
     actual fun stopStream() {
-        scheduleStop(stopBinary = false)
+        scheduleStop(shutdownEngine = false)
     }
 
     actual fun shutdown() {
-        scheduleStop(stopBinary = true)
+        scheduleStop(shutdownEngine = true)
     }
 
-    private fun scheduleStop(stopBinary: Boolean) {
-        val hash = detachActiveStream()
+    private fun scheduleStop(shutdownEngine: Boolean) {
+        val startedAtMs = SystemClock.elapsedRealtime()
+        val detached = detachActiveStream()
+        Log.i(
+            DIAGNOSTIC_TAG,
+            "cleanup scheduled shutdownEngine=$shutdownEngine stream=${diagnosticId(detached.streamId)}",
+        )
         val previousCleanup = cleanupJob
         cleanupJob = scope.launch {
             previousCleanup?.join()
-            cleanupDetachedStream(hash, stopBinary)
+            cleanupDetachedStream(detached, shutdownEngine)
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "cleanup complete shutdownEngine=$shutdownEngine stream=${diagnosticId(detached.streamId)} " +
+                    "elapsedMs=${elapsedSince(startedAtMs)}",
+            )
         }
     }
 
-    private suspend fun stopStreamNow(stopBinary: Boolean) {
+    private suspend fun stopStreamNow(shutdownEngine: Boolean) {
+        val startedAtMs = SystemClock.elapsedRealtime()
         cleanupJob?.join()
-        val hash = detachActiveStream()
-        cleanupDetachedStream(hash, stopBinary)
+        val detached = detachActiveStream()
+        cleanupDetachedStream(detached, shutdownEngine)
+        Log.i(
+            DIAGNOSTIC_TAG,
+            "cleanup synchronous shutdownEngine=$shutdownEngine stream=${diagnosticId(detached.streamId)} " +
+                "elapsedMs=${elapsedSince(startedAtMs)}",
+        )
     }
 
-    private fun detachActiveStream(): String? {
-        val detached = synchronized(lifecycleLock) {
+    private fun detachActiveStream(): DetachedStream {
+        val detached: Pair<DetachedStream, Job?> = synchronized(lifecycleLock) {
             streamGeneration += 1
-            val hash = currentHash
+            val value = DetachedStream(engine = engine, streamId = currentStreamId)
             val job = statsJob
-            currentHash = null
+            currentTorrentId = null
+            currentStreamId = null
             statsJob = null
-            hash to job
+            _state.value = P2pStreamingState.Idle
+            value to job
         }
         detached.second?.cancel()
-        _state.value = P2pStreamingState.Idle
         return detached.first
     }
 
-    private suspend fun cleanupDetachedStream(hash: String?, stopBinary: Boolean) {
-        hash?.let {
-            try {
-                api.dropTorrent(it)
-            } catch (e: Exception) {
-                Log.w(TAG, "Error dropping torrent", e)
+    private fun detachGenerationIfCurrent(
+        generation: Long,
+        terminalState: P2pStreamingState,
+    ): DetachedStream? {
+        val detached: Pair<DetachedStream, Job?>? = synchronized(lifecycleLock) {
+            if (streamGeneration != generation) return@synchronized null
+            streamGeneration += 1
+            val value = DetachedStream(engine = engine, streamId = currentStreamId)
+            val job = statsJob
+            currentTorrentId = null
+            currentStreamId = null
+            statsJob = null
+            _state.value = terminalState
+            value to job
+        }
+        detached?.second?.cancel()
+        return detached?.first
+    }
+
+    private suspend fun cleanupDetachedStream(detached: DetachedStream, shutdownEngine: Boolean) {
+        detached.streamId?.let { streamId ->
+            stopPreparedStream(detached.engine, streamId)
+        }
+        if (shutdownEngine) {
+            closeEngine(detached.engine)
+        }
+    }
+
+    private suspend fun cleanupFailedStart(
+        generation: Long,
+        activeEngine: NuvioEngine?,
+        preparedStream: NuvioStream?,
+        attached: Boolean,
+        terminalState: P2pStreamingState,
+    ) {
+        if (attached) {
+            detachGenerationIfCurrent(generation, terminalState)?.let { detached ->
+                cleanupDetachedStream(detached, shutdownEngine = false)
             }
+        } else {
+            preparedStream?.let { stream -> stopPreparedStream(activeEngine, stream.id) }
+            detachGenerationIfCurrent(generation, terminalState)
+        }
+    }
+
+    private suspend fun stopPreparedStream(activeEngine: NuvioEngine?, streamId: String) {
+        try {
+            activeEngine?.stopStream(streamId)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Log.w(TAG, "Error stopping Nuvio Engine stream route", error)
+        }
+    }
+
+    private suspend fun ensureEngine(): NuvioEngine {
+        val startedAtMs = SystemClock.elapsedRealtime()
+        P2pSettingsRepository.ensureLoaded()
+        val settings = P2pSettingsRepository.uiState.value
+        val configurationKey = EngineConfigurationKey(
+            uploadEnabled = settings.enableUpload,
+            torrentProfile = settings.torrentProfile,
+            diskCacheCapacityBytes = settings.cacheSize.bytes,
+        )
+        engine?.takeIf { engineConfigurationKey == configurationKey }?.let {
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "engine reuse configuration=$configurationKey elapsedMs=${elapsedSince(startedAtMs)}",
+            )
+            return it
         }
 
-        if (stopBinary) {
+        Log.i(
+            DIAGNOSTIC_TAG,
+            "engine create begin configuration=$configurationKey replacing=${engine != null}",
+        )
+        closeEngine(engine)
+        currentCoroutineContext().ensureActive()
+        val context = requireContext()
+        val stateDirectory = File(context.noBackupFilesDir, "nuvio-engine/state")
+        val cacheDirectory = File(context.cacheDir, "nuvio-engine/payload")
+        check(stateDirectory.mkdirs() || stateDirectory.isDirectory) {
+            "Could not create the Nuvio Engine state directory"
+        }
+        check(cacheDirectory.mkdirs() || cacheDirectory.isDirectory) {
+            "Could not create the Nuvio Engine cache directory"
+        }
+        return NuvioEngine.create(
+            buildNuvioEngineConfig(
+                stateDirectory = stateDirectory,
+                cacheDirectory = cacheDirectory,
+                uploadEnabled = configurationKey.uploadEnabled,
+                torrentProfile = configurationKey.torrentProfile,
+                diskCacheCapacityBytes = configurationKey.diskCacheCapacityBytes,
+            )
+        ).also { created ->
+            engine = created
+            engineConfigurationKey = configurationKey
+            observeEngineEvents(created)
+            Log.i(
+                TAG,
+                "Using Nuvio Engine ${NuvioEngine.version} (${NuvioEngine.protocolBackendVersion})"
+            )
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "engine create complete configuration=$configurationKey elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "version=${NuvioEngine.version} backend=${NuvioEngine.protocolBackendVersion}",
+            )
+        }
+    }
+
+    private suspend fun closeEngine(target: NuvioEngine?) {
+        if (target == null) return
+        val startedAtMs = SystemClock.elapsedRealtime()
+        Log.i(DIAGNOSTIC_TAG, "engine shutdown begin active=${engine === target}")
+        if (engine === target) {
+            engineEventsJob?.cancel()
+            engineEventsJob = null
+            engine = null
+            engineConfigurationKey = null
+            knownTorrentIds.clear()
+        }
+        withContext(NonCancellable) {
             try {
-                binary.stop()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error stopping TorrServer", e)
+                target.shutdown()
+            } catch (error: Exception) {
+                Log.w(TAG, "Error shutting down Nuvio Engine", error)
+            }
+        }
+        Log.i(
+            DIAGNOSTIC_TAG,
+            "engine shutdown complete elapsedMs=${elapsedSince(startedAtMs)}",
+        )
+    }
+
+    private fun observeEngineEvents(activeEngine: NuvioEngine) {
+        engineEventsJob?.cancel()
+        engineEventsJob = scope.launch {
+            activeEngine.events.collect { event ->
+                Log.i(
+                    DIAGNOSTIC_TAG,
+                    "event type=${event.type} sequence=${event.sequence} requestId=${event.requestId} " +
+                        "dropped=${event.droppedEvents} torrent=${diagnosticId(event.torrentId)} " +
+                        "stream=${diagnosticId(event.streamId)} fileIndex=${event.fileIndex ?: -1} " +
+                        "fileBytes=${event.fileSize} message=${diagnosticMessage(event.message)}",
+                )
+                if (engine !== activeEngine) return@collect
+                when (event.type) {
+                    NuvioEventType.TorrentError -> {
+                        if (event.requestId != 0L) return@collect
+                        val terminalError = P2pStreamingState.Error(
+                            event.message ?: localizedP2pUnknownTorrentError()
+                        )
+                        synchronized(lifecycleLock) {
+                            if (engine !== activeEngine ||
+                                (event.torrentId != null && event.torrentId != currentTorrentId)
+                            ) {
+                                return@synchronized
+                            }
+                            streamGeneration += 1
+                            statsJob?.cancel()
+                            statsJob = null
+                            _state.value = terminalError
+                        }
+                    }
+                    NuvioEventType.StreamStopped -> {
+                        if (event.requestId != 0L) return@collect
+                        val fallbackMessage = localizedP2pUnknownTorrentError()
+                        synchronized(lifecycleLock) {
+                            if (engine !== activeEngine) return@synchronized
+                            val error = unexpectedStreamStopError(
+                                requestId = event.requestId,
+                                eventStreamId = event.streamId,
+                                currentStreamId = currentStreamId,
+                                message = event.message,
+                                fallbackMessage = fallbackMessage,
+                            ) ?: return@synchronized
+                            streamGeneration += 1
+                            currentTorrentId = null
+                            currentStreamId = null
+                            statsJob?.cancel()
+                            statsJob = null
+                            _state.value = error
+                        }
+                    }
+                    else -> Unit
+                }
             }
         }
     }
 
-    private fun nextStreamGeneration(): Long =
-        synchronized(lifecycleLock) {
-            streamGeneration += 1
-            streamGeneration
+    private fun startStatsPolling(
+        activeEngine: NuvioEngine,
+        stream: NuvioStream,
+        generation: Long,
+        requestSequence: Long,
+        startedAtMs: Long,
+        payloadDownloadBaseline: Long,
+    ) {
+        statsJob?.cancel()
+        statsJob = scope.launch {
+            var nextDiagnosticSampleAtMs = 0L
+            while (isActive) {
+                if (!isCurrentGeneration(generation)) return@launch
+                val currentState = _state.value
+                if (currentState is P2pStreamingState.Streaming) {
+                    val route = try {
+                        activeEngine.currentStreamStats(stream.id)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Error sampling Nuvio Engine stream progress", error)
+                        null
+                    }
+                    val aggregate = activeEngine.stats.value
+                    updateCacheState(
+                        aggregate.diskCacheUsedBytes,
+                        aggregate.diskCacheProtectedBytes,
+                    )
+                    val nowMs = SystemClock.elapsedRealtime()
+                    if (nowMs >= nextDiagnosticSampleAtMs) {
+                        nextDiagnosticSampleAtMs = nowMs + DIAGNOSTIC_SAMPLE_INTERVAL_MS
+                        Log.i(
+                            DIAGNOSTIC_TAG,
+                            "sample request=$requestSequence elapsedMs=${elapsedSince(startedAtMs)} " +
+                                "generation=$generation stream=${diagnosticId(stream.id)} " +
+                                "http=${aggregate.activeHttpRequests} pendingReads=${aggregate.pendingPieceReads} " +
+                                "peers=${aggregate.connectedPeers} seeds=${aggregate.connectedSeeds} " +
+                                "known=${aggregate.knownPeers} candidates=${aggregate.connectCandidates} " +
+                                "interested=${aggregate.interestedPeers} unchoked=${aggregate.unchokedPeers} " +
+                                "downloading=${aggregate.downloadingPeers} snubbed=${aggregate.snubbedPeers} " +
+                                "connecting=${aggregate.connectingPeers} handshaking=${aggregate.handshakingPeers} " +
+                                "targetPeers=${aggregate.targetPiecePeers} " +
+                                "targetUnchoked=${aggregate.targetPieceUnchokedPeers} " +
+                                "targetDownloading=${aggregate.targetPieceDownloadingPeers} " +
+                                "offTargetDownloading=${aggregate.offTargetDownloadingPeers} " +
+                                "pendingBlocks=${aggregate.pendingBlockRequests} " +
+                                "targetBlocks=${aggregate.targetBlockRequests} " +
+                                "timedOutBlocks=${aggregate.timedOutBlockRequests} " +
+                                "downBps=${aggregate.downloadRateBytesPerSecond} upBps=${aggregate.uploadRateBytesPerSecond} " +
+                                "payloadDown=${aggregate.totalPayloadDownloadBytes} " +
+                                "trackerReplies=${aggregate.trackerReplyEvents} " +
+                                "trackerErrors=${aggregate.trackerErrorEvents} " +
+                                "trackerPeers=${aggregate.trackerPeersReturned} " +
+                                "dhtReplies=${aggregate.dhtReplyEvents} dhtPeers=${aggregate.dhtPeersReturned} " +
+                                "peerConnects=${aggregate.peerConnectEvents} " +
+                                "peerDisconnects=${aggregate.peerDisconnectEvents} " +
+                                "disconnectTimeouts=${aggregate.peerDisconnectTimeouts} " +
+                                "disconnectConnectFailures=${aggregate.peerDisconnectConnectFailures} " +
+                                "disconnectRedundant=${aggregate.peerDisconnectRedundant} " +
+                                "disconnectTurnover=${aggregate.peerDisconnectTurnover} " +
+                                "disconnectOther=${aggregate.peerDisconnectOther} " +
+                                "finishedTransitions=${aggregate.torrentFinishedEvents} " +
+                                "contiguous=${route?.contiguousReadyBytes ?: -1L} " +
+                                "verified=${route?.verifiedFileBytes ?: -1L} delivered=${route?.deliveredBytes ?: -1L} " +
+                                "demands=${route?.activeDemands ?: -1} scheduledPieces=${route?.scheduledPieces ?: -1} " +
+                                "blockingPieces=${route?.blockingPieces ?: -1} " +
+                                "blockingPrimary=${route?.primaryBlockingPiece ?: -1} " +
+                                "blockingSecondary=${route?.secondaryBlockingPiece ?: -1} " +
+                                "demandPrimary=${route?.primaryDemandStart ?: -1L}-${route?.primaryDemandEnd ?: -1L} " +
+                                "demandSecondary=${route?.secondaryDemandStart ?: -1L}-${route?.secondaryDemandEnd ?: -1L} " +
+                                "lastReadyPiece=${route?.lastReadyPiece ?: -1} " +
+                                "scheduleRevision=${route?.scheduleRevision ?: -1L} " +
+                                "fileBytes=${route?.fileSize ?: stream.fileSize} activeTorrents=${aggregate.activeTorrents} " +
+                                "activeStreams=${aggregate.activeStreams} warm=${aggregate.warmTorrents} " +
+                                "quiesced=${aggregate.quiescedTorrents} memUsed=${aggregate.memoryCacheUsedBytes} " +
+                                "memHits=${aggregate.memoryCacheHits} memMisses=${aggregate.memoryCacheMisses} " +
+                                "diskUsed=${aggregate.diskCacheUsedBytes} diskProtected=${aggregate.diskCacheProtectedBytes} " +
+                                "diskOverBudget=${aggregate.diskCacheOverBudget}",
+                        )
+                    }
+                    updateStreamingIfCurrent(generation) { latestState ->
+                        latestState.copy(
+                            downloadSpeed = aggregate.downloadRateBytesPerSecond,
+                            uploadSpeed = aggregate.uploadRateBytesPerSecond,
+                            peers = aggregate.connectedPeers,
+                            seeds = aggregate.connectedSeeds,
+                            bufferProgress = route?.bufferProgress ?: latestState.bufferProgress,
+                            totalProgress = route?.fileProgress ?: latestState.totalProgress,
+                            downloadedBytes = (aggregate.totalPayloadDownloadBytes -
+                                payloadDownloadBaseline).coerceAtLeast(0L),
+                            verifiedBytes = route?.verifiedFileBytes ?: latestState.verifiedBytes,
+                            deliveredBytes = route?.deliveredBytes ?: latestState.deliveredBytes,
+                        )
+                    }
+                }
+                delay(250L)
+            }
         }
+    }
 
-    private fun attachTorrentIfCurrent(generation: Long, hash: String): Boolean =
-        synchronized(lifecycleLock) {
-            if (streamGeneration != generation) return@synchronized false
-            currentHash = hash
-            true
+    private fun updateCacheState(usedBytes: Long, protectedBytes: Long) {
+        _cacheState.value = _cacheState.value.copy(
+            usedBytes = usedBytes,
+            protectedBytes = protectedBytes,
+            hasMeasurement = true,
+        )
+    }
+
+    private fun startStartupStatsPolling(
+        activeEngine: NuvioEngine,
+        generation: Long,
+        phase: AtomicReference<String>,
+        requestSequence: Long,
+        startedAtMs: Long,
+    ): Job = scope.launch {
+        while (isActive) {
+            val aggregate = activeEngine.stats.value
+            updateConnectingIfCurrent(
+                generation = generation,
+                phase = phase.get(),
+                downloadSpeed = aggregate.downloadRateBytesPerSecond,
+                uploadSpeed = aggregate.uploadRateBytesPerSecond,
+                peers = aggregate.connectedPeers,
+                seeds = aggregate.connectedSeeds,
+            )
+            Log.i(
+                DIAGNOSTIC_TAG,
+                "startupSample request=$requestSequence phase=${phase.get()} elapsedMs=${elapsedSince(startedAtMs)} " +
+                    "http=${aggregate.activeHttpRequests} pendingReads=${aggregate.pendingPieceReads} " +
+                    "peers=${aggregate.connectedPeers} seeds=${aggregate.connectedSeeds} " +
+                    "known=${aggregate.knownPeers} candidates=${aggregate.connectCandidates} " +
+                    "interested=${aggregate.interestedPeers} unchoked=${aggregate.unchokedPeers} " +
+                    "downloading=${aggregate.downloadingPeers} snubbed=${aggregate.snubbedPeers} " +
+                    "connecting=${aggregate.connectingPeers} handshaking=${aggregate.handshakingPeers} " +
+                    "pendingBlocks=${aggregate.pendingBlockRequests} " +
+                    "targetBlocks=${aggregate.targetBlockRequests} " +
+                    "timedOutBlocks=${aggregate.timedOutBlockRequests} " +
+                    "downBps=${aggregate.downloadRateBytesPerSecond} upBps=${aggregate.uploadRateBytesPerSecond} " +
+                    "payloadDown=${aggregate.totalPayloadDownloadBytes} activeTorrents=${aggregate.activeTorrents} " +
+                    "trackerReplies=${aggregate.trackerReplyEvents} trackerErrors=${aggregate.trackerErrorEvents} " +
+                    "trackerPeers=${aggregate.trackerPeersReturned} dhtReplies=${aggregate.dhtReplyEvents} " +
+                    "dhtPeers=${aggregate.dhtPeersReturned} peerConnects=${aggregate.peerConnectEvents} " +
+                    "peerDisconnects=${aggregate.peerDisconnectEvents} " +
+                    "activeStreams=${aggregate.activeStreams} warm=${aggregate.warmTorrents} " +
+                    "quiesced=${aggregate.quiescedTorrents}",
+            )
+            delay(DIAGNOSTIC_SAMPLE_INTERVAL_MS)
         }
+    }
+
+    private fun beginStreamGeneration(): Long = synchronized(lifecycleLock) {
+        streamGeneration += 1
+        _state.value = P2pStreamingState.Connecting()
+        streamGeneration
+    }
+
+    private fun updateConnectingIfCurrent(
+        generation: Long,
+        phase: String,
+        downloadSpeed: Long,
+        uploadSpeed: Long,
+        peers: Int,
+        seeds: Int,
+    ) = synchronized(lifecycleLock) {
+        if (streamGeneration != generation || _state.value !is P2pStreamingState.Connecting) {
+            return@synchronized
+        }
+        _state.value = P2pStreamingState.Connecting(
+            phase = phase,
+            downloadSpeed = downloadSpeed,
+            uploadSpeed = uploadSpeed,
+            peers = peers,
+            seeds = seeds,
+        )
+    }
+
+    private fun nextDiagnosticRequestSequence(): Long = synchronized(lifecycleLock) {
+        diagnosticRequestSequence += 1
+        diagnosticRequestSequence
+    }
+
+    private fun attachStreamIfCurrent(
+        generation: Long,
+        torrentId: String,
+        streamId: String,
+    ): Boolean = synchronized(lifecycleLock) {
+        if (streamGeneration != generation) return@synchronized false
+        currentTorrentId = torrentId
+        currentStreamId = streamId
+        true
+    }
+
+    private fun publishStreamingIfCurrent(
+        generation: Long,
+        state: P2pStreamingState.Streaming,
+    ): Boolean = synchronized(lifecycleLock) {
+        if (streamGeneration != generation || currentStreamId == null) {
+            return@synchronized false
+        }
+        _state.value = state
+        true
+    }
+
+    private fun updateStreamingIfCurrent(
+        generation: Long,
+        update: (P2pStreamingState.Streaming) -> P2pStreamingState.Streaming,
+    ) = synchronized(lifecycleLock) {
+        if (streamGeneration != generation) return@synchronized
+        val current = _state.value as? P2pStreamingState.Streaming ?: return@synchronized
+        _state.value = update(current)
+    }
 
     private fun isCurrentGeneration(generation: Long): Boolean =
         synchronized(lifecycleLock) { streamGeneration == generation }
@@ -177,381 +780,50 @@ actual object P2pStreamingEngine {
         }
     }
 
-    private fun buildMagnetUri(infoHash: String, extraTrackers: List<String>): String {
-        val trackers = (DEFAULT_TRACKERS + extraTrackers).distinct()
-        val trackerParams = trackers.joinToString("") { "&tr=$it" }
-        return "magnet:?xt=urn:btih:$infoHash$trackerParams"
-    }
-
-    private suspend fun resolveFileIndex(hash: String, requestedIdx: Int?, filename: String?): Int {
-        val deadline = System.currentTimeMillis() + 15_000L
-        var files: List<TorrServerFile> = emptyList()
-
-        while (System.currentTimeMillis() < deadline) {
-            files = api.getTorrentStats(hash)?.files ?: emptyList()
-            if (files.isNotEmpty()) break
-            Log.d(TAG, "Waiting for torrent metadata...")
-            delay(1_000L)
-        }
-
-        if (files.isEmpty()) {
-            Log.w(TAG, "No files after metadata timeout, guessing index ${requestedIdx?.plus(1) ?: 1}")
-            return requestedIdx?.plus(1) ?: 1
-        }
-
-        if (!filename.isNullOrBlank()) {
-            val name = filename.trim()
-            val exact = files.firstOrNull { file ->
-                file.path.substringAfterLast('/').equals(name, ignoreCase = true)
-            }
-            if (exact != null) {
-                Log.d(TAG, "File resolved by exact filename match: ${exact.path} -> id=${exact.id}")
-                return exact.id
-            }
-
-            val contains = files.firstOrNull { file ->
-                file.path.contains(name, ignoreCase = true)
-            }
-            if (contains != null) {
-                Log.d(TAG, "File resolved by filename contains match: ${contains.path} -> id=${contains.id}")
-                return contains.id
-            }
-        }
-
-        if (requestedIdx != null) {
-            val torrServerIndex = requestedIdx + 1
-            if (files.any { it.id == torrServerIndex }) {
-                Log.d(TAG, "File resolved by ID offset: id=$torrServerIndex")
-                return torrServerIndex
-            }
-        }
-
-        if (requestedIdx != null && requestedIdx in files.indices) {
-            val positionalFile = files[requestedIdx]
-            Log.d(TAG, "File resolved by positional index: [$requestedIdx] -> ${positionalFile.path} (id=${positionalFile.id})")
-            return positionalFile.id
-        }
-
-        val videoFile = files
-            .filter { file ->
-                val ext = file.path.substringAfterLast('.', "").lowercase()
-                ext in VIDEO_EXTENSIONS
-            }
-            .maxByOrNull { it.length }
-
-        val result = videoFile?.id ?: files.maxByOrNull { it.length }?.id ?: 1
-        Log.d(TAG, "File resolved by largest video fallback: id=$result")
-        return result
-    }
-
-    private fun startStatsPolling(hash: String, generation: Long) {
-        statsJob?.cancel()
-        statsJob = scope.launch {
-            while (isActive) {
-                if (!isCurrentGeneration(generation)) return@launch
-                try {
-                    val stats = api.getTorrentStats(hash)
-                    val currentState = _state.value
-                    if (
-                        stats != null &&
-                        currentState is P2pStreamingState.Streaming &&
-                        isCurrentGeneration(generation)
-                    ) {
-                        _state.value = currentState.copy(
-                            downloadSpeed = stats.downloadSpeed,
-                            uploadSpeed = stats.uploadSpeed,
-                            peers = stats.peers,
-                            seeds = stats.seeds,
-                            preloadedBytes = stats.preloadedBytes,
-                        )
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "Stats polling error", e)
-                }
-                delay(1_000L)
-            }
-        }
-    }
-
     private fun requireContext(): Context =
         appContext ?: throw P2pStreamingException("P2P streaming engine is not initialized")
 
+    private fun logPhase(requestSequence: Long, startedAtMs: Long, phase: String) {
+        Log.i(
+            DIAGNOSTIC_TAG,
+            "start request=$requestSequence phase=$phase complete elapsedMs=${elapsedSince(startedAtMs)}",
+        )
+    }
+
+    private fun elapsedSince(startedAtMs: Long): Long =
+        (SystemClock.elapsedRealtime() - startedAtMs).coerceAtLeast(0L)
+
+    private fun diagnosticId(value: String?): String =
+        value?.trim()?.take(12)?.ifBlank { "none" } ?: "none"
+
+    private fun diagnosticLoopbackUrl(value: String): String = runCatching {
+        val uri = android.net.Uri.parse(value)
+        "${uri.scheme}://${uri.host}:${uri.port}/…"
+    }.getOrDefault("unparseable")
+
+    private fun diagnosticMessage(value: String?): String =
+        value?.replace('\n', ' ')?.replace('\r', ' ')?.take(160) ?: "none"
+
     private val DEFAULT_TRACKERS = listOf(
+        "udp://zer0day.ch:1337/announce",
+        "udp://tracker.publictracker.xyz:6969/announce",
         "udp://tracker.opentrackr.org:1337/announce",
+        "udp://open.demonii.com:1337/announce",
         "udp://open.stealth.si:80/announce",
-        "udp://tracker.openbittorrent.com:6969/announce",
-        "udp://exodus.desync.com:6969/announce",
+        "http://tracker.renfei.net:8080/announce",
+        "udp://udp.tracker.projectk.org:23333/announce",
+        "udp://tracker.tryhackx.org:6969/announce",
         "udp://tracker.torrent.eu.org:451/announce",
+        "udp://tracker.theoks.net:6969/announce",
+        "udp://tracker.startwork.cv:1337/announce",
+        "udp://tracker.qu.ax:6969/announce",
+        "udp://tracker.plx.im:6969/announce",
+        "udp://tracker.nyaa.vc:6969/announce",
+        "udp://tracker.iperson.xyz:6969/announce",
+        "udp://tracker.gmi.gd:6969/announce",
+        "udp://tracker.fnix.net:6969/announce",
+        "udp://tracker.flatuslifir.is:6969/announce",
+        "udp://tracker.ducks.party:1984/announce",
+        "udp://tracker.bluefrog.pw:2710/announce",
     )
-
-    private class TorrServerBinary {
-        private var context: Context? = null
-        private var process: Process? = null
-        private val healthClient = OkHttpClient.Builder()
-            .connectTimeout(2, TimeUnit.SECONDS)
-            .readTimeout(5, TimeUnit.SECONDS)
-            .build()
-
-        val baseUrl: String get() = "http://127.0.0.1:$PORT"
-
-        fun initialize(context: Context) {
-            this.context = context.applicationContext
-        }
-
-        suspend fun start() = withContext(Dispatchers.IO) {
-            if (isRunning()) {
-                Log.d(TAG, "TorrServer already running")
-                return@withContext
-            }
-
-            killOrphanedProcess()
-
-            val ctx = requireContext()
-            val binaryFile = File(ctx.applicationInfo.nativeLibraryDir, "libtorrserver.so")
-            if (!binaryFile.exists()) {
-                throw P2pStreamingException("TorrServer binary not found at ${binaryFile.absolutePath}")
-            }
-
-            if (!binaryFile.canExecute()) {
-                binaryFile.setExecutable(true)
-            }
-
-            val configDir = File(ctx.filesDir, "torrserver").also { it.mkdirs() }
-            val processBuilder = ProcessBuilder(
-                binaryFile.absolutePath,
-                "--port",
-                PORT.toString(),
-                "--path",
-                configDir.absolutePath,
-            )
-            processBuilder.directory(configDir)
-            processBuilder.redirectErrorStream(true)
-
-            Log.d(TAG, "Starting TorrServer on port $PORT from ${binaryFile.absolutePath}")
-            process = processBuilder.start()
-
-            val proc = process!!
-            Thread {
-                try {
-                    proc.inputStream.bufferedReader().forEachLine { line ->
-                        Log.d(TAG, "[server] $line")
-                    }
-                } catch (_: Exception) {
-                }
-            }.apply {
-                isDaemon = true
-                start()
-            }
-
-            val deadline = System.currentTimeMillis() + STARTUP_TIMEOUT_MS
-            while (System.currentTimeMillis() < deadline) {
-                if (isRunning()) {
-                    Log.d(TAG, "TorrServer started successfully")
-                    return@withContext
-                }
-                if (!isProcessAlive(process)) {
-                    val exitCode = process?.exitValue() ?: -1
-                    process = null
-                    throw P2pStreamingException("TorrServer process died on startup (exit code $exitCode)")
-                }
-                delay(HEALTH_CHECK_INTERVAL_MS)
-            }
-
-            stop()
-            throw P2pStreamingException("TorrServer failed to start within ${STARTUP_TIMEOUT_MS / 1000}s")
-        }
-
-        fun isRunning(): Boolean {
-            return try {
-                val request = Request.Builder().url("$baseUrl/echo").build()
-                healthClient.newCall(request).execute().use { it.isSuccessful }
-            } catch (e: Exception) {
-                false
-            }
-        }
-
-        fun stop() {
-            try {
-                val request = Request.Builder().url("$baseUrl/shutdown").build()
-                healthClient.newCall(request).execute().close()
-            } catch (_: Exception) {
-            }
-
-            process?.let { proc ->
-                try {
-                    Thread.sleep(3_000L)
-                    if (isProcessAlive(proc)) {
-                        proc.destroyForcibly()
-                    }
-                } catch (_: Exception) {
-                    proc.destroyForcibly()
-                }
-            }
-            process = null
-            Log.d(TAG, "TorrServer stopped")
-        }
-
-        private fun killOrphanedProcess() {
-            try {
-                val request = Request.Builder().url("$baseUrl/shutdown").build()
-                healthClient.newCall(request).execute().close()
-                Thread.sleep(1_000L)
-                Log.d(TAG, "Shut down orphaned TorrServer instance")
-            } catch (_: Exception) {
-            }
-        }
-
-        private fun isProcessAlive(proc: Process?): Boolean {
-            if (proc == null) return false
-            return try {
-                proc.exitValue()
-                false
-            } catch (_: IllegalThreadStateException) {
-                true
-            } catch (_: Exception) {
-                false
-            }
-        }
-
-        private fun requireContext(): Context =
-            context ?: throw P2pStreamingException("P2P streaming engine is not initialized")
-
-        companion object {
-            const val PORT = 8091
-            private const val STARTUP_TIMEOUT_MS = 15_000L
-            private const val HEALTH_CHECK_INTERVAL_MS = 200L
-        }
-    }
-
-    private data class TorrServerFile(
-        val id: Int,
-        val path: String,
-        val length: Long,
-    )
-
-    private data class TorrServerStats(
-        val downloadSpeed: Long,
-        val uploadSpeed: Long,
-        val peers: Int,
-        val seeds: Int,
-        val preloadedBytes: Long,
-        val loadedSize: Long,
-        val torrentSize: Long,
-        val files: List<TorrServerFile>,
-    )
-
-    private class TorrServerApi(
-        private val binary: TorrServerBinary,
-    ) {
-        private val client = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
-
-        private val baseUrl: String get() = binary.baseUrl
-
-        suspend fun addTorrent(magnetLink: String, title: String? = null): String? = withContext(Dispatchers.IO) {
-            val body = JSONObject().apply {
-                put("action", "add")
-                put("link", magnetLink)
-                put("save_to_db", false)
-                if (title != null) put("title", title)
-            }
-
-            val request = Request.Builder()
-                .url("$baseUrl/torrents")
-                .post(body.toString().toRequestBody(JSON_TYPE))
-                .build()
-
-            try {
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        Log.e(TAG, "addTorrent failed: ${response.code}")
-                        return@withContext null
-                    }
-                    val json = JSONObject(response.body?.string() ?: "{}")
-                    val hash = json.optString("hash", "")
-                    Log.d(TAG, "Torrent added: $hash")
-                    hash.ifEmpty { null }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "addTorrent error", e)
-                null
-            }
-        }
-
-        suspend fun getTorrentStats(hash: String): TorrServerStats? = withContext(Dispatchers.IO) {
-            val body = JSONObject().apply {
-                put("action", "get")
-                put("hash", hash)
-            }
-
-            val request = Request.Builder()
-                .url("$baseUrl/torrents")
-                .post(body.toString().toRequestBody(JSON_TYPE))
-                .build()
-
-            try {
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@withContext null
-                    val json = JSONObject(response.body?.string() ?: "{}")
-
-                    val files = mutableListOf<TorrServerFile>()
-                    val fileList = json.optJSONArray("file_stats") ?: JSONArray()
-                    for (i in 0 until fileList.length()) {
-                        val file = fileList.getJSONObject(i)
-                        files.add(
-                            TorrServerFile(
-                                id = file.optInt("id", i + 1),
-                                path = file.optString("path", ""),
-                                length = file.optLong("length", 0),
-                            ),
-                        )
-                    }
-
-                    TorrServerStats(
-                        downloadSpeed = json.optLong("download_speed", 0),
-                        uploadSpeed = json.optLong("upload_speed", 0),
-                        peers = json.optInt("active_peers", 0),
-                        seeds = json.optInt("connected_seeders", 0),
-                        preloadedBytes = json.optLong("preloaded_bytes", 0),
-                        loadedSize = json.optLong("loaded_size", 0),
-                        torrentSize = json.optLong("torrent_size", 0),
-                        files = files,
-                    )
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "getTorrentStats error", e)
-                null
-            }
-        }
-
-        suspend fun dropTorrent(hash: String) = withContext(Dispatchers.IO) {
-            val body = JSONObject().apply {
-                put("action", "drop")
-                put("hash", hash)
-            }
-
-            val request = Request.Builder()
-                .url("$baseUrl/torrents")
-                .post(body.toString().toRequestBody(JSON_TYPE))
-                .build()
-
-            try {
-                client.newCall(request).execute().close()
-                Log.d(TAG, "Torrent dropped: $hash")
-            } catch (e: Exception) {
-                Log.w(TAG, "dropTorrent error", e)
-            }
-        }
-
-        fun getStreamUrl(magnetLink: String, fileIdx: Int): String {
-            val encodedLink = URLEncoder.encode(magnetLink, "UTF-8")
-            return "$baseUrl/stream?link=$encodedLink&index=$fileIdx&play"
-        }
-    }
-
-    private val JSON_TYPE = "application/json".toMediaType()
 }

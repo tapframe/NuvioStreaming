@@ -129,6 +129,12 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
             }
         }
 
+        Spacer(
+            modifier = Modifier.height(
+                if (isTablet) NuvioTokens.Space.s18 else MaterialTheme.nuvio.spacing.listGap,
+            ),
+        )
+
         SettingsSection(
             title = stringResource(Res.string.settings_stream_display_section),
             isTablet = isTablet,
