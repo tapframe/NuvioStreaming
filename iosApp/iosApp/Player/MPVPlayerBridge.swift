@@ -935,7 +935,7 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_property_string(mpv, "sub-color", textColor))
         checkError(mpv_set_property_string(mpv, "sub-back-color", backgroundColor))
         checkError(mpv_set_property_string(mpv, "sub-outline-color", outlineColor))
-        checkError(mpv_set_property_string(mpv, "sub-border-style", backgroundColor.hasPrefix("#00") ? "outline-and-shadow" : "opaque-box"))
+        checkError(mpv_set_property_string(mpv, "sub-border-style", backgroundColor.hasPrefix("#00") ? "outline-and-shadow" : "background-box"))
         setStringProperty("sub-bold", bold ? "yes" : "no")
 
         var outline = Double(outlineSize)
