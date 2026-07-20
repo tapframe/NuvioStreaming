@@ -93,6 +93,7 @@ class TmdbMetadataServiceTest {
                 thumbnail = "https://example.com/thumb.jpg",
                 airDate = "2024-01-01",
                 runtimeMinutes = 58,
+                voteAverage = 8.7,
             ),
         )
 
@@ -114,7 +115,48 @@ class TmdbMetadataServiceTest {
         assertEquals(listOf("HBO"), result.networks.map { it.name })
         assertEquals("Pilot", result.videos.first().title)
         assertEquals(58, result.videos.first().runtime)
+        assertEquals(8.7, result.videos.first().tmdbRating)
         assertEquals("2023-12-31T19:00:00Z", result.videos.first().released)
+    }
+
+    @Test
+    fun `applyEnrichment omits TMDB episode rating when disabled`() {
+        val base = MetaDetails(
+            id = "tt1234567",
+            type = "series",
+            name = "Original",
+            videos = listOf(
+                MetaVideo(
+                    id = "ep1",
+                    title = "Episode 1",
+                    season = 1,
+                    episode = 1,
+                    tmdbRating = 7.0,
+                ),
+            ),
+        )
+        val episodes = mapOf(
+            (1 to 1) to TmdbEpisodeEnrichment(
+                title = null,
+                overview = null,
+                thumbnail = null,
+                airDate = null,
+                runtimeMinutes = null,
+                voteAverage = 8.7,
+            ),
+        )
+
+        val result = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = null,
+            episodeMap = episodes,
+            settings = TmdbSettings(
+                enabled = true,
+                useEpisodeRatings = false,
+            ),
+        )
+
+        assertEquals(null, result.videos.first().tmdbRating)
     }
 
     @Test

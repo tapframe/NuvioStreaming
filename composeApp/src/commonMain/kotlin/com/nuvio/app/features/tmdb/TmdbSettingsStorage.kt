@@ -27,6 +27,8 @@ internal expect object TmdbSettingsStorage {
     fun saveUseNetworks(enabled: Boolean)
     fun loadUseEpisodes(): Boolean?
     fun saveUseEpisodes(enabled: Boolean)
+    fun loadUseEpisodeRatings(): Boolean?
+    fun saveUseEpisodeRatings(enabled: Boolean)
     fun loadUseSeasonPosters(): Boolean?
     fun saveUseSeasonPosters(enabled: Boolean)
     fun loadUseMoreLikeThis(): Boolean?

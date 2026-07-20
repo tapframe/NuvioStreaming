@@ -1150,6 +1150,8 @@
     <string name="settings_tmdb_module_release_dates_description">Use TMDB broadcaster air dates instead of precise add-on release times</string>
     <string name="settings_tmdb_module_episodes">Episodes</string>
     <string name="settings_tmdb_module_episodes_description">Episode titles, overviews, thumbnails, and runtime from TMDB</string>
+    <string name="settings_tmdb_module_episode_ratings">Episode ratings</string>
+    <string name="settings_tmdb_module_episode_ratings_description">Show TMDB vote averages on episode cards</string>
     <string name="settings_tmdb_module_more_like_this">More Like This</string>
     <string name="settings_tmdb_module_more_like_this_description">TMDB recommendation backdrops on detail page</string>
     <string name="settings_tmdb_module_networks">Networks</string>

@@ -107,7 +107,6 @@ import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
-import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentReview
 import com.nuvio.app.features.trakt.TraktCommentsRepository
@@ -214,7 +213,6 @@ fun MetaDetailsScreen(
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var pickerPending by remember(type, id) { mutableStateOf(false) }
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
-    var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
 
     val shouldShowComments = commentsEnabled &&
@@ -252,31 +250,6 @@ fun MetaDetailsScreen(
         isCommentsLoading = false
     }
 
-    LaunchedEffect(displayedMeta?.id, displayedMeta?.videos, deferredMetaWorkAllowed) {
-        val metaForRatings = displayedMeta
-        if (!deferredMetaWorkAllowed) return@LaunchedEffect
-        if (metaForRatings == null || !metaForRatings.isSeriesLikeForEpisodeRatings()) {
-            episodeImdbRatings = emptyMap()
-            return@LaunchedEffect
-        }
-
-        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
-        val tmdbId = extractTmdbId(metaForRatings.id)
-            ?: extractTmdbId(id)
-            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
-            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
-
-        if (imdbId == null && tmdbId == null) {
-            episodeImdbRatings = emptyMap()
-            return@LaunchedEffect
-        }
-
-        episodeImdbRatings = ImdbEpisodeRatingsRepository.getEpisodeRatings(
-            imdbId = imdbId,
-            tmdbId = tmdbId,
-        )
-    }
-
     LaunchedEffect(type, id, displayedMeta, uiState.isLoading, autoLoadAttempted) {
         if (!autoLoadAttempted && displayedMeta == null && !uiState.isLoading) {
             autoLoadAttempted = true
@@ -293,6 +266,7 @@ fun MetaDetailsScreen(
         traktAuthUiState.mode,
         tmdbSettingsUiState.enabled,
         tmdbSettingsUiState.useMoreLikeThis,
+        tmdbSettingsUiState.useEpisodeRatings,
         tmdbSettingsUiState.language,
     ) {
         if (displayedMeta != null && !uiState.isLoading) {
@@ -966,7 +940,6 @@ fun MetaDetailsScreen(
                                 commentsCurrentPage = commentsCurrentPage,
                                 commentsPageCount = commentsPageCount,
                                 commentsError = commentsError,
-                                episodeImdbRatings = episodeImdbRatings,
                                 onRetryComments = {
                                     detailsScope.launch {
                                         isCommentsLoading = true
@@ -1449,12 +1422,6 @@ fun MetaDetailsScreen(
     }
 }
 
-private fun MetaDetails.isSeriesLikeForEpisodeRatings(): Boolean {
-    val normalizedType = type.trim().lowercase()
-    val hasNumberedEpisodes = videos.any { it.season != null && it.episode != null }
-    return hasNumberedEpisodes && normalizedType in setOf("series", "show", "tv", "tvshow")
-}
-
 @Composable
 private fun DetailHeaderOverlay(
     meta: MetaDetails,
@@ -1542,24 +1509,6 @@ private fun areEpisodesWatchedForActions(
     )
 }
 
-private fun extractImdbId(value: String?): String? =
-    value
-        ?.trim()
-        ?.split(':', '/', '?', '&')
-        ?.firstOrNull { part -> part.startsWith("tt", ignoreCase = true) }
-        ?.takeIf { it.length > 2 }
-
-private fun extractTmdbId(value: String?): Int? {
-    val trimmed = value?.trim().orEmpty()
-    if (trimmed.isBlank()) return null
-    return trimmed
-        .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
-        ?.substringAfter(':')
-        ?.substringBefore(':')
-        ?.substringBefore('/')
-        ?.toIntOrNull()
-}
-
 private fun MetaDetails.toMetaPreview(): MetaPreview =
     MetaPreview(
         id = id,
@@ -1604,7 +1553,6 @@ private fun LazyListScope.configuredMetaSectionItems(
     commentsCurrentPage: Int,
     commentsPageCount: Int,
     commentsError: String?,
-    episodeImdbRatings: Map<Pair<Int, Int>, Double>,
     onRetryComments: () -> Unit,
     onLoadMoreComments: () -> Unit,
     onCommentClick: (TraktCommentReview) -> Unit,
@@ -1680,7 +1628,6 @@ private fun LazyListScope.configuredMetaSectionItems(
                     commentsCurrentPage = commentsCurrentPage,
                     commentsPageCount = commentsPageCount,
                     commentsError = commentsError,
-                    episodeImdbRatings = episodeImdbRatings,
                     onRetryComments = onRetryComments,
                     onLoadMoreComments = onLoadMoreComments,
                     onCommentClick = onCommentClick,
@@ -1829,7 +1776,6 @@ private fun ConfiguredMetaSections(
     commentsCurrentPage: Int,
     commentsPageCount: Int,
     commentsError: String?,
-    episodeImdbRatings: Map<Pair<Int, Int>, Double>,
     onRetryComments: () -> Unit,
     onLoadMoreComments: () -> Unit,
     onCommentClick: (TraktCommentReview) -> Unit,
@@ -1964,7 +1910,6 @@ private fun ConfiguredMetaSections(
                         episodeCardStyle = settings.episodeCardStyle,
                         progressByVideoId = progressByVideoId,
                         watchedKeys = watchedKeys,
-                        episodeRatings = episodeImdbRatings,
                         blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onEpisodeClick = onEpisodeClick,
                         onEpisodeLongPress = onEpisodeLongPress,

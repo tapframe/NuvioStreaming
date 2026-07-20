@@ -93,6 +93,7 @@ data class MetaVideo(
     val episode: Int? = null,
     val overview: String? = null,
     val runtime: Int? = null,
+    val tmdbRating: Double? = null,
     val streams: List<StreamItem> = emptyList(),
 )
 

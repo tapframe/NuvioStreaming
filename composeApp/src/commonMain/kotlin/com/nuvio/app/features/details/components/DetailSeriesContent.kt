@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import co.touchlab.kermit.Logger
-import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
@@ -102,7 +101,6 @@ fun DetailSeriesContent(
     episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
     progressByVideoId: Map<String, WatchProgressEntry> = emptyMap(),
     watchedKeys: Set<String> = emptySet(),
-    episodeRatings: Map<Pair<Int, Int>, Double> = emptyMap(),
     blurUnwatchedEpisodes: Boolean = false,
     onEpisodeClick: ((MetaVideo) -> Unit)? = null,
     onEpisodeLongPress: ((MetaVideo) -> Unit)? = null,
@@ -298,7 +296,6 @@ fun DetailSeriesContent(
                             watchedKeys = watchedKeys,
                             fallbackImage = meta.background ?: meta.poster,
                             progressByVideoId = progressByVideoId,
-                            episodeRatings = episodeRatings,
                             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                             preferredEpisodeNumber = preferredEpisodeNumber,
                             onEpisodeClick = onEpisodeClick,
@@ -319,7 +316,7 @@ fun DetailSeriesContent(
                                     video = episode,
                                     fallbackImage = meta.background ?: meta.poster,
                                     progressEntry = progressByVideoId[episodeVideoId],
-                                    imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] },
+                                    tmdbRating = episode.tmdbRating,
                                     isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
                                         WatchingState.isEpisodeWatched(
                                             watchedKeys = watchedKeys,
@@ -600,7 +597,6 @@ private fun EpisodeHorizontalRow(
     watchedKeys: Set<String>,
     fallbackImage: String?,
     progressByVideoId: Map<String, WatchProgressEntry>,
-    episodeRatings: Map<Pair<Int, Int>, Double>,
     blurUnwatchedEpisodes: Boolean,
     preferredEpisodeNumber: Int? = null,
     onEpisodeClick: ((MetaVideo) -> Unit)?,
@@ -651,7 +647,7 @@ private fun EpisodeHorizontalRow(
                 video = episode,
                 fallbackImage = fallbackImage,
                 progressEntry = progressByVideoId[episodeVideoId],
-                imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] },
+                tmdbRating = episode.tmdbRating,
                 isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
                     WatchingState.isEpisodeWatched(
                         watchedKeys = watchedKeys,
@@ -674,7 +670,7 @@ private fun EpisodeHorizontalCard(
     video: MetaVideo,
     fallbackImage: String?,
     progressEntry: WatchProgressEntry?,
-    imdbRating: Double?,
+    tmdbRating: Double?,
     isWatched: Boolean,
     blurUnwatchedEpisodes: Boolean,
     metrics: EpisodeHorizontalCardMetrics,
@@ -682,7 +678,7 @@ private fun EpisodeHorizontalCard(
     onLongPress: (() -> Unit)? = null,
 ) {
     val cardShape = RoundedCornerShape(metrics.cornerRadius)
-    val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
+    val ratingLabel = remember(tmdbRating) { tmdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
     val imageUrl = video.thumbnail ?: fallbackImage
@@ -799,10 +795,9 @@ private fun EpisodeHorizontalCard(
                         )
                     }
                     ratingLabel?.let { rating ->
-                        ImdbEpisodeRatingBadge(
+                        TmdbEpisodeRatingBadge(
                             rating = rating,
-                            logoWidth = metrics.imdbLogoWidth,
-                            logoHeight = metrics.imdbLogoHeight,
+                            logoSize = metrics.tmdbLogoSize,
                             textSize = metrics.metaTextSize,
                         )
                     }
@@ -857,8 +852,7 @@ private data class EpisodeHorizontalCardMetrics(
     val badgeRadius: Dp,
     val badgeHorizontalPadding: Dp,
     val badgeVerticalPadding: Dp,
-    val imdbLogoWidth: Dp,
-    val imdbLogoHeight: Dp,
+    val tmdbLogoSize: Dp,
 )
 
 @Composable
@@ -884,8 +878,7 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 badgeRadius = 8.dp,
                 badgeHorizontalPadding = 10.dp,
                 badgeVerticalPadding = 5.dp,
-                imdbLogoWidth = 28.dp,
-                imdbLogoHeight = 14.dp,
+                tmdbLogoSize = 14.dp,
             )
 
             maxWidthDp >= 1000f -> EpisodeHorizontalCardMetrics(
@@ -907,8 +900,7 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 badgeRadius = 7.dp,
                 badgeHorizontalPadding = 9.dp,
                 badgeVerticalPadding = 4.dp,
-                imdbLogoWidth = 26.dp,
-                imdbLogoHeight = 13.dp,
+                tmdbLogoSize = 13.dp,
             )
 
             maxWidthDp >= 760f -> EpisodeHorizontalCardMetrics(
@@ -930,8 +922,7 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 badgeRadius = 6.dp,
                 badgeHorizontalPadding = 8.dp,
                 badgeVerticalPadding = 4.dp,
-                imdbLogoWidth = 24.dp,
-                imdbLogoHeight = 12.dp,
+                tmdbLogoSize = 12.dp,
             )
 
             else -> EpisodeHorizontalCardMetrics(
@@ -953,8 +944,7 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 badgeRadius = 5.dp,
                 badgeHorizontalPadding = 7.dp,
                 badgeVerticalPadding = 3.dp,
-                imdbLogoWidth = 22.dp,
-                imdbLogoHeight = 11.dp,
+                tmdbLogoSize = 11.dp,
             )
         }
     }
@@ -994,44 +984,28 @@ private fun EpisodeCodeBadge(
 }
 
 @Composable
-private fun ImdbEpisodeRatingBadge(
+private fun TmdbEpisodeRatingBadge(
     rating: String,
-    logoWidth: Dp,
-    logoHeight: Dp,
+    logoSize: Dp,
     textSize: androidx.compose.ui.unit.TextUnit,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (AppFeaturePolicy.imdbRatingLogoEnabled) {
-            Image(
-                painter = painterResource(Res.drawable.rating_imdb),
-                contentDescription = stringResource(Res.string.source_imdb),
-                modifier = Modifier
-                    .width(logoWidth)
-                    .height(logoHeight),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
-            Text(
-                text = stringResource(Res.string.source_imdb),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = textSize,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.sp,
-                ),
-                color = Color.White.copy(alpha = 0.78f),
-                maxLines = 1,
-            )
-        }
+        Image(
+            painter = painterResource(Res.drawable.rating_tmdb),
+            contentDescription = stringResource(Res.string.source_tmdb),
+            modifier = Modifier.size(logoSize),
+            contentScale = ContentScale.Fit,
+        )
         Text(
             text = rating,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = textSize,
                 fontWeight = FontWeight.SemiBold,
             ),
-            color = Color(0xFFF5C518),
+            color = Color(0xFF01B4E4),
             maxLines = 1,
         )
     }
@@ -1043,7 +1017,7 @@ private fun EpisodeListCard(
     video: MetaVideo,
     fallbackImage: String?,
     progressEntry: WatchProgressEntry?,
-    imdbRating: Double?,
+    tmdbRating: Double?,
     isWatched: Boolean,
     blurUnwatchedEpisodes: Boolean,
     sizing: SeriesContentSizing,
@@ -1052,7 +1026,7 @@ private fun EpisodeListCard(
     onLongPress: (() -> Unit)? = null,
 ) {
     val cardShape = RoundedCornerShape(sizing.cardRadius)
-    val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
+    val ratingLabel = remember(tmdbRating) { tmdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     Box(
         modifier = modifier
@@ -1163,10 +1137,9 @@ private fun EpisodeListCard(
                             )
                         }
                         ratingLabel?.let { rating ->
-                            ImdbEpisodeRatingBadge(
+                            TmdbEpisodeRatingBadge(
                                 rating = rating,
-                                logoWidth = 24.dp,
-                                logoHeight = 12.dp,
+                                logoSize = 12.dp,
                                 textSize = sizing.metaTextSize,
                             )
                         }
