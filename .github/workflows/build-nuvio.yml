@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 0.3.0-enhanced
+      - 0.3.1-enhanced-rebased
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -109,6 +109,56 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Download Nuvio Engine Apple XCFramework
+        env:
+          NUVIO_ENGINE_VERSION: 0.1.0
+        run: |
+          set -euo pipefail
+
+          ENGINE_ROOT="../nuvio-engine/platform/apple"
+          ENGINE_DEST="${ENGINE_ROOT}/NuvioEngine.xcframework"
+          ARCHIVE="${RUNNER_TEMP}/nuvio-engine-apple-${NUVIO_ENGINE_VERSION}.zip"
+          EXTRACT_DIR="${RUNNER_TEMP}/nuvio-engine-apple-${NUVIO_ENGINE_VERSION}"
+
+          rm -rf "${ENGINE_ROOT}" "${EXTRACT_DIR}" "${ARCHIVE}"
+          mkdir -p "${ENGINE_ROOT}" "${EXTRACT_DIR}"
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-all-errors \
+            "https://github.com/NuvioMedia/nuvio-engine/releases/download/v${NUVIO_ENGINE_VERSION}/nuvio-engine-apple-${NUVIO_ENGINE_VERSION}.zip" \
+            --output "${ARCHIVE}"
+
+          ditto -x -k "${ARCHIVE}" "${EXTRACT_DIR}"
+
+          XCFRAMEWORK="$(find "${EXTRACT_DIR}" -type d -name NuvioEngine.xcframework -print -quit)"
+          if [[ -z "${XCFRAMEWORK}" ]]; then
+            echo "::error::NuvioEngine.xcframework was not found in the downloaded archive."
+            find "${EXTRACT_DIR}" -maxdepth 4 -print
+            exit 1
+          fi
+
+          ditto "${XCFRAMEWORK}" "${ENGINE_DEST}"
+
+          for SLICE in ios-arm64 ios-arm64_x86_64-simulator; do
+            SLICE_DIR="${ENGINE_DEST}/${SLICE}"
+
+            test -f "${SLICE_DIR}/libCNuvioEngine.a" || {
+              echo "::error::Missing ${SLICE_DIR}/libCNuvioEngine.a"
+              exit 1
+            }
+
+            test -f "${SLICE_DIR}/Headers/nuvio_engine/nuvio_engine.h" || {
+              echo "::error::Missing ${SLICE_DIR}/Headers/nuvio_engine/nuvio_engine.h"
+              exit 1
+            }
+          done
+
+          echo "Nuvio Engine Apple XCFramework installed at ${ENGINE_DEST}"
+          find "${ENGINE_DEST}" -maxdepth 4 -type f -print
 
       - name: Generate local.properties
         run: |
