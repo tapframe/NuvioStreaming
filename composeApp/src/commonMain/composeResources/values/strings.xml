@@ -1083,6 +1083,8 @@
     <string name="settings_playback_parental_guide">Content Warnings</string>
     <string name="settings_playback_parental_guide_description">Show parental guidance overlay when playback starts.</string>
     <string name="settings_playback_subtitle_background_color">Background Color</string>
+    <string name="settings_playback_subtitle_background_transparency">Transparency</string>
+    <string name="settings_playback_subtitle_background_transparency_value">%1$d%%</string>
     <string name="settings_playback_subtitle_bold">Bold</string>
     <string name="settings_playback_subtitle_bold_description">Use a heavier subtitle font weight.</string>
     <string name="settings_playback_subtitle_color_transparent">Transparent</string>

@@ -1263,12 +1263,12 @@ private fun PlaybackSettingsSection(
     }
 
     if (showSubtitleBackgroundColorDialog) {
-        SubtitleColorDialog(
-            title = stringResource(Res.string.settings_playback_subtitle_background_color),
-            colors = SubtitleBackgroundColorSwatches,
+        SubtitleBackgroundColorDialog(
             selectedColor = autoPlayPlayerSettings.subtitleStyle.backgroundColor,
-            onColorSelected = { color ->
-                PlayerSettingsRepository.setSubtitleStyle(autoPlayPlayerSettings.subtitleStyle.copy(backgroundColor = color))
+            onSave = { color ->
+                PlayerSettingsRepository.setSubtitleStyle(
+                    autoPlayPlayerSettings.subtitleStyle.copy(backgroundColor = color),
+                )
                 showSubtitleBackgroundColorDialog = false
             },
             onDismiss = { showSubtitleBackgroundColorDialog = false },
@@ -2616,6 +2616,162 @@ private fun SubtitleColorDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SubtitleBackgroundColorDialog(
+    selectedColor: Color,
+    onSave: (Color) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var color by remember(selectedColor) { mutableStateOf(selectedColor) }
+    var opacity by remember(selectedColor) { mutableFloatStateOf(selectedColor.alpha) }
+    val backgroundColors = remember {
+        SubtitleBackgroundColorSwatches
+            .filter { it.alpha > 0f }
+            .distinctBy { Triple(it.red, it.green, it.blue) }
+    }
+
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .heightIn(max = 560.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_subtitle_background_color),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = color.copy(alpha = opacity),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                    ),
+                ) {}
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(backgroundColors) { swatch ->
+                        val isSelected = color.red == swatch.red &&
+                            color.green == swatch.green &&
+                            color.blue == swatch.blue
+                        val containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    color = swatch.copy(alpha = opacity)
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = containerColor,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(28.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = swatch.copy(alpha = 1f),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                                    ),
+                                ) {}
+                                Spacer(modifier = Modifier.size(12.dp))
+                                Text(
+                                    text = subtitleColorLabel(swatch.copy(alpha = 1f)),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val transparency = ((1f - opacity) * 100f).roundToInt().coerceIn(0, 100)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(Res.string.settings_playback_subtitle_background_transparency),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ValueBox(
+                        text = stringResource(
+                            Res.string.settings_playback_subtitle_background_transparency_value,
+                            transparency,
+                        ),
+                    )
+                }
+                Slider(
+                    value = transparency.toFloat(),
+                    onValueChange = { value ->
+                        val snapped = snapToStep(value, 5f).coerceIn(0f, 100f)
+                        opacity = 1f - (snapped / 100f)
+                        color = color.copy(alpha = opacity)
+                    },
+                    valueRange = 0f..100f,
+                    steps = calculateSteps(0f, 100f, 5f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(Res.string.action_cancel))
+                    }
+                    TextButton(onClick = { onSave(color.copy(alpha = opacity)) }) {
+                        Text(stringResource(Res.string.action_save))
+                    }
+                }
             }
         }
     }
