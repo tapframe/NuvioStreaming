@@ -117,6 +117,7 @@ private fun ProviderRows(
         MdbListMetadataService.PROVIDER_TRAKT to Res.string.source_trakt,
         MdbListMetadataService.PROVIDER_LETTERBOXD to Res.string.source_letterboxd,
         MdbListMetadataService.PROVIDER_AUDIENCE to Res.string.source_audience_score,
+        MdbListMetadataService.PROVIDER_MAL to Res.string.source_mal,
     )
 
     providers.forEachIndexed { index, (providerId, providerLabelRes) ->
