@@ -45,6 +45,8 @@ interface TrackingAuthProvider {
     fun ensureLoaded()
     fun onProfileChanged()
     fun clearLocalState()
+    fun removeStoredProfile(profileId: Int)
+    fun handleAuthCallback(url: String): Boolean = false
 }
 
 object TrackingProviderRegistry {
@@ -72,6 +74,29 @@ object TrackingProviderRegistry {
         providerSnapshot()
             .filter { provider -> capability in provider.descriptor.capabilities }
             .sortedBy { provider -> provider.descriptor.id.ordinal }
+
+    fun handleAuthCallback(url: String): Boolean =
+        providersWith(TrackingCapability.AUTHENTICATION)
+            .any { provider -> provider.handleAuthCallback(url) }
+
+    fun ensureLoaded() {
+        providerSnapshot().forEach(TrackingAuthProvider::ensureLoaded)
+    }
+
+    fun onProfileChanged() {
+        providerSnapshot().forEach(TrackingAuthProvider::onProfileChanged)
+    }
+
+    fun clearLocalState() {
+        providerSnapshot().forEach(TrackingAuthProvider::clearLocalState)
+    }
+
+    fun removeStoredProfiles(profileIds: Iterable<Int>) {
+        val providers = providerSnapshot()
+        profileIds.forEach { profileId ->
+            providers.forEach { provider -> provider.removeStoredProfile(profileId) }
+        }
+    }
 
     private fun providerSnapshot(): List<TrackingAuthProvider> = synchronized(lock) {
         authProviders.values.toList()

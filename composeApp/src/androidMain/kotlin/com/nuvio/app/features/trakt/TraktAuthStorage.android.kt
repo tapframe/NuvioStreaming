@@ -23,4 +23,11 @@ internal actual object TraktAuthStorage {
             ?.putString(ProfileScopedKey.of(payloadKey), payload)
             ?.apply()
     }
+
+    actual fun removeProfile(profileId: Int) {
+        preferences
+            ?.edit()
+            ?.remove(ProfileScopedKey.of(payloadKey, profileId))
+            ?.apply()
+    }
 }

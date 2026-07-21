@@ -91,6 +91,10 @@ object TraktAuthRepository : TrackingAuthProvider {
         publish()
     }
 
+    override fun removeStoredProfile(profileId: Int) {
+        TraktAuthStorage.removeProfile(profileId)
+    }
+
     fun snapshot(): TraktAuthUiState {
         ensureLoaded()
         return _uiState.value
@@ -153,6 +157,15 @@ object TraktAuthRepository : TrackingAuthProvider {
             completeAuthorizationFromCallback(callbackUrl)
         }
     }
+
+    override fun handleAuthCallback(url: String): Boolean {
+        if (!isTraktAuthCallback(url)) return false
+        onAuthCallbackReceived(url)
+        return true
+    }
+
+    private fun isTraktAuthCallback(url: String): Boolean =
+        url == TraktConfig.REDIRECT_URI || url.startsWith("${TraktConfig.REDIRECT_URI}?")
 
     suspend fun authorizedHeaders(): Map<String, String>? {
         ensureLoaded()
