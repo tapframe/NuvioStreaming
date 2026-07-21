@@ -54,6 +54,7 @@ internal actual object PlatformLocalAccountDataCleaner {
         "mdblist_use_audience",
         "trakt_auth_payload",
         "simkl_auth_metadata",
+        "simkl_sync_snapshot",
         "trakt_library_payload",
         "trakt_settings_payload",
         "library_display_settings_payload",

@@ -166,6 +166,7 @@ object SimklAuthRepository : TrackingAuthProvider {
         clearPendingAuthorization()
         storedState = SimklStoredAuthState()
         persistMetadata()
+        SimklSyncRepository.clearLocalState()
         publish(error = null)
     }
 
@@ -261,6 +262,7 @@ object SimklAuthRepository : TrackingAuthProvider {
             persistMetadata()
             publish(isLoading = false, error = null)
             fetchAndStoreUserSettings()
+            SimklSyncRepository.refreshAsync()
         }
 
     private suspend fun fetchAndStoreUserSettings(): String? {
@@ -327,6 +329,7 @@ object SimklAuthRepository : TrackingAuthProvider {
         clearPendingAuthorization()
         storedState = SimklStoredAuthState()
         persistMetadata()
+        SimklSyncRepository.clearLocalState()
         publish(isLoading = false, error = error)
     }
 

@@ -38,23 +38,36 @@ data class TrackingProviderDescriptor(
     val capabilities: Set<TrackingCapability>,
 )
 
-interface TrackingAuthProvider {
-    val descriptor: TrackingProviderDescriptor
-    val isAuthenticated: StateFlow<Boolean>
+interface TrackingProfileStore {
+    val providerId: TrackingProviderId
 
-    fun ensureLoaded()
     fun onProfileChanged()
     fun clearLocalState()
     fun removeStoredProfile(profileId: Int)
+}
+
+interface TrackingAuthProvider : TrackingProfileStore {
+    val descriptor: TrackingProviderDescriptor
+    val isAuthenticated: StateFlow<Boolean>
+    override val providerId: TrackingProviderId
+        get() = descriptor.id
+
+    fun ensureLoaded()
     fun handleAuthCallback(url: String): Boolean = false
 }
 
 object TrackingProviderRegistry {
     private val lock = SynchronizedObject()
     private val authProviders = mutableMapOf<TrackingProviderId, TrackingAuthProvider>()
+    private val profileStores = mutableSetOf<TrackingProfileStore>()
 
     fun register(provider: TrackingAuthProvider) = synchronized(lock) {
         authProviders[provider.descriptor.id] = provider
+        profileStores += provider
+    }
+
+    fun registerProfileStore(store: TrackingProfileStore) = synchronized(lock) {
+        profileStores += store
     }
 
     fun authProvider(id: TrackingProviderId): TrackingAuthProvider? = synchronized(lock) {
@@ -84,21 +97,25 @@ object TrackingProviderRegistry {
     }
 
     fun onProfileChanged() {
-        providerSnapshot().forEach(TrackingAuthProvider::onProfileChanged)
+        profileStoreSnapshot().forEach(TrackingProfileStore::onProfileChanged)
     }
 
     fun clearLocalState() {
-        providerSnapshot().forEach(TrackingAuthProvider::clearLocalState)
+        profileStoreSnapshot().forEach(TrackingProfileStore::clearLocalState)
     }
 
     fun removeStoredProfiles(profileIds: Iterable<Int>) {
-        val providers = providerSnapshot()
+        val stores = profileStoreSnapshot()
         profileIds.forEach { profileId ->
-            providers.forEach { provider -> provider.removeStoredProfile(profileId) }
+            stores.forEach { store -> store.removeStoredProfile(profileId) }
         }
     }
 
     private fun providerSnapshot(): List<TrackingAuthProvider> = synchronized(lock) {
         authProviders.values.toList()
+    }
+
+    private fun profileStoreSnapshot(): List<TrackingProfileStore> = synchronized(lock) {
+        profileStores.toList()
     }
 }
