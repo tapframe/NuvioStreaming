@@ -27,13 +27,13 @@ Only the current title's IMDb/TMDB/Stremio identifier, media type, optional seas
 
 ## Screenshots
 
-Required before opening the PR: collapsed, expanded categories, scene detail, partial, unavailable, error, dark/light, large text, and RTL screenshots. No screenshot is claimed in this preparation branch because a production API and emulator/device were not configured.
+Required before marking the draft PR ready for review: collapsed, expanded categories, scene detail, partial, unavailable, error, dark/light, large text, and RTL screenshots. No screenshot is claimed because a working simulator/device was not available in this environment.
 
 ## Tests performed
 
-- iOS simulator shared-source compilation: `./gradlew :composeApp:compileKotlinIosSimulatorArm64`
-- iOS simulator common tests: `./gradlew :composeApp:iosSimulatorArm64Test`
-- Android: `./gradlew :composeApp:assembleDebug -Pnuvio.android.distribution=playstore` (record final result before PR)
+- Passed iOS simulator shared-source compilation: `./gradlew :composeApp:compileKotlinIosSimulatorArm64`
+- iOS simulator tests compiled and linked, but execution could not be completed because the simulator service hung.
+- Android was not verified because the Android SDK is unavailable in this environment.
 
 Added tests cover JSON/status/provenance/timestamps, partial success, network error isolation, cache hit/expiry, identifier resolution, category order/severity, spoiler filtering, and timestamp formatting.
 
@@ -43,7 +43,6 @@ The feature reuses the existing Show Parental Guide preference as its master ena
 
 ## Known limitations
 
-- A stable production API URL and legal/operator contact must be approved before release.
 - Cache is process-local in this first contribution; it supports transient offline use but not restoration after app restart.
 - Episode requests include season/episode when encoded in the current ID. A future follow-up can surface an explicit episode selector and persist display preferences independently.
 - Initial new strings are English and require community translation after merge.
