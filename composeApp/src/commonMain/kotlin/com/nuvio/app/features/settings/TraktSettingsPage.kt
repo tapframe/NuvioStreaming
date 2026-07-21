@@ -48,7 +48,7 @@ import com.nuvio.app.features.trakt.TraktContinueWatchingDaysOptions
 import com.nuvio.app.features.trakt.MoreLikeThisSourcePreference
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.trakt.TraktSettingsUiState
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
 import com.nuvio.app.features.trakt.traktBrandPainter
@@ -355,6 +355,7 @@ private fun librarySourceModeLabel(source: LibrarySourceMode): String =
     when (source) {
         LibrarySourceMode.TRAKT -> stringResource(Res.string.trakt_library_source_trakt)
         LibrarySourceMode.LOCAL -> stringResource(Res.string.trakt_library_source_nuvio)
+        LibrarySourceMode.SIMKL -> "Simkl"
     }
 
 @Composable
@@ -362,6 +363,7 @@ private fun watchProgressSourceLabel(source: WatchProgressSource): String =
     when (source) {
         WatchProgressSource.TRAKT -> stringResource(Res.string.trakt_watch_progress_source_trakt)
         WatchProgressSource.NUVIO_SYNC -> stringResource(Res.string.trakt_watch_progress_source_nuvio)
+        WatchProgressSource.SIMKL -> "Simkl"
     }
 
 @Composable

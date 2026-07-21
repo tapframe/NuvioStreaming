@@ -51,7 +51,7 @@ import com.nuvio.app.features.home.components.HomeContinueWatchingSectionBottomP
 import com.nuvio.app.features.home.components.ContinueWatchingLayout
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.WatchedRepository

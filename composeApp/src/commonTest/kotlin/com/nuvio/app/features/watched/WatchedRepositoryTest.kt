@@ -2,7 +2,7 @@ package com.nuvio.app.features.watched
 
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -158,9 +158,10 @@ class WatchedRepositoryTest {
     }
 
     @Test
-    fun watchedItemsForSource_keepsNuvioAndTraktSnapshotsIsolated() {
+    fun watchedItemsForSource_keepsProviderSnapshotsIsolated() {
         val nuvioItem = watchedItem(id = "nuvio", markedAtEpochMs = 1_000L)
         val traktItem = watchedItem(id = "trakt", markedAtEpochMs = 2_000L)
+        val simklItem = watchedItem(id = "simkl", markedAtEpochMs = 3_000L)
 
         assertEquals(
             listOf(nuvioItem),
@@ -168,6 +169,7 @@ class WatchedRepositoryTest {
                 source = WatchProgressSource.NUVIO_SYNC,
                 nuvioItems = listOf(nuvioItem),
                 traktItems = listOf(traktItem),
+                simklItems = listOf(simklItem),
             ),
         )
         assertEquals(
@@ -176,6 +178,16 @@ class WatchedRepositoryTest {
                 source = WatchProgressSource.TRAKT,
                 nuvioItems = listOf(nuvioItem),
                 traktItems = listOf(traktItem),
+                simklItems = listOf(simklItem),
+            ),
+        )
+        assertEquals(
+            listOf(simklItem),
+            watchedItemsForSource(
+                source = WatchProgressSource.SIMKL,
+                nuvioItems = listOf(nuvioItem),
+                traktItems = listOf(traktItem),
+                simklItems = listOf(simklItem),
             ),
         )
     }
@@ -184,6 +196,7 @@ class WatchedRepositoryTest {
     fun onlyNuvioWatchedStateIsPersisted() {
         assertTrue(shouldPersistWatchedSource(WatchProgressSource.NUVIO_SYNC))
         assertFalse(shouldPersistWatchedSource(WatchProgressSource.TRAKT))
+        assertFalse(shouldPersistWatchedSource(WatchProgressSource.SIMKL))
     }
 
     @Test
@@ -193,11 +206,13 @@ class WatchedRepositoryTest {
         val refreshedTraktItem = watchedItem(id = "new-trakt", markedAtEpochMs = 3_000L)
         val nuvioItems = mutableMapOf("nuvio" to nuvioItem)
         val traktItems = mutableMapOf("old-trakt" to previousTraktItem)
+        val simklItems = mutableMapOf<String, WatchedItem>()
 
         replaceWatchedItemsForSource(
             source = WatchProgressSource.TRAKT,
             nuvioItems = nuvioItems,
             traktItems = traktItems,
+            simklItems = simklItems,
             replacement = mapOf("new-trakt" to refreshedTraktItem),
         )
 

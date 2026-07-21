@@ -19,7 +19,7 @@ import com.nuvio.app.features.watchprogress.resolvedProgressKey
 import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

@@ -1,7 +1,7 @@
 package com.nuvio.app.features.watched
 
 import com.nuvio.app.features.trakt.TraktPlatformClock
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

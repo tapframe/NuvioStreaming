@@ -14,7 +14,7 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktProgressRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.trakt.effectiveWatchProgressSource
 import com.nuvio.app.features.trakt.isTraktCompatibleId
 import com.nuvio.app.features.trakt.resolveEffectiveContentId
@@ -425,6 +425,8 @@ object WatchProgressRepository {
                 operationGeneration = operationGeneration,
                 force = force,
             )
+
+            WatchProgressSource.SIMKL -> false
         }
     }
 

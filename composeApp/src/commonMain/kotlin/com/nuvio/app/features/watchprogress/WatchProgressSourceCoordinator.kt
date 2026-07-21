@@ -4,10 +4,10 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.features.profiles.ProfileRepository
-import com.nuvio.app.features.trakt.DEFAULT_WATCH_PROGRESS_SOURCE
+import com.nuvio.app.features.tracking.DEFAULT_WATCH_PROGRESS_SOURCE
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.trakt.effectiveWatchProgressSource
 import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.atomicfu.atomic

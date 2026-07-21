@@ -12,6 +12,16 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+typealias WatchProgressSource = com.nuvio.app.features.tracking.WatchProgressSource
+
+val DEFAULT_WATCH_PROGRESS_SOURCE: WatchProgressSource =
+    com.nuvio.app.features.tracking.DEFAULT_WATCH_PROGRESS_SOURCE
+val DEFAULT_LIBRARY_SOURCE_MODE: LibrarySourceMode =
+    com.nuvio.app.features.tracking.DEFAULT_LIBRARY_SOURCE_MODE
+
+fun librarySourceModeFromStorage(value: String?): LibrarySourceMode =
+    com.nuvio.app.features.tracking.librarySourceModeFromStorage(value)
+
 const val TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL = 0
 const val TRAKT_DEFAULT_CONTINUE_WATCHING_DAYS_CAP = 60
 const val TRAKT_MIN_CONTINUE_WATCHING_DAYS_CAP = 7
@@ -26,23 +36,6 @@ val TraktContinueWatchingDaysOptions: List<Int> = listOf(
     TRAKT_MAX_CONTINUE_WATCHING_DAYS_CAP,
     TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL,
 )
-
-@Serializable
-enum class WatchProgressSource {
-    TRAKT,
-    NUVIO_SYNC;
-
-    companion object {
-        fun fromStorage(value: String?): WatchProgressSource =
-            entries.firstOrNull { it.name == value } ?: DEFAULT_WATCH_PROGRESS_SOURCE
-    }
-}
-
-val DEFAULT_WATCH_PROGRESS_SOURCE: WatchProgressSource = WatchProgressSource.TRAKT
-val DEFAULT_LIBRARY_SOURCE_MODE: LibrarySourceMode = LibrarySourceMode.TRAKT
-
-fun librarySourceModeFromStorage(value: String?): LibrarySourceMode =
-    LibrarySourceMode.entries.firstOrNull { it.name == value } ?: DEFAULT_LIBRARY_SOURCE_MODE
 
 @Serializable
 enum class MoreLikeThisSourcePreference {

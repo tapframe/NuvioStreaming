@@ -5,6 +5,11 @@ import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.tracking.TrackingAuthProvider
+import com.nuvio.app.features.tracking.TrackingCapability
+import com.nuvio.app.features.tracking.TrackingProviderDescriptor
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.CancellationException
@@ -28,7 +33,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.StringResource
 import kotlinx.coroutines.runBlocking
 
-object TraktAuthRepository {
+object TraktAuthRepository : TrackingAuthProvider {
     private const val BASE_URL = "https://api.trakt.tv"
     private const val AUTHORIZE_URL = "https://trakt.tv/oauth/authorize"
     private const val API_VERSION = "2"
@@ -45,21 +50,42 @@ object TraktAuthRepository {
     val uiState: StateFlow<TraktAuthUiState> = _uiState.asStateFlow()
 
     private val _isAuthenticated = MutableStateFlow(false)
-    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+    override val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+
+    override val descriptor = TrackingProviderDescriptor(
+        id = TrackingProviderId.TRAKT,
+        displayName = "Trakt",
+        capabilities = setOf(
+            TrackingCapability.AUTHENTICATION,
+            TrackingCapability.LIBRARY_READ,
+            TrackingCapability.LIBRARY_WRITE,
+            TrackingCapability.WATCHED_READ,
+            TrackingCapability.WATCHED_WRITE,
+            TrackingCapability.PROGRESS_READ,
+            TrackingCapability.PROGRESS_WRITE,
+            TrackingCapability.SCROBBLE,
+            TrackingCapability.COMMENTS,
+            TrackingCapability.RECOMMENDATIONS,
+        ),
+    )
+
+    init {
+        TrackingProviderRegistry.register(this)
+    }
 
     private var hasLoaded = false
     private var authState = TraktAuthState()
 
-    fun ensureLoaded() {
+    override fun ensureLoaded() {
         if (hasLoaded) return
         loadFromDisk()
     }
 
-    fun onProfileChanged() {
+    override fun onProfileChanged() {
         loadFromDisk()
     }
 
-    fun clearLocalState() {
+    override fun clearLocalState() {
         hasLoaded = false
         authState = TraktAuthState()
         publish()
