@@ -301,22 +301,6 @@ class WatchProgressRulesTest {
     }
 
     @Test
-    fun `Trakt playback next up seeds require TV percent threshold`() {
-        val belowSeedThreshold = entry(
-            videoId = "show:1:4",
-            parentMetaId = "show",
-            seasonNumber = 1,
-            episodeNumber = 4,
-            progressPercent = 94f,
-            source = WatchProgressSourceTraktPlayback,
-        )
-        val seed = belowSeedThreshold.copy(progressPercent = 95f)
-
-        assertFalse(belowSeedThreshold.shouldUseAsCompletedSeedForContinueWatching())
-        assertTrue(seed.shouldUseAsCompletedSeedForContinueWatching())
-    }
-
-    @Test
     fun `Trakt history is not treated as active resume`() {
         val history = entry(
             videoId = "show:1:4",

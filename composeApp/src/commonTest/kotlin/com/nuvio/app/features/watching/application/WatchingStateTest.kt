@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class WatchingStateTest {
     @Test
-    fun `latest completed ignores Trakt playback below next up seed threshold`() {
+    fun `latest completed aggregates provider-filtered completed progress`() {
         val almostCompletePlayback = entry(
             videoId = "show:1:4",
             seasonNumber = 1,
@@ -24,7 +24,7 @@ class WatchingStateTest {
             watchedItems = emptyList(),
         )
 
-        assertTrue(result.isEmpty())
+        assertEquals(4, result.values.single().episodeNumber)
     }
 
     @Test

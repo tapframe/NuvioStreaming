@@ -4,6 +4,7 @@ import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.shouldUseAsCompletedSeedForContinueWatching
 import kotlinx.coroutines.flow.Flow
 
 enum class TrackingLibraryTabKind {
@@ -77,6 +78,19 @@ interface TrackingProgressProvider {
     /** True when completed progress is already reconciled into watched history by the provider. */
     val ownsCompletedHistoryProjection: Boolean
         get() = false
+
+    /** Optional age cutoff applied to continue-watching entries and completed next-up seeds. */
+    fun continueWatchingCutoffEpochMs(daysCap: Int, nowEpochMs: Long): Long? = null
+
+    /** Provider policy for deciding whether a progress row is a valid completed next-up seed. */
+    fun shouldUseAsNextUpSeed(entry: WatchProgressEntry, nowEpochMs: Long): Boolean =
+        entry.shouldUseAsCompletedSeedForContinueWatching()
+
+    /** Maps provider episode numbering into the application's metadata numbering when needed. */
+    suspend fun prepareNextUpProgressEntries(
+        entries: List<WatchProgressEntry>,
+        contentId: String,
+    ): List<WatchProgressEntry> = entries
 
     fun ensureLoaded()
     fun onProfileChanged() = Unit

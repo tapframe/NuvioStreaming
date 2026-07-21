@@ -1627,6 +1627,25 @@ object WatchProgressRepository {
         return activeProgressProvider()?.isHiddenFromProgress(contentId) == true
     }
 
+    fun activeProviderOwnsCompletedHistoryProjection(): Boolean =
+        activeProgressProvider()?.ownsCompletedHistoryProjection == true
+
+    fun activeProviderContinueWatchingCutoffEpochMs(
+        daysCap: Int,
+        nowEpochMs: Long,
+    ): Long? = activeProgressProvider()?.continueWatchingCutoffEpochMs(daysCap, nowEpochMs)
+
+    fun shouldUseAsNextUpSeed(entry: WatchProgressEntry, nowEpochMs: Long): Boolean =
+        activeProgressProvider()?.shouldUseAsNextUpSeed(entry, nowEpochMs)
+            ?: entry.shouldUseAsCompletedSeedForContinueWatching()
+
+    suspend fun prepareNextUpProgressEntries(
+        entries: List<WatchProgressEntry>,
+        contentId: String,
+    ): List<WatchProgressEntry> = activeProgressProvider()
+        ?.prepareNextUpProgressEntries(entries, contentId)
+        ?: entries
+
     private fun AddonsUiState.metadataProviderReadiness(): MetadataProviderReadiness {
         val enabled = addons.enabledAddons()
         val providers = enabled
