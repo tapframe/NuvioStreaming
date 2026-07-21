@@ -2163,6 +2163,15 @@ private fun MainAppContent(
                                             contentDescription = stringResource(Res.string.compose_nav_library),
                                             label = stringResource(Res.string.compose_nav_library),
                                         )
+                                        if (showLiveTvInNavigation) {
+                                            NavItem(
+                                                selected = selectedTab == AppScreenTab.LiveTv,
+                                                onClick = { handleRootTabClick(AppScreenTab.LiveTv) },
+                                                icon = Icons.Filled.Tv,
+                                                contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                                                label = stringResource(Res.string.compose_nav_live_tv),
+                                            )
+                                        }
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Settings,
                                             onClick = { handleRootTabClick(AppScreenTab.Settings) },
