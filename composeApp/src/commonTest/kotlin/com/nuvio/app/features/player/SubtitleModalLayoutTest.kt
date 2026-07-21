@@ -13,6 +13,7 @@ class SubtitleModalLayoutTest {
         val metrics = SubtitleModalLayoutMetrics.from(
             maxWidth = 884.dp,
             maxHeight = 400.dp,
+            titleLineHeight = 32.dp,
         )
 
         assertTrue(metrics.isCompact)
@@ -25,6 +26,7 @@ class SubtitleModalLayoutTest {
         val metrics = SubtitleModalLayoutMetrics.from(
             maxWidth = 1280.dp,
             maxHeight = 720.dp,
+            titleLineHeight = 36.dp,
         )
 
         assertFalse(metrics.isCompact)
@@ -38,11 +40,24 @@ class SubtitleModalLayoutTest {
         val metrics = SubtitleModalLayoutMetrics.from(
             maxWidth = 640.dp,
             maxHeight = 360.dp,
+            titleLineHeight = 32.dp,
         )
 
         assertTrue(metrics.isCompact)
         assertTrue(metrics.languageRailWidth >= 132.dp)
         assertTrue(metrics.subtitleRailWidth >= 210.dp)
         assertTrue(metrics.styleRailWidth >= 210.dp)
+    }
+
+    @Test
+    fun `compact title reservation follows scaled typography line height`() {
+        val metrics = SubtitleModalLayoutMetrics.from(
+            maxWidth = 884.dp,
+            maxHeight = 400.dp,
+            titleLineHeight = 64.dp,
+        )
+
+        assertEquals(72.dp, metrics.titleReservedHeight)
+        assertEquals(244.dp, metrics.railMaxHeight(400.dp))
     }
 }

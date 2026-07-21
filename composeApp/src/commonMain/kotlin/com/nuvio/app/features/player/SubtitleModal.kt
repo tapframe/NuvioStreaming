@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -149,13 +150,15 @@ fun SubtitleModal(
         modifier = modifier,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val layout = SubtitleModalLayoutMetrics.from(maxWidth, maxHeight)
-            val railMaxHeight = (
-                maxHeight -
-                    layout.topPadding -
-                    layout.bottomPadding -
-                    layout.titleReservedHeight
-                ).coerceAtLeast(120.dp)
+            val compactLayout = SubtitleModalLayoutMetrics.usesCompactLayout(maxWidth, maxHeight)
+            val titleStyle = if (compactLayout) {
+                MaterialTheme.typography.headlineSmall
+            } else {
+                MaterialTheme.typography.headlineMedium
+            }
+            val titleLineHeight = with(LocalDensity.current) { titleStyle.lineHeight.toDp() }
+            val layout = SubtitleModalLayoutMetrics.from(maxWidth, maxHeight, titleLineHeight)
+            val railMaxHeight = layout.railMaxHeight(maxHeight)
 
             Box(
                 modifier = Modifier
@@ -174,11 +177,7 @@ fun SubtitleModal(
                     Text(
                         text = stringResource(Res.string.compose_player_subtitles),
                         color = Color.White,
-                        style = if (layout.isCompact) {
-                            MaterialTheme.typography.headlineSmall
-                        } else {
-                            MaterialTheme.typography.headlineMedium
-                        },
+                        style = titleStyle,
                         modifier = Modifier.padding(bottom = layout.titleBottomPadding),
                     )
 
@@ -359,6 +358,7 @@ private fun SubtitleLanguageRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
             .clickable(onClick = onClick)
@@ -432,6 +432,7 @@ private fun SubtitleOptionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
             .clickable(onClick = onClick)
@@ -522,6 +523,7 @@ private fun SubtitleRailEmptyState(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 10.dp),
@@ -557,17 +559,29 @@ internal data class SubtitleModalLayoutMetrics(
     val totalRailWidth: Dp
         get() = languageRailWidth + subtitleRailWidth + styleRailWidth + railGap * 2
 
+    fun railMaxHeight(maxHeight: Dp): Dp = (
+        maxHeight - topPadding - bottomPadding - titleReservedHeight
+        ).coerceAtLeast(120.dp)
+
     companion object {
-        fun from(maxWidth: Dp, maxHeight: Dp): SubtitleModalLayoutMetrics {
-            val isCompact = maxWidth < 960.dp || maxHeight < 500.dp
+        fun usesCompactLayout(maxWidth: Dp, maxHeight: Dp): Boolean =
+            maxWidth < 960.dp || maxHeight < 500.dp
+
+        fun from(
+            maxWidth: Dp,
+            maxHeight: Dp,
+            titleLineHeight: Dp,
+        ): SubtitleModalLayoutMetrics {
+            val isCompact = usesCompactLayout(maxWidth, maxHeight)
             if (!isCompact) {
+                val titleBottomPadding = 12.dp
                 return SubtitleModalLayoutMetrics(
                     isCompact = false,
                     horizontalPadding = 52.dp,
                     topPadding = 36.dp,
                     bottomPadding = 76.dp,
-                    titleReservedHeight = 72.dp,
-                    titleBottomPadding = 12.dp,
+                    titleReservedHeight = titleLineHeight + titleBottomPadding,
+                    titleBottomPadding = titleBottomPadding,
                     railGap = 14.dp,
                     languageRailWidth = 200.dp,
                     subtitleRailWidth = 300.dp,
@@ -581,14 +595,15 @@ internal data class SubtitleModalLayoutMetrics(
             val languageWidth = (availableWidth * 0.2f).coerceIn(132.dp, 168.dp)
             val subtitleWidth = (availableWidth * 0.34f).coerceIn(210.dp, 260.dp)
             val remainingStyleWidth = availableWidth - languageWidth - subtitleWidth - railGap * 2
+            val titleBottomPadding = 8.dp
 
             return SubtitleModalLayoutMetrics(
                 isCompact = true,
                 horizontalPadding = horizontalPadding,
                 topPadding = 24.dp,
                 bottomPadding = 60.dp,
-                titleReservedHeight = 52.dp,
-                titleBottomPadding = 8.dp,
+                titleReservedHeight = titleLineHeight + titleBottomPadding,
+                titleBottomPadding = titleBottomPadding,
                 railGap = railGap,
                 languageRailWidth = languageWidth,
                 subtitleRailWidth = subtitleWidth,
