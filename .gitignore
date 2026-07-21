@@ -22,6 +22,9 @@ node_modules/
 logs/
 analysis/
 Docs
+!Docs/
+Docs/*
+!Docs/NUVIO_PULL_REQUEST.md
 keystore/
 scripts/build-distribution.sh
 asset

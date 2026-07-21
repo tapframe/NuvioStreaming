@@ -43,6 +43,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:Input
     abstract val realtimeSyncEnabled: Property<Boolean>
 
+    @get:Input
+    abstract val parentsGuideApiBaseUrl: Property<String>
+
     @TaskAction
     fun generate() {
         val props = Properties()
@@ -176,6 +179,19 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 """.trimMargin()
             )
         }
+
+        outDir.resolve("com/nuvio/app/features/parentsguide").apply {
+            mkdirs()
+            resolve("ParentsGuideConfig.kt").writeText(
+                """
+                |package com.nuvio.app.features.parentsguide
+                |
+                |object ParentsGuideConfig {
+                |    const val API_BASE_URL = "${parentsGuideApiBaseUrl.get()}"
+                |}
+                """.trimMargin()
+            )
+        }
     }
 }
 
@@ -301,6 +317,7 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
         }
     )
     realtimeSyncEnabled.set(runtimeConfigBoolean("NUVIO_REALTIME_SYNC_ENABLED", true))
+    parentsGuideApiBaseUrl.set(runtimeConfigValue("PARENTS_GUIDE_API_BASE_URL"))
 }
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
