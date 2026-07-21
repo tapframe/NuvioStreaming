@@ -16,11 +16,12 @@ internal fun buildSimklApiUrl(
     val normalizedPath = path.trim().let { value ->
         if (value.startsWith('/')) value else "/$value"
     }
-    val parameters = linkedMapOf(
-        "client_id" to SimklConfig.CLIENT_ID,
-        "app-name" to SimklConfig.APP_NAME,
-        "app-version" to simklAppVersion,
-    ).apply { putAll(query) }
+    val parameters = linkedMapOf<String, String>().apply {
+        putAll(query)
+        put("client_id", SimklConfig.CLIENT_ID)
+        put("app-name", SimklConfig.APP_NAME)
+        put("app-version", simklAppVersion)
+    }
     return buildString {
         append(SIMKL_API_BASE_URL)
         append(normalizedPath)
@@ -38,6 +39,7 @@ internal fun simklRequestHeaders(
     contentTypeJson: Boolean = false,
 ): Map<String, String> = buildMap {
     put("User-Agent", "${SimklConfig.APP_NAME}/$simklAppVersion")
+    put("Accept", "application/json")
     accessToken?.trim()?.takeIf(String::isNotBlank)?.let { token ->
         put("Authorization", "Bearer $token")
     }

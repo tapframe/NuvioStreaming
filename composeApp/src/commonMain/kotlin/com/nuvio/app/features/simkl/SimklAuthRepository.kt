@@ -185,8 +185,8 @@ object SimklAuthRepository : TrackingAuthProvider {
     }
 
     suspend fun refreshUserSettings(): String? {
-        val token = authorizedAccessToken() ?: return null
-        return fetchAndStoreUserSettings(token)
+        authorizedAccessToken() ?: return null
+        return fetchAndStoreUserSettings()
     }
 
     private suspend fun completeAuthorization(callback: SimklAuthCallback.AuthorizationCode) =
@@ -260,16 +260,17 @@ object SimklAuthRepository : TrackingAuthProvider {
             )
             persistMetadata()
             publish(isLoading = false, error = null)
-            fetchAndStoreUserSettings(token.accessToken)
+            fetchAndStoreUserSettings()
         }
 
-    private suspend fun fetchAndStoreUserSettings(token: String): String? {
+    private suspend fun fetchAndStoreUserSettings(): String? {
         val response = try {
-            httpRequestRaw(
-                method = "POST",
-                url = buildSimklApiUrl("/users/settings"),
-                headers = simklRequestHeaders(accessToken = token, contentTypeJson = true),
-                body = "{}",
+            SimklApi.client.execute(
+                SimklApiRequest(
+                    method = SimklHttpMethod.POST,
+                    path = "/users/settings",
+                    body = "{}",
+                ),
             )
         } catch (error: CancellationException) {
             throw error
@@ -277,11 +278,6 @@ object SimklAuthRepository : TrackingAuthProvider {
             log.w { "Failed to fetch Simkl user settings: ${error.message}" }
             return null
         }
-        if (response.status == 401) {
-            onUnauthorizedResponse()
-            return null
-        }
-        if (response.status !in 200..299) return null
         val settings = runCatching { json.decodeFromString<SimklUserSettingsResponse>(response.body) }
             .getOrNull() ?: return null
         storedState = storedState.copy(
