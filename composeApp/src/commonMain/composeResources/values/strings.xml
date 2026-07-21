@@ -515,6 +515,8 @@
     <string name="settings_licenses_attributions_exoplayer_license">Licensed under the Apache License, Version 2.0.</string>
     <string name="compose_trakt_list_picker_loading">Loading your Trakt lists…</string>
     <string name="compose_trakt_list_picker_subtitle">Choose where to save this title on Trakt</string>
+    <string name="compose_tracking_list_picker_loading">Loading lists…</string>
+    <string name="compose_tracking_list_picker_subtitle">Choose where to save this title</string>
     <string name="action_donate">Donate</string>
     <string name="cw_action_go_to_details">Go to details</string>
     <string name="cw_action_remove">Remove</string>
@@ -1442,6 +1444,7 @@
     <string name="trailer_unable_to_play">Unable to play trailer</string>
     <string name="trakt_lists_load_failed">Failed to load Trakt lists</string>
     <string name="trakt_lists_update_failed">Failed to update Trakt lists</string>
+    <string name="tracking_lists_update_failed">Failed to update tracking lists</string>
     <string name="updates_asset_line">%1$s • %2$s</string>
     <string name="updates_check_failed">Update check failed</string>
     <string name="updates_download_failed">Download failed</string>

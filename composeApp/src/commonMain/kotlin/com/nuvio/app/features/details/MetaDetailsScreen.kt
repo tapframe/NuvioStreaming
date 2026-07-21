@@ -82,7 +82,7 @@ import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
 import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
-import com.nuvio.app.core.ui.TraktListPickerDialog
+import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.rememberHeroStretchState
 import dev.chrisbanes.haze.hazeSource
@@ -115,7 +115,7 @@ import com.nuvio.app.features.trakt.TraktCommentReview
 import com.nuvio.app.features.trakt.TraktCommentsRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
 import com.nuvio.app.features.trakt.TraktConnectionMode
-import com.nuvio.app.features.trakt.TraktListTab
+import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
@@ -213,7 +213,7 @@ fun MetaDetailsScreen(
     var selectedComment by remember(type, id) { mutableStateOf<TraktCommentReview?>(null) }
     val detailsScope = rememberCoroutineScope()
     var showLibraryListPicker by remember(type, id) { mutableStateOf(false) }
-    var pickerTabs by remember(type, id) { mutableStateOf<List<TraktListTab>>(emptyList()) }
+    var pickerTabs by remember(type, id) { mutableStateOf<List<TrackingLibraryTab>>(emptyList()) }
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var pickerPending by remember(type, id) { mutableStateOf(false) }
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
@@ -1212,7 +1212,7 @@ fun MetaDetailsScreen(
                             )
                         }
 
-                        TraktListPickerDialog(
+                        TrackingListPickerDialog(
                             visible = showLibraryListPicker,
                             title = meta.name,
                             tabs = pickerTabs,
@@ -1241,7 +1241,7 @@ fun MetaDetailsScreen(
                                     }.onSuccess {
                                         showLibraryListPicker = false
                                     }.onFailure { error ->
-                                        pickerError = error.message ?: getString(Res.string.trakt_lists_update_failed)
+                                        pickerError = error.message ?: getString(Res.string.tracking_lists_update_failed)
                                     }
                                     pickerPending = false
                                 }

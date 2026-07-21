@@ -117,7 +117,7 @@ import com.nuvio.app.core.ui.NuvioToastHost
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.NuvioFloatingPrompt
 import com.nuvio.app.core.ui.ProfileMeshBackground
-import com.nuvio.app.core.ui.TraktListPickerDialog
+import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
@@ -224,7 +224,7 @@ import com.nuvio.app.features.tracking.TrackingScrobbleAction
 import com.nuvio.app.features.tracking.TrackingScrobbleCoordinator
 import com.nuvio.app.features.tracking.TrackingScrobbleEvent
 import com.nuvio.app.features.tracking.buildTrackingMediaReference
-import com.nuvio.app.features.trakt.TraktListTab
+import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.updater.AppUpdaterHost
 import com.nuvio.app.features.updater.AppUpdaterPlatform
 import com.nuvio.app.features.updater.rememberAppUpdaterController
@@ -814,7 +814,7 @@ private fun MainAppContent(
         var showLibraryListPicker by remember { mutableStateOf(false) }
         var pickerItem by remember { mutableStateOf<LibraryItem?>(null) }
         var pickerTitle by remember { mutableStateOf("") }
-        var pickerTabs by remember { mutableStateOf<List<TraktListTab>>(emptyList()) }
+        var pickerTabs by remember { mutableStateOf<List<TrackingLibraryTab>>(emptyList()) }
         var pickerMembership by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
         var pickerPending by remember { mutableStateOf(false) }
         var pickerError by remember { mutableStateOf<String?>(null) }
@@ -3341,7 +3341,7 @@ private fun MainAppContent(
                                                     }
                                                 }.onFailure { error ->
                                                     NuvioToastController.show(
-                                                        error.message ?: getString(Res.string.trakt_lists_update_failed),
+                                                        error.message ?: getString(Res.string.tracking_lists_update_failed),
                                                     )
                                                 }
                                             }
@@ -3491,7 +3491,7 @@ private fun MainAppContent(
                 },
             )
 
-            TraktListPickerDialog(
+            TrackingListPickerDialog(
                 visible = showLibraryListPicker,
                 title = pickerTitle,
                 tabs = pickerTabs,
@@ -3511,7 +3511,7 @@ private fun MainAppContent(
                     }
                 },
                 onSave = {
-                    val item = pickerItem ?: return@TraktListPickerDialog
+                    val item = pickerItem ?: return@TrackingListPickerDialog
                     coroutineScope.launch {
                         pickerPending = true
                         pickerError = null
@@ -3525,7 +3525,7 @@ private fun MainAppContent(
                             pickerItem = null
                             pickerError = null
                         }.onFailure { error ->
-                            pickerError = error.message ?: getString(Res.string.trakt_lists_update_failed)
+                            pickerError = error.message ?: getString(Res.string.tracking_lists_update_failed)
                         }
                         pickerPending = false
                     }

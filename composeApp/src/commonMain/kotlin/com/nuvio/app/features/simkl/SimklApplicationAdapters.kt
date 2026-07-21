@@ -2,9 +2,15 @@ package com.nuvio.app.features.simkl
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.library.LibraryItem
+import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tracking.TrackingHistoryItem
+import com.nuvio.app.features.tracking.TrackingLibraryProvider
+import com.nuvio.app.features.tracking.TrackingLibrarySnapshot
+import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingListStatus
+import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
@@ -16,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class SimklLibraryUiState(
@@ -92,6 +100,73 @@ object SimklLibraryRepository {
             isLoading = syncState.isLoading,
             hasLoaded = syncState.hasLoaded,
             errorMessage = syncState.errorMessage,
+        )
+    }
+}
+
+object SimklTrackingLibraryProvider : TrackingLibraryProvider {
+    override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
+    override val changes: Flow<Unit> = SimklLibraryRepository.uiState.map { Unit }
+
+    override fun ensureLoaded() = SimklLibraryRepository.ensureLoaded()
+
+    override suspend fun refresh() = SimklLibraryRepository.refreshNow()
+
+    override fun snapshot(): TrackingLibrarySnapshot {
+        val state = SimklLibraryRepository.uiState.value
+        val items = state.items.sortedByDescending(LibraryItem::savedAtEpochMs)
+        return TrackingLibrarySnapshot(
+            items = items,
+            sections = listOf(
+                LibrarySection(
+                    type = SIMKL_WATCHLIST_KEY,
+                    displayTitle = SIMKL_WATCHLIST_TITLE,
+                    items = items,
+                ),
+            ),
+            tabs = listOf(
+                TrackingLibraryTab(
+                    key = SIMKL_WATCHLIST_KEY,
+                    title = SIMKL_WATCHLIST_TITLE,
+                    providerId = TrackingProviderId.SIMKL,
+                    kind = TrackingLibraryTabKind.WATCHLIST,
+                ),
+            ),
+            hasLoaded = state.hasLoaded,
+            isLoading = state.isLoading,
+            errorMessage = state.errorMessage,
+        )
+    }
+
+    override fun contains(contentId: String, contentType: String?): Boolean =
+        SimklLibraryRepository.isInWatchlist(contentId, contentType)
+
+    override fun find(contentId: String): LibraryItem? =
+        SimklLibraryRepository.uiState.value.items.firstOrNull { item -> item.id == contentId }
+
+    override suspend fun membership(item: LibraryItem): Map<String, Boolean> =
+        mapOf(SIMKL_WATCHLIST_KEY to SimklLibraryRepository.isInWatchlist(item.id, item.type))
+
+    override suspend fun applyMembership(
+        profileId: Int,
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+    ) {
+        val desired = desiredMembership[SIMKL_WATCHLIST_KEY] == true
+        if (desired != SimklLibraryRepository.isInWatchlist(item.id, item.type)) {
+            SimklLibraryRepository.setWatchlistMembership(
+                profileId = profileId,
+                item = item,
+                isMember = desired,
+            )
+        }
+    }
+
+    override suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem) {
+        SimklLibraryRepository.setWatchlistMembership(
+            profileId = profileId,
+            item = item,
+            isMember = !SimklLibraryRepository.isInWatchlist(item.id, item.type),
         )
     }
 }
