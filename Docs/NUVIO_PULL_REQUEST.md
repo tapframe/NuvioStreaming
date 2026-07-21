@@ -17,7 +17,7 @@ The top-level row and each category are independently expandable. The section su
 - `ParentsGuideClient`/`ParentsGuideRepository`: request coalescing, identifier mapping, error isolation, and UI-state mapping.
 - `ParentsGuideModels`: strict kotlinx.serialization wire model and canonical category/severity ordering.
 - `ParentsGuideSection`: theme-derived Compose accordion components.
-- `ParentsGuideConfig`: build-generated `PARENTS_GUIDE_API_BASE_URL`. It is blank by default until a production service is approved; local builds set it in `local.properties` or the environment.
+- `ParentsGuideConfig`: build-generated `PARENTS_GUIDE_API_BASE_URL`. It defaults to the production service at `https://nuvio-parents-guide-addon.vercel.app`; local builds can override it in `local.properties` or the environment.
 
 The Stremio v3 protocol has no standard Parents Guide resource. The companion addon publishes a valid no-stream manifest and a custom `/parentsguide/:type/:id.json` resource; this client calls the equivalent versioned API directly.
 

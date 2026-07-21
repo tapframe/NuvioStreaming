@@ -317,7 +317,12 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
         }
     )
     realtimeSyncEnabled.set(runtimeConfigBoolean("NUVIO_REALTIME_SYNC_ENABLED", true))
-    parentsGuideApiBaseUrl.set(runtimeConfigValue("PARENTS_GUIDE_API_BASE_URL"))
+    parentsGuideApiBaseUrl.set(
+        runtimeConfigValue(
+            "PARENTS_GUIDE_API_BASE_URL",
+            "https://nuvio-parents-guide-addon.vercel.app",
+        )
+    )
 }
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
