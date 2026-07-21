@@ -20,7 +20,7 @@ Families cannot currently review sourced category summaries or scene-level paren
 
 ## Issue or approval
 
-Awaiting a maintainer decision in #1600. This PR is intentionally a draft and is not submitted as review-ready before approval.
+Awaiting a maintainer decision in #1601. This PR is intentionally a draft and is not submitted as review-ready before approval.
 
 ## UI / behavior impact
 
@@ -31,7 +31,7 @@ Awaiting a maintainer decision in #1600. This PR is intentionally a draft and is
 - [ ] UI change has explicit maintainer approval
 - [ ] Behavior change has explicit maintainer approval
 
-The implementation adds UI and network/cache behavior. The approval boxes will remain unchecked unless maintainers approve #1600.
+The implementation adds UI and network/cache behavior. The approval boxes will remain unchecked unless maintainers approve #1601.
 
 ## Policy check
 
@@ -73,4 +73,4 @@ None. With the feature disabled, no request or section is added. Missing guides 
 
 ## Linked issues
 
-#1600 — awaiting explicit maintainer approval.
+#1601 — awaiting explicit maintainer approval.
