@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.time.EpisodeReleaseDatePlatform
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.collection.CollectionSyncService
 import com.nuvio.app.features.home.HomeCatalogSettingsSyncService
@@ -11,9 +12,8 @@ import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
-import com.nuvio.app.features.trakt.TraktPlatformClock
-import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.tracking.effectiveLibrarySourceMode
 import com.nuvio.app.features.tracking.effectiveWatchProgressSource
@@ -305,7 +305,7 @@ object SyncManager {
     private fun hasRecentFullPull(profileId: Int): Boolean =
         synchronized(pullStateLock) {
             lastFullPullProfileId == profileId &&
-                TraktPlatformClock.nowEpochMs() - lastFullPullAtMs < FOREGROUND_PULL_MIN_INTERVAL_MS
+                EpisodeReleaseDatePlatform.nowEpochMs() - lastFullPullAtMs < FOREGROUND_PULL_MIN_INTERVAL_MS
         }
 
     private suspend fun pullForegroundForProfile(profileId: Int) {
@@ -383,7 +383,7 @@ object SyncManager {
             }
             if (syncResult.succeeded) {
                 synchronized(pullStateLock) {
-                    lastFullPullAtMs = TraktPlatformClock.nowEpochMs()
+                    lastFullPullAtMs = EpisodeReleaseDatePlatform.nowEpochMs()
                     lastFullPullProfileId = profileId
                 }
             } else {
@@ -429,9 +429,9 @@ object SyncManager {
                 }
 
                 TrackingProviderRegistry.ensureLoaded()
-                TraktSettingsRepository.ensureLoaded()
+                TrackingSettingsRepository.ensureLoaded()
 
-                val settings = TraktSettingsRepository.uiState.value
+                val settings = TrackingSettingsRepository.uiState.value
                 val shouldPullLibrary = effectiveLibrarySourceMode(
                     requestedSource = settings.librarySourceMode,
                     isProviderAuthenticated = TrackingProviderRegistry::isAuthenticated,

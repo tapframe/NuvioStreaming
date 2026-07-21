@@ -116,7 +116,7 @@ import com.nuvio.app.features.trakt.TraktCommentsRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.tracking.TrackingLibraryTab
-import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
@@ -165,9 +165,9 @@ fun MetaDetailsScreen(
         TraktAuthRepository.ensureLoaded()
         TraktAuthRepository.uiState
     }.collectAsStateWithLifecycle()
-    val traktSettingsUiState by remember {
-        TraktSettingsRepository.ensureLoaded()
-        TraktSettingsRepository.uiState
+    val trackingSettingsUiState by remember {
+        TrackingSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val tmdbSettingsUiState by remember {
         TmdbSettingsRepository.ensureLoaded()
@@ -292,7 +292,7 @@ fun MetaDetailsScreen(
         id,
         displayedMeta?.id,
         uiState.isLoading,
-        traktSettingsUiState.moreLikeThisSource,
+        trackingSettingsUiState.moreLikeThisSource,
         traktAuthUiState.mode,
         tmdbSettingsUiState.enabled,
         tmdbSettingsUiState.useMoreLikeThis,

@@ -21,6 +21,10 @@ object TrackingSettingsRepository {
 
     fun ensureLoaded() = TraktSettingsRepository.ensureLoaded()
 
+    fun onProfileChanged() = TraktSettingsRepository.onProfileChanged()
+
+    fun clearLocalState() = TraktSettingsRepository.clearLocalState()
+
     fun setLibrarySourceMode(source: LibrarySourceMode) =
         TraktSettingsRepository.setLibrarySourceMode(source)
 

@@ -30,7 +30,7 @@ import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.trakt.TraktCommentsStorage
 import com.nuvio.app.features.trakt.TraktCommentsSettings
 import com.nuvio.app.features.trakt.TraktSettingsStorage
-import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesStorage
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import io.github.jan.supabase.postgrest.postgrest
@@ -184,7 +184,7 @@ object ProfileSettingsSync {
             MetaScreenSettingsRepository.uiState.map { "meta" },
             CollectionMobileSettingsRepository.uiState.map { "collection_mobile_settings" },
             ContinueWatchingPreferencesRepository.uiState.map { "continue_watching" },
-            TraktSettingsRepository.uiState.map { "trakt_settings" },
+            TrackingSettingsRepository.uiState.map { "trakt_settings" },
             TraktCommentsSettings.enabled.map { "trakt_comments" },
             EpisodeReleaseNotificationsRepository.uiState.map { "episode_release_alerts" },
         )
@@ -278,7 +278,7 @@ object ProfileSettingsSync {
         ContinueWatchingPreferencesRepository.onProfileChanged()
 
         TraktSettingsStorage.savePayload(blob.features.traktSettingsPayload)
-        TraktSettingsRepository.onProfileChanged()
+        TrackingSettingsRepository.onProfileChanged()
 
         TraktCommentsStorage.replaceFromSyncPayload(blob.features.traktCommentsSettings)
         TraktCommentsSettings.onProfileChanged()
@@ -298,7 +298,7 @@ object ProfileSettingsSync {
         MetaScreenSettingsRepository.ensureLoaded()
         CollectionMobileSettingsRepository.ensureLoaded()
         ContinueWatchingPreferencesRepository.ensureLoaded()
-        TraktSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
         TraktCommentsSettings.ensureLoaded()
         EpisodeReleaseNotificationsRepository.ensureLoaded()
     }
@@ -321,7 +321,7 @@ object ProfileSettingsSync {
         "meta=${MetaScreenSettingsRepository.uiState.value}",
         "collection_mobile_settings=${CollectionMobileSettingsRepository.uiState.value}",
         "continue=${ContinueWatchingPreferencesRepository.uiState.value}",
-        "trakt_settings=${TraktSettingsRepository.uiState.value}",
+        "trakt_settings=${TrackingSettingsRepository.uiState.value}",
         "trakt_comments=${TraktCommentsSettings.enabled.value}",
         "episode_release_alerts=${EpisodeReleaseNotificationsRepository.uiState.value.isEnabled}",
     ).joinToString(separator = "||")

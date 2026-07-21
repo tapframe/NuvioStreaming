@@ -1,7 +1,7 @@
 package com.nuvio.app.features.watched
 
+import com.nuvio.app.core.time.parseZonedIsoDateTimeToEpochMs
 import com.nuvio.app.features.home.MetaPreview
-import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import com.nuvio.app.features.watching.domain.watchedKey
 import kotlinx.serialization.Serializable
@@ -72,7 +72,7 @@ internal fun normalizeWatchedMarkedAtEpochMs(value: Long): Long {
         append(second.toString().padStart(2, '0'))
         append('Z')
     }
-    return TraktPlatformClock.parseIsoDateTimeToEpochMs(iso) ?: value
+    return parseZonedIsoDateTimeToEpochMs(iso) ?: value
 }
 
 fun watchedItemKey(

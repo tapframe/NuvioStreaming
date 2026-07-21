@@ -50,7 +50,7 @@ import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.home.components.HomeContinueWatchingSectionBottomPadding
 import com.nuvio.app.features.home.components.ContinueWatchingLayout
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
-import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
 import com.nuvio.app.features.watched.WatchedItem
@@ -147,9 +147,9 @@ fun HomeScreen(
     val effectiveWatchProgressSource by WatchProgressRepository.activeSourceState.collectAsStateWithLifecycle()
     val cloudLibraryUiState by CloudLibraryRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
-    val traktSettingsUiState by remember {
-        TraktSettingsRepository.ensureLoaded()
-        TraktSettingsRepository.uiState
+    val trackingSettingsUiState by remember {
+        TrackingSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     var observedOfflineState by remember { mutableStateOf(false) }
 
@@ -189,7 +189,7 @@ fun HomeScreen(
     val effectiveWatchProgressEntries = remember(
         watchProgressUiState.entries,
         isTraktProgressActive,
-        traktSettingsUiState.continueWatchingDaysCap,
+        trackingSettingsUiState.continueWatchingDaysCap,
     ) {
         val filtered = if (isTraktProgressActive) {
             watchProgressUiState.entries.filter { !WatchProgressRepository.isDroppedShow(it.parentMetaId) }
@@ -199,7 +199,7 @@ fun HomeScreen(
         filterEntriesForTraktContinueWatchingWindow(
             entries = filtered,
             isTraktProgressActive = isTraktProgressActive,
-            daysCap = traktSettingsUiState.continueWatchingDaysCap,
+            daysCap = trackingSettingsUiState.continueWatchingDaysCap,
             nowEpochMs = WatchProgressClock.nowEpochMs(),
         )
     }
@@ -227,12 +227,12 @@ fun HomeScreen(
     val recentNextUpSeedCandidates = remember(
         allNextUpSeedCandidates,
         isTraktProgressActive,
-        traktSettingsUiState.continueWatchingDaysCap,
+        trackingSettingsUiState.continueWatchingDaysCap,
     ) {
         filterHomeNextUpCandidatesForTraktContinueWatchingWindow(
             candidates = allNextUpSeedCandidates,
             isTraktProgressActive = isTraktProgressActive,
-            daysCap = traktSettingsUiState.continueWatchingDaysCap,
+            daysCap = trackingSettingsUiState.continueWatchingDaysCap,
             nowEpochMs = WatchProgressClock.nowEpochMs(),
         )
     }
