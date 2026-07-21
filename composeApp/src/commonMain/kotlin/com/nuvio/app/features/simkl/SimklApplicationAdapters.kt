@@ -11,6 +11,8 @@ import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingListStatus
 import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProgressProvider
+import com.nuvio.app.features.tracking.TrackingProgressSnapshot
 import com.nuvio.app.features.tracking.TrackingWatchedProvider
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
@@ -109,6 +111,8 @@ object SimklTrackingLibraryProvider : TrackingLibraryProvider {
     override val changes: Flow<Unit> = SimklLibraryRepository.uiState.map { Unit }
 
     override fun ensureLoaded() = SimklLibraryRepository.ensureLoaded()
+
+    override fun onProfileChanged() = SimklLibraryRepository.ensureLoaded()
 
     override suspend fun refresh() = SimklLibraryRepository.refreshNow()
 
@@ -297,6 +301,30 @@ object SimklProgressRepository {
             errorMessage = syncState.errorMessage,
         )
     }
+}
+
+object SimklTrackingProgressProvider : TrackingProgressProvider {
+    override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
+    override val changes: Flow<Unit> = SimklProgressRepository.uiState.map { Unit }
+
+    override fun ensureLoaded() = SimklProgressRepository.ensureLoaded()
+
+    override fun onProfileChanged() = SimklProgressRepository.ensureLoaded()
+
+    override suspend fun refresh(force: Boolean, sourceChanged: Boolean) =
+        SimklProgressRepository.refreshNow()
+
+    override fun snapshot(): TrackingProgressSnapshot {
+        val state = SimklProgressRepository.uiState.value
+        return TrackingProgressSnapshot(
+            entries = state.entries,
+            hasLoadedRemoteProgress = state.hasLoadedRemoteProgress,
+            errorMessage = state.errorMessage,
+        )
+    }
+
+    override suspend fun removeProgress(entries: Collection<WatchProgressEntry>) =
+        SimklProgressRepository.removeProgress(entries)
 }
 
 private fun SimklSyncSnapshot.canSafelyRemoveFromSimklWatchlist(contentId: String): Boolean =

@@ -175,8 +175,8 @@ internal fun shouldReplaceProgressSnapshotEntry(
 
 internal fun shouldCascadeCompletedProgressToWatchedHistory(
     entry: WatchProgressEntry,
-    isUsingTraktProgress: Boolean,
-): Boolean = !isUsingTraktProgress && entry.normalizedCompletion().isCompleted
+    providerOwnsCompletedHistory: Boolean,
+): Boolean = !providerOwnsCompletedHistory && entry.normalizedCompletion().isCompleted
 
 internal fun String?.isSeriesTypeForContinueWatching(): Boolean =
     equals("series", ignoreCase = true) || equals("tv", ignoreCase = true)

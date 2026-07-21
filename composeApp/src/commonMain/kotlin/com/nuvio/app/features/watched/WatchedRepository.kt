@@ -141,7 +141,7 @@ object WatchedRepository {
             activateEffectiveSource(
                 effectiveWatchedSource(
                     requestedSource = TrackingSettingsRepository.uiState.value.watchProgressSource,
-                    connectedProviderIds = TrackingProviderRegistry.connectedProviderIdsSnapshot(),
+                    connectedProviderIds = connectedWatchedProviderIds(),
                 ),
             )
         }
@@ -276,7 +276,7 @@ object WatchedRepository {
             profileId = profileId,
             source = effectiveWatchedSource(
                 requestedSource = TrackingSettingsRepository.uiState.value.watchProgressSource,
-                connectedProviderIds = TrackingProviderRegistry.connectedProviderIdsSnapshot(),
+                connectedProviderIds = connectedWatchedProviderIds(),
             ),
             forceSnapshot = false,
         )
@@ -289,7 +289,7 @@ object WatchedRepository {
             profileId = profileId,
             source = effectiveWatchedSource(
                 requestedSource = TrackingSettingsRepository.uiState.value.watchProgressSource,
-                connectedProviderIds = TrackingProviderRegistry.connectedProviderIdsSnapshot(),
+                connectedProviderIds = connectedWatchedProviderIds(),
             ),
             forceSnapshot = true,
         )
@@ -1000,6 +1000,10 @@ object WatchedRepository {
         synchronized(accountScopeLock) {
             accountScope
         }
+
+    private fun connectedWatchedProviderIds(): Set<TrackingProviderId> =
+        TrackingProviderRegistry.connectedWatchedProviders()
+            .mapTo(linkedSetOf()) { provider -> provider.providerId }
 }
 
 internal data class WatchedSnapshotMerge(

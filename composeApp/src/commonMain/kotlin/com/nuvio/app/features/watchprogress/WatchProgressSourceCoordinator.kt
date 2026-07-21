@@ -474,7 +474,11 @@ object WatchProgressSourceCoordinator {
         requestedSource = requestedSource,
         effectiveSource = effectiveWatchProgressSource(
             requestedSource = requestedSource,
-            isProviderAuthenticated = { providerId -> providerId in connectedProviderIds },
+            isProviderAuthenticated = { providerId ->
+                providerId in connectedProviderIds &&
+                    TrackingProviderRegistry.progressProvider(providerId) != null &&
+                    TrackingProviderRegistry.watchedProvider(providerId) != null
+            },
         ),
         isNuvioAuthenticated = authState is AuthState.Authenticated && !authState.isAnonymous,
     )

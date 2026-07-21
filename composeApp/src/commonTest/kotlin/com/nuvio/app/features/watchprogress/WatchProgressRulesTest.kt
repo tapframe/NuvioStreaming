@@ -403,7 +403,7 @@ class WatchProgressRulesTest {
     }
 
     @Test
-    fun `completed progress does not cascade to watched history while Trakt progress is active`() {
+    fun `completed progress does not cascade when provider owns watched projection`() {
         val completed = entry(
             videoId = "movie-complete",
             isCompleted = true,
@@ -413,19 +413,19 @@ class WatchProgressRulesTest {
         assertFalse(
             shouldCascadeCompletedProgressToWatchedHistory(
                 entry = completed,
-                isUsingTraktProgress = true,
+                providerOwnsCompletedHistory = true,
             ),
         )
         assertTrue(
             shouldCascadeCompletedProgressToWatchedHistory(
                 entry = completed,
-                isUsingTraktProgress = false,
+                providerOwnsCompletedHistory = false,
             ),
         )
         assertFalse(
             shouldCascadeCompletedProgressToWatchedHistory(
                 entry = inProgress,
-                isUsingTraktProgress = false,
+                providerOwnsCompletedHistory = false,
             ),
         )
     }

@@ -76,6 +76,7 @@ object TrackingProviderRegistry {
     private val scrobblers = mutableMapOf<TrackingProviderId, TrackingScrobbler>()
     private val libraryProviders = mutableMapOf<TrackingProviderId, TrackingLibraryProvider>()
     private val watchedProviders = mutableMapOf<TrackingProviderId, TrackingWatchedProvider>()
+    private val progressProviders = mutableMapOf<TrackingProviderId, TrackingProgressProvider>()
 
     private val _connectedProviderIds = MutableStateFlow<Set<TrackingProviderId>>(emptySet())
     val connectedProviderIds: StateFlow<Set<TrackingProviderId>> = _connectedProviderIds.asStateFlow()
@@ -123,6 +124,10 @@ object TrackingProviderRegistry {
         watchedProviders[provider.providerId] = provider
     }
 
+    fun registerProgressProvider(provider: TrackingProgressProvider) = synchronized(lock) {
+        progressProviders[provider.providerId] = provider
+    }
+
     fun authProvider(id: TrackingProviderId): TrackingAuthProvider? = synchronized(lock) {
         authProviders[id]
     }
@@ -168,6 +173,16 @@ object TrackingProviderRegistry {
         watchedProviders[id]
     }
 
+    fun progressProvider(id: TrackingProviderId): TrackingProgressProvider? = synchronized(lock) {
+        progressProviders[id]
+    }
+
+    fun progressProviders(): List<TrackingProgressProvider> = synchronized(lock) {
+        progressProviders.entries
+            .sortedBy { (id, _) -> id.ordinal }
+            .map { (_, provider) -> provider }
+    }
+
     fun connectedListWriters(): List<TrackingListWriter> =
         connectedPorts(listWriters, TrackingCapability.LIBRARY_WRITE)
 
@@ -182,6 +197,9 @@ object TrackingProviderRegistry {
 
     fun connectedWatchedProviders(): List<TrackingWatchedProvider> =
         connectedPorts(watchedProviders, TrackingCapability.WATCHED_READ)
+
+    fun connectedProgressProviders(): List<TrackingProgressProvider> =
+        connectedPorts(progressProviders, TrackingCapability.PROGRESS_READ)
 
     fun handleAuthCallback(url: String): Boolean =
         providersWith(TrackingCapability.AUTHENTICATION)

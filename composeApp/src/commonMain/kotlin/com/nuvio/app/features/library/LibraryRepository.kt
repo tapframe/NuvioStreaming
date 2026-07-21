@@ -594,7 +594,10 @@ object LibraryRepository {
     private fun effectiveLibrarySourceMode(): LibrarySourceMode =
         resolveEffectiveLibrarySourceMode(
             requestedSource = selectedLibrarySourceMode(),
-            isProviderAuthenticated = TrackingProviderRegistry::isAuthenticated,
+            isProviderAuthenticated = { providerId ->
+                TrackingProviderRegistry.libraryProvider(providerId) != null &&
+                    TrackingProviderRegistry.isAuthenticated(providerId)
+            },
         )
 
     private fun activeLibraryProvider(
