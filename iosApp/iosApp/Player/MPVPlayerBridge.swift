@@ -931,14 +931,22 @@ final class MPVPlayerViewController: UIViewController {
     ) {
         guard mpv != nil else { return }
 
+        let hasBackground = !backgroundColor.hasPrefix("#00")
+
+        let effectiveOutlineColor = hasBackground ? backgroundColor : outlineColor
+        let effectiveOutlineSize = hasBackground
+            ? max(Double(outlineSize), 1.0)
+            : Double(outlineSize)
+
         checkError(mpv_set_property_string(mpv, "sub-ass-override", "no"))
         checkError(mpv_set_property_string(mpv, "sub-color", textColor))
         checkError(mpv_set_property_string(mpv, "sub-back-color", backgroundColor))
-        checkError(mpv_set_property_string(mpv, "sub-outline-color", outlineColor))
-        checkError(mpv_set_property_string(mpv, "sub-border-style", backgroundColor.hasPrefix("#00") ? "outline-and-shadow" : "background-box"))
+        checkError(mpv_set_property_string(mpv, "sub-outline-color", effectiveOutlineColor))
+        checkError(mpv_set_property_string(mpv, "sub-border-style", hasBackground ? "opaque-box" : "outline-and-shadow"))
+        checkError(mpv_set_property_string(mpv, "sub-shadow-offset", "0"))
         setStringProperty("sub-bold", bold ? "yes" : "no")
 
-        var outline = Double(outlineSize)
+        var outline = effectiveOutlineSize
         checkError(mpv_set_property(mpv, "sub-outline-size", MPV_FORMAT_DOUBLE, &outline))
 
         var size = Double(fontSize)
