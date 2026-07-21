@@ -483,6 +483,7 @@ private fun ExoPlayerSurface(
                 "startPositionMs=${requestedStartPositionMs ?: 0L}",
         )
         exoPlayer.setPlaybackMediaItem(mediaItem, requestedStartPositionMs)
+        exoPlayer.prepare()
         if (fallbackStartPositionMs == null) {
             initialPositionRequestKey?.let { key ->
                 latestOnInitialPositionHandled.value(
