@@ -169,7 +169,13 @@ object SimklMutationRepository : TrackingListWriter, TrackingHistoryWriter, Trac
         event: TrackingScrobbleEvent,
     ) {
         if (!isActiveProfile(profileId)) return
-        service.scrobble(action, event)
+        SimklSyncRepository.ensureLoaded()
+        service.scrobble(
+            action = action,
+            event = event.copy(
+                media = SimklSyncRepository.state.value.snapshot.enrichMediaReference(event.media),
+            ),
+        )
     }
 
     private fun isActiveProfile(profileId: Int): Boolean = ProfileRepository.activeProfileId == profileId

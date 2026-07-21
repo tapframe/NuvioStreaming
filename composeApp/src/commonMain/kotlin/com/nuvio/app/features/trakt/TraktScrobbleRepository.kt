@@ -4,6 +4,13 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.build.AppVersionConfig
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.tracking.TrackingMediaKind
+import com.nuvio.app.features.tracking.TrackingMediaReference
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingScrobbleAction
+import com.nuvio.app.features.tracking.TrackingScrobbleEvent
+import com.nuvio.app.features.tracking.TrackingScrobbler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
@@ -39,7 +46,9 @@ internal sealed interface TraktScrobbleItem {
     }
 }
 
-internal object TraktScrobbleRepository {
+internal object TraktScrobbleRepository : TrackingScrobbler {
+    override val providerId: TrackingProviderId = TrackingProviderId.TRAKT
+
     private data class ScrobbleStamp(
         val profileId: Int,
         val action: String,
@@ -61,6 +70,26 @@ internal object TraktScrobbleRepository {
     private val maxStopRetries = 2
     private val retryDelayMs = 1_500L
     private val serverOverloadedRetryDelayMs = 5_000L
+
+    init {
+        TrackingProviderRegistry.registerScrobbler(this)
+    }
+
+    fun ensureRegistered() = Unit
+
+    override suspend fun scrobble(
+        profileId: Int,
+        action: TrackingScrobbleAction,
+        event: TrackingScrobbleEvent,
+    ) {
+        val item = buildItem(event.media) ?: return
+        sendScrobble(
+            profileId = profileId,
+            action = action.wireValue,
+            item = item,
+            progressPercent = event.progressPercent.toFloat(),
+        )
+    }
 
     suspend fun scrobbleStart(profileId: Int, item: TraktScrobbleItem, progressPercent: Float) {
         sendScrobble(profileId = profileId, action = "start", item = item, progressPercent = progressPercent)
@@ -124,6 +153,45 @@ internal object TraktScrobbleRepository {
                 ids = ids,
             )
         }
+    }
+
+    private suspend fun buildItem(media: TrackingMediaReference): TraktScrobbleItem? {
+        val ids = TraktExternalIds(
+            trakt = media.ids.trakt?.toTraktIntOrNull(),
+            imdb = media.ids.imdb?.takeIf(String::isNotBlank),
+            tmdb = media.ids.tmdb?.toTraktIntOrNull(),
+        )
+        if (!ids.hasAnyId()) return null
+        if (media.kind == TrackingMediaKind.MOVIE) {
+            return TraktScrobbleItem.Movie(
+                title = media.title,
+                year = media.year,
+                ids = ids,
+            )
+        }
+
+        val episode = media.episode ?: return null
+        val season = episode.season ?: return null
+        val contentId = ids.imdb
+            ?: ids.tmdb?.let { value -> "tmdb:$value" }
+            ?: ids.trakt?.let { value -> "trakt:$value" }
+            ?: return null
+        val mappedEpisode = TraktEpisodeMappingService.resolveEpisodeMapping(
+            contentId = contentId,
+            contentType = "series",
+            videoId = null,
+            season = season,
+            episode = episode.number,
+            episodeTitle = episode.title,
+        )
+        return TraktScrobbleItem.Episode(
+            showTitle = media.title,
+            showYear = media.year,
+            showIds = ids,
+            season = mappedEpisode?.season ?: season,
+            number = mappedEpisode?.episode ?: episode.number,
+            episodeTitle = episode.title,
+        )
     }
 
     private suspend fun sendScrobble(
@@ -324,6 +392,8 @@ internal object TraktScrobbleRepository {
         )
     }
 }
+
+private fun Long.toTraktIntOrNull(): Int? = takeIf { value -> value in 1L..Int.MAX_VALUE.toLong() }?.toInt()
 
 @Serializable
 private data class TraktScrobbleRequest(

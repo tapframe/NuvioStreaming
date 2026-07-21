@@ -32,4 +32,24 @@ class TrackingMediaTest {
         assertEquals(TrackingMediaKind.MOVIE, trackingMediaKind("film"))
         assertFalse(TrackingExternalIds().hasAny)
     }
+
+    @Test
+    fun `playback media builder falls back to video id and keeps episode coordinates`() {
+        val media = buildTrackingMediaReference(
+            contentType = "series",
+            parentMetaId = "addon_specific_identifier",
+            videoId = "tt4574334:2:7",
+            title = "Stranger Things",
+            releaseInfo = "2016–",
+            seasonNumber = 2,
+            episodeNumber = 7,
+            episodeTitle = "The Lost Sister",
+        )
+
+        assertEquals("tt4574334", media.ids.imdb)
+        assertEquals(TrackingMediaKind.SHOW, media.kind)
+        assertEquals(2016, media.year)
+        assertEquals(2, media.episode?.season)
+        assertEquals(7, media.episode?.number)
+    }
 }

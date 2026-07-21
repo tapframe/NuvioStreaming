@@ -220,9 +220,11 @@ import com.nuvio.app.features.streams.StreamsRepository
 import com.nuvio.app.features.streams.StreamsScreen
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.player.PlayerSettingsRepository
-import com.nuvio.app.features.trakt.TraktAuthRepository
+import com.nuvio.app.features.tracking.TrackingScrobbleAction
+import com.nuvio.app.features.tracking.TrackingScrobbleCoordinator
+import com.nuvio.app.features.tracking.TrackingScrobbleEvent
+import com.nuvio.app.features.tracking.buildTrackingMediaReference
 import com.nuvio.app.features.trakt.TraktListTab
-import com.nuvio.app.features.trakt.TraktScrobbleRepository
 import com.nuvio.app.features.updater.AppUpdaterHost
 import com.nuvio.app.features.updater.AppUpdaterPlatform
 import com.nuvio.app.features.updater.rememberAppUpdaterController
@@ -1233,8 +1235,8 @@ private fun MainAppContent(
                     null
                 }
                 val playerLaunch = lastExternalPlayerLaunch
-                if (TraktAuthRepository.isAuthenticated.value && progressPercent != null && playerLaunch != null) {
-                    val scrobbleItem = TraktScrobbleRepository.buildItem(
+                if (progressPercent != null && playerLaunch != null) {
+                    val trackingMedia = buildTrackingMediaReference(
                         contentType = playerLaunch.parentMetaType,
                         parentMetaId = playerLaunch.parentMetaId,
                         videoId = playerLaunch.videoId,
@@ -1243,12 +1245,15 @@ private fun MainAppContent(
                         episodeNumber = playerLaunch.episodeNumber,
                         episodeTitle = playerLaunch.episodeTitle,
                     )
-                    if (scrobbleItem != null) {
+                    if (trackingMedia.hasResolvableIdentity) {
                         runCatching {
-                            TraktScrobbleRepository.scrobbleStop(
+                            TrackingScrobbleCoordinator.scrobble(
                                 profileId = playerLaunch.profileId,
-                                item = scrobbleItem,
-                                progressPercent = progressPercent,
+                                action = TrackingScrobbleAction.STOP,
+                                event = TrackingScrobbleEvent(
+                                    media = trackingMedia,
+                                    progressPercent = progressPercent.toDouble(),
+                                ),
                             )
                         }
                     }

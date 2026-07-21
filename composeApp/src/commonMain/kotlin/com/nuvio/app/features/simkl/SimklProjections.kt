@@ -141,6 +141,24 @@ internal fun SimklSyncSnapshot.mediaReference(
     )
 }
 
+internal fun SimklSyncSnapshot.enrichMediaReference(reference: TrackingMediaReference): TrackingMediaReference {
+    val entry = entries.firstOrNull { candidate ->
+        candidate.media?.toTrackingExternalIds()?.sharesIdentityWith(reference.ids) == true
+    } ?: return reference
+    val media = entry.media ?: return reference
+    val kind = when (entry.mediaType) {
+        SimklMediaType.MOVIES -> TrackingMediaKind.MOVIE
+        SimklMediaType.SHOWS -> TrackingMediaKind.SHOW
+        SimklMediaType.ANIME -> TrackingMediaKind.ANIME
+    }
+    return reference.copy(
+        kind = kind,
+        title = media.title?.takeIf(String::isNotBlank) ?: reference.title,
+        year = media.year ?: reference.year,
+        ids = media.toTrackingExternalIds().mergeMissing(reference.ids),
+    )
+}
+
 internal fun SimklMedia.toTrackingExternalIds(): TrackingExternalIds = TrackingExternalIds(
     simkl = ids.simklIdValue()?.toLongOrNull(),
     imdb = ids.idValue("imdb"),
@@ -289,6 +307,16 @@ private fun SimklLibraryEntry.matchesContentId(contentId: String): Boolean {
         (parsed.anilist != null && parsed.anilist == candidateIds.anilist) ||
         (parsed.kitsu != null && parsed.kitsu == candidateIds.kitsu)
 }
+
+private fun TrackingExternalIds.sharesIdentityWith(other: TrackingExternalIds): Boolean =
+    (simkl != null && simkl == other.simkl) ||
+        (!imdb.isNullOrBlank() && imdb.equals(other.imdb, ignoreCase = true)) ||
+        (tmdb != null && tmdb == other.tmdb) ||
+        (!tvdb.isNullOrBlank() && tvdb.equals(other.tvdb, ignoreCase = true)) ||
+        (mal != null && mal == other.mal) ||
+        (anidb != null && anidb == other.anidb) ||
+        (anilist != null && anilist == other.anilist) ||
+        (kitsu != null && kitsu == other.kitsu)
 
 private fun Int.isLeapYear(): Boolean = (this % 4 == 0 && this % 100 != 0) || this % 400 == 0
 

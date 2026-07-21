@@ -122,4 +122,31 @@ fun extractTrackingYear(value: String?): Int? =
         ?.let { YEAR_PATTERN.find(it)?.value }
         ?.toIntOrNull()
 
+fun buildTrackingMediaReference(
+    contentType: String,
+    parentMetaId: String,
+    videoId: String? = null,
+    title: String? = null,
+    releaseInfo: String? = null,
+    seasonNumber: Int? = null,
+    episodeNumber: Int? = null,
+    episodeTitle: String? = null,
+): TrackingMediaReference {
+    val ids = parseTrackingExternalIds(parentMetaId)
+        .mergeMissing(parseTrackingExternalIds(videoId))
+    return TrackingMediaReference(
+        kind = trackingMediaKind(contentType, ids),
+        title = title?.trim()?.takeIf(String::isNotBlank),
+        year = extractTrackingYear(releaseInfo),
+        ids = ids,
+        episode = episodeNumber?.let { number ->
+            TrackingEpisode(
+                season = seasonNumber,
+                number = number,
+                title = episodeTitle,
+            )
+        },
+    )
+}
+
 private val YEAR_PATTERN = Regex("(19|20)\\d{2}")
