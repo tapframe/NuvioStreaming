@@ -105,6 +105,17 @@ object SimklSyncRepository : TrackingProfileStore {
         }
     }
 
+    internal fun commitPlaybackRemoval(sessionIds: Set<Long>) {
+        if (sessionIds.isEmpty()) return
+        ensureLoaded()
+        val current = _state.value
+        val updatedPlayback = current.snapshot.playback.filterNot { session -> session.id in sessionIds }
+        if (updatedPlayback.size == current.snapshot.playback.size) return
+        val updatedSnapshot = current.snapshot.copy(playback = updatedPlayback)
+        SimklSyncStorage.savePayload(json.encodeToString(updatedSnapshot))
+        _state.value = current.copy(snapshot = updatedSnapshot)
+    }
+
     override fun onProfileChanged() {
         profileGeneration += 1L
         hasLoaded = false

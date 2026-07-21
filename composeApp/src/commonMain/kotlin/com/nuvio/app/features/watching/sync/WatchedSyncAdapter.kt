@@ -19,6 +19,8 @@ interface WatchedSyncAdapter {
         pageSize: Int,
     ): List<WatchedItem>
 
+    suspend fun pullFullyWatchedSeriesKeys(profileId: Int): Set<String>? = null
+
     suspend fun getDeltaCursor(profileId: Int): Long? = null
 
     suspend fun pullDelta(

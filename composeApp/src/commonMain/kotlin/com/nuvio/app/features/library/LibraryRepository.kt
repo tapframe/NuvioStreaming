@@ -2,20 +2,25 @@ package com.nuvio.app.features.library
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
-import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.core.sync.putSyncOriginClientId
+import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
+import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.simkl.SIMKL_WATCHLIST_KEY
+import com.nuvio.app.features.simkl.SIMKL_WATCHLIST_TITLE
+import com.nuvio.app.features.simkl.SimklLibraryRepository
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktLibraryRepository
 import com.nuvio.app.features.trakt.TraktListTab
 import com.nuvio.app.features.trakt.TraktListType
 import com.nuvio.app.features.trakt.TraktMembershipChanges
 import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
-import com.nuvio.app.features.trakt.shouldUseTraktLibrary
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -93,13 +98,20 @@ object LibraryRepository {
 
     init {
         syncScope.launch {
-            TraktAuthRepository.isAuthenticated.collectLatest { authenticated ->
-                if (authenticated) {
+            TrackingProviderRegistry.connectedProviderIds.collectLatest { connectedProviderIds ->
+                if (TrackingProviderId.TRAKT in connectedProviderIds) {
                     TraktLibraryRepository.preloadListTabsAsync()
-                    if (shouldUseTraktLibrary(authenticated, selectedLibrarySourceMode())) {
+                    if (effectiveLibrarySourceMode() == LibrarySourceMode.TRAKT) {
                         runCatching { TraktLibraryRepository.refreshNow() }
                             .onFailure { log.e(it) { "Failed to refresh Trakt library after auth change" } }
                     }
+                }
+                if (
+                    TrackingProviderId.SIMKL in connectedProviderIds &&
+                    effectiveLibrarySourceMode() == LibrarySourceMode.SIMKL
+                ) {
+                    runCatching { SimklLibraryRepository.refreshNow() }
+                        .onFailure { log.e(it) { "Failed to refresh Simkl library after auth change" } }
                 }
                 publish()
             }
@@ -109,12 +121,17 @@ object LibraryRepository {
                 .map { it.librarySourceMode }
                 .distinctUntilChanged()
                 .collectLatest { source ->
-                    if (shouldUseTraktLibrary(TraktAuthRepository.isAuthenticated.value, source)) {
-                        TraktLibraryRepository.preloadListTabsAsync()
-                        publish()
-                        refreshTraktLibraryAsync()
-                    } else {
-                        publish()
+                    when (resolveEffectiveLibrarySourceMode(source, TrackingProviderRegistry::isAuthenticated)) {
+                        LibrarySourceMode.TRAKT -> {
+                            TraktLibraryRepository.preloadListTabsAsync()
+                            publish()
+                            refreshTraktLibraryAsync()
+                        }
+                        LibrarySourceMode.SIMKL -> {
+                            publish()
+                            refreshSimklLibraryAsync()
+                        }
+                        LibrarySourceMode.LOCAL -> publish()
                     }
                 }
         }
@@ -125,24 +142,34 @@ object LibraryRepository {
                 }
             }
         }
+        syncScope.launch {
+            SimklLibraryRepository.uiState.collectLatest {
+                if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.SIMKL)) {
+                    publish()
+                }
+            }
+        }
     }
 
     fun ensureLoaded() {
-        TraktAuthRepository.ensureLoaded()
+        ensureTrackingProvidersRegistered()
+        TrackingProviderRegistry.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
         TraktLibraryRepository.ensureLoaded()
+        SimklLibraryRepository.ensureLoaded()
         while (true) {
             val activeProfileId = ProfileRepository.activeProfileId
             val snapshot = localState.snapshot()
             if (snapshot.hasLoaded && snapshot.token.profileId == activeProfileId) break
             loadFromDisk(activeProfileId)
         }
-        if (TraktAuthRepository.isAuthenticated.value) {
+        if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.TRAKT)) {
             TraktLibraryRepository.preloadListTabsAsync()
             if (isTraktLibrarySourceActive()) {
                 refreshTraktLibraryAsync()
             }
         }
+        if (isSimklLibrarySourceActive()) refreshSimklLibraryAsync()
     }
 
     fun onProfileChanged(profileId: Int) {
@@ -159,6 +186,8 @@ object LibraryRepository {
                 refreshTraktLibraryAsync()
             }
         }
+        SimklLibraryRepository.ensureLoaded()
+        if (isSimklLibrarySourceActive()) refreshSimklLibraryAsync()
     }
 
     fun clearLocalState() {
@@ -224,17 +253,32 @@ object LibraryRepository {
             return
         }
 
-        if (isTraktLibrarySourceActive()) {
-            try {
-                TraktLibraryRepository.refreshNow()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                log.e(error) { "Failed to pull Trakt library" }
+        when (effectiveLibrarySourceMode()) {
+            LibrarySourceMode.TRAKT -> {
+                try {
+                    TraktLibraryRepository.refreshNow()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    log.e(error) { "Failed to pull Trakt library" }
+                }
+                if (!isActiveOperation(operationToken)) return
+                publish()
+                return
             }
-            if (!isActiveOperation(operationToken)) return
-            publish()
-            return
+            LibrarySourceMode.SIMKL -> {
+                try {
+                    SimklLibraryRepository.refreshNow()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    log.e(error) { "Failed to pull Simkl library" }
+                }
+                if (!isActiveOperation(operationToken)) return
+                publish()
+                return
+            }
+            LibrarySourceMode.LOCAL -> Unit
         }
 
         nuvioPullMutex.withLock {
@@ -290,6 +334,29 @@ object LibraryRepository {
                                 ?: getString(Res.string.trakt_lists_update_failed),
                         )
                     }
+                publish()
+            }
+            return
+        }
+
+        if (isSimklLibrarySourceActive()) {
+            val profileId = localState.snapshot().token.profileId
+            val isCurrentlySaved = SimklLibraryRepository.isInWatchlist(item.id, item.type)
+            log.i {
+                "toggleSaved routed to Simkl library source item=${item.id} type=${item.type} profile=$profileId"
+            }
+            syncScope.launch {
+                runCatching {
+                    SimklLibraryRepository.setWatchlistMembership(
+                        profileId = profileId,
+                        item = item,
+                        isMember = !isCurrentlySaved,
+                    )
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    log.e(error) { "Failed to toggle Simkl watchlist" }
+                    NuvioToastController.show(error.message ?: "Unable to update Simkl Watchlist")
+                }
                 publish()
             }
             return
@@ -366,6 +433,10 @@ object LibraryRepository {
             return false
         }
 
+        if (isSimklLibrarySourceActive()) {
+            return SimklLibraryRepository.isInWatchlist(id, type)
+        }
+
         return if (type != null) {
             localState.contains(id, type)
         } else {
@@ -380,16 +451,25 @@ object LibraryRepository {
             return TraktLibraryRepository.uiState.value.allItems.firstOrNull { it.id == id }
         }
 
+        if (isSimklLibrarySourceActive()) {
+            return SimklLibraryRepository.uiState.value.items.firstOrNull { it.id == id }
+        }
+
         return localState.findById(id)
     }
 
     fun libraryListTabs(): List<TraktListTab> {
-        val traktTabs = if (TraktAuthRepository.isAuthenticated.value) {
+        val traktTabs = if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.TRAKT)) {
             TraktLibraryRepository.currentListTabs()
         } else {
             emptyList()
         }
-        return libraryTabsWithLocal(traktTabs)
+        val simklTabs = if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.SIMKL)) {
+            listOf(simklLibraryListTab())
+        } else {
+            emptyList()
+        }
+        return libraryTabsWithLocal(traktTabs + simklTabs)
     }
 
     fun traktListTabs(): List<TraktListTab> = libraryListTabs()
@@ -397,14 +477,14 @@ object LibraryRepository {
     suspend fun getMembershipSnapshot(item: LibraryItem): Map<String, Boolean> {
         ensureLoaded()
         val inLocal = localState.contains(item.id, item.type)
-        if (TraktAuthRepository.isAuthenticated.value) {
-            val traktMembership = TraktLibraryRepository.getMembershipSnapshot(item).listMembership
-            return libraryMembershipWithLocal(
-                inLocal = inLocal,
-                traktMembership = traktMembership,
-            )
+        val memberships = linkedMapOf<String, Boolean>()
+        if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.TRAKT)) {
+            memberships += TraktLibraryRepository.getMembershipSnapshot(item).listMembership
         }
-        return libraryMembershipWithLocal(inLocal = inLocal)
+        if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.SIMKL)) {
+            memberships[SIMKL_WATCHLIST_KEY] = SimklLibraryRepository.isInWatchlist(item.id, item.type)
+        }
+        return libraryMembershipWithLocal(inLocal = inLocal, traktMembership = memberships)
     }
 
     suspend fun applyMembershipChanges(item: LibraryItem, desiredMembership: Map<String, Boolean>) {
@@ -415,7 +495,7 @@ object LibraryRepository {
         log.i {
             "Applying library membership item=${item.id} type=${item.type} profile=$profileId " +
                 "localDesired=$localDesired currentlyInLocal=$currentlyInLocal " +
-                "traktAuthenticated=${TraktAuthRepository.isAuthenticated.value}"
+                "connectedProviders=${TrackingProviderRegistry.connectedProviderIdsSnapshot()}"
         }
         if (localDesired != currentlyInLocal) {
             if (localDesired) {
@@ -425,18 +505,44 @@ object LibraryRepository {
             }
         }
 
-        if (TraktAuthRepository.isAuthenticated.value) {
-            val traktMembership = desiredMembership.filterKeys { it != LOCAL_LIBRARY_LIST_KEY }
+        var firstFailure: Throwable? = null
+        if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.TRAKT)) {
+            val traktListKeys = TraktLibraryRepository.currentListTabs().mapTo(mutableSetOf(), TraktListTab::key)
+            val traktMembership = desiredMembership.filterKeys { key -> key in traktListKeys }
             if (traktMembership.isNotEmpty()) {
-                TraktLibraryRepository.applyMembershipChanges(
-                    item = item,
-                    changes = TraktMembershipChanges(desiredMembership = traktMembership),
-                )
+                try {
+                    TraktLibraryRepository.applyMembershipChanges(
+                        item = item,
+                        changes = TraktMembershipChanges(desiredMembership = traktMembership),
+                    )
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    firstFailure = error
+                    log.e(error) { "Failed to update Trakt library membership" }
+                }
             }
-            publish()
-        } else {
-            publish()
         }
+        if (TrackingProviderRegistry.isAuthenticated(TrackingProviderId.SIMKL)) {
+            val desired = desiredMembership[SIMKL_WATCHLIST_KEY] == true
+            val current = SimklLibraryRepository.isInWatchlist(item.id, item.type)
+            if (desired != current) {
+                try {
+                    SimklLibraryRepository.setWatchlistMembership(
+                        profileId = profileId,
+                        item = item,
+                        isMember = desired,
+                    )
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    if (firstFailure == null) firstFailure = error
+                    log.e(error) { "Failed to update Simkl library membership" }
+                }
+            }
+        }
+        publish()
+        firstFailure?.let { throw it }
     }
 
     suspend fun removeFromList(item: LibraryItem, listKey: String) {
@@ -528,33 +634,59 @@ object LibraryRepository {
 
     private fun publish() {
         val localSnapshot = localState.snapshot()
-        if (isTraktLibrarySourceActive()) {
-            val traktState = TraktLibraryRepository.uiState.value
-            val sections = traktState.listTabs.mapNotNull { tab ->
-                val listItems = traktState.entriesByList[tab.key].orEmpty()
-                if (listItems.isEmpty()) {
-                    null
-                } else {
-                    LibrarySection(
-                        type = tab.key,
-                        displayTitle = tab.title,
-                        items = listItems,
-                    )
+        when (effectiveLibrarySourceMode()) {
+            LibrarySourceMode.TRAKT -> {
+                val traktState = TraktLibraryRepository.uiState.value
+                val sections = traktState.listTabs.mapNotNull { tab ->
+                    val listItems = traktState.entriesByList[tab.key].orEmpty()
+                    if (listItems.isEmpty()) {
+                        null
+                    } else {
+                        LibrarySection(
+                            type = tab.key,
+                            displayTitle = tab.title,
+                            items = listItems,
+                        )
+                    }
                 }
-            }
 
-            val newUiState = LibraryUiState(
-                sourceMode = LibrarySourceMode.TRAKT,
-                items = traktState.allItems,
-                sections = sections,
-                isLoaded = traktState.hasLoaded,
-                isLoading = traktState.isLoading,
-                errorMessage = traktState.errorMessage,
-            )
-            localState.runIfTokenCurrent(localSnapshot.token) {
-                _uiState.value = newUiState
+                val newUiState = LibraryUiState(
+                    sourceMode = LibrarySourceMode.TRAKT,
+                    items = traktState.allItems,
+                    sections = sections,
+                    isLoaded = traktState.hasLoaded,
+                    isLoading = traktState.isLoading,
+                    errorMessage = traktState.errorMessage,
+                )
+                localState.runIfTokenCurrent(localSnapshot.token) {
+                    _uiState.value = newUiState
+                }
+                return
             }
-            return
+            LibrarySourceMode.SIMKL -> {
+                val simklState = SimklLibraryRepository.uiState.value
+                val items = simklState.items.sortedByDescending(LibraryItem::savedAtEpochMs)
+                val sections = listOf(
+                    LibrarySection(
+                        type = SIMKL_WATCHLIST_KEY,
+                        displayTitle = SIMKL_WATCHLIST_TITLE,
+                        items = items,
+                    ),
+                )
+                val newUiState = LibraryUiState(
+                    sourceMode = LibrarySourceMode.SIMKL,
+                    items = items,
+                    sections = sections,
+                    isLoaded = simklState.hasLoaded,
+                    isLoading = simklState.isLoading,
+                    errorMessage = simklState.errorMessage,
+                )
+                localState.runIfTokenCurrent(localSnapshot.token) {
+                    _uiState.value = newUiState
+                }
+                return
+            }
+            LibrarySourceMode.LOCAL -> Unit
         }
 
         val items = localSnapshot.items
@@ -608,6 +740,17 @@ object LibraryRepository {
         }
     }
 
+    private fun refreshSimklLibraryAsync() {
+        syncScope.launch {
+            runCatching { SimklLibraryRepository.refreshNow() }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    log.e(error) { "Failed to refresh Simkl library" }
+                }
+            publish()
+        }
+    }
+
     private fun selectedLibrarySourceMode(): LibrarySourceMode {
         TraktSettingsRepository.ensureLoaded()
         return TraktSettingsRepository.uiState.value.librarySourceMode
@@ -615,12 +758,15 @@ object LibraryRepository {
 
     private fun effectiveLibrarySourceMode(): LibrarySourceMode =
         resolveEffectiveLibrarySourceMode(
-            isAuthenticated = TraktAuthRepository.isAuthenticated.value,
-            source = selectedLibrarySourceMode(),
+            requestedSource = selectedLibrarySourceMode(),
+            isProviderAuthenticated = TrackingProviderRegistry::isAuthenticated,
         )
 
     private fun isTraktLibrarySourceActive(): Boolean =
         effectiveLibrarySourceMode() == LibrarySourceMode.TRAKT
+
+    private fun isSimklLibrarySourceActive(): Boolean =
+        effectiveLibrarySourceMode() == LibrarySourceMode.SIMKL
 }
 
 internal const val LOCAL_LIBRARY_LIST_KEY = "local"
@@ -634,6 +780,13 @@ internal fun localLibraryListTab(): TraktListTab =
             resource = Res.string.library_local_tab_title,
             fallback = DEFAULT_LOCAL_LIBRARY_TAB_TITLE,
         ),
+        type = TraktListType.WATCHLIST,
+    )
+
+internal fun simklLibraryListTab(): TraktListTab =
+    TraktListTab(
+        key = SIMKL_WATCHLIST_KEY,
+        title = SIMKL_WATCHLIST_TITLE,
         type = TraktListType.WATCHLIST,
     )
 

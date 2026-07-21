@@ -239,6 +239,24 @@ class WatchedRepositoryTest {
     }
 
     @Test
+    fun effectiveWatchedSource_selectsConnectedSimkl() {
+        assertEquals(
+            WatchProgressSource.SIMKL,
+            effectiveWatchedSource(
+                requestedSource = WatchProgressSource.SIMKL,
+                connectedProviderIds = setOf(com.nuvio.app.features.tracking.TrackingProviderId.SIMKL),
+            ),
+        )
+        assertEquals(
+            WatchProgressSource.NUVIO_SYNC,
+            effectiveWatchedSource(
+                requestedSource = WatchProgressSource.SIMKL,
+                connectedProviderIds = emptySet(),
+            ),
+        )
+    }
+
+    @Test
     fun sourceOperationGuard_rejectsResultFromSourceActiveBeforeSwitch() {
         val traktOperation = WatchedSourceOperation(
             source = WatchProgressSource.TRAKT,
