@@ -24,6 +24,9 @@ data class LibraryItem(
     val imdbId: String? = null,
     val tmdbId: Int? = null,
     val traktId: Int? = null,
+    val trackingProviderId: String? = null,
+    val trackingProviderItemId: String? = null,
+    val trackingSourceUrl: String? = null,
     val savedAtEpochMs: Long,
 )
 

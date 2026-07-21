@@ -12,6 +12,7 @@ internal const val WatchProgressSourceLocal = "local"
 internal const val WatchProgressSourceTraktPlayback = "trakt_playback"
 internal const val WatchProgressSourceTraktHistory = "trakt_history"
 internal const val WatchProgressSourceTraktShowProgress = "trakt_show_progress"
+internal const val WatchProgressSourceSimklPlayback = "simkl_playback"
 
 @Serializable
 enum class ContinueWatchingSectionStyle {

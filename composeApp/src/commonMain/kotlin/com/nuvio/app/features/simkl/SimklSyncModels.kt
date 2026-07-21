@@ -187,7 +187,11 @@ data class SimklSyncUiState(
 internal fun Map<String, JsonElement>.idValue(key: String): String? =
     get(key)?.jsonPrimitive?.content?.trim()?.takeIf(String::isNotBlank)
 
+internal fun Map<String, JsonElement>.simklIdValue(): String? =
+    idValue("simkl") ?: idValue("simkl_id")
+
 private fun Map<String, JsonElement>.stableMediaId(): String? {
-    val keys = listOf("simkl", "imdb", "tmdb", "tvdb", "mal", "anidb", "anilist", "kitsu")
+    simklIdValue()?.let { return "simkl:$it" }
+    val keys = listOf("imdb", "tmdb", "tvdb", "mal", "anidb", "anilist", "kitsu")
     return keys.firstNotNullOfOrNull { key -> idValue(key)?.let { value -> "$key:$value" } }
 }

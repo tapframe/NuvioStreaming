@@ -1,6 +1,15 @@
 package com.nuvio.app.features.tracking
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
@@ -58,15 +67,34 @@ interface TrackingAuthProvider : TrackingProfileStore {
 
 object TrackingProviderRegistry {
     private val lock = SynchronizedObject()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val authProviders = mutableMapOf<TrackingProviderId, TrackingAuthProvider>()
+    private val authObservationJobs = mutableMapOf<TrackingProviderId, Job>()
     private val profileStores = mutableSetOf<TrackingProfileStore>()
     private val listWriters = mutableMapOf<TrackingProviderId, TrackingListWriter>()
     private val historyWriters = mutableMapOf<TrackingProviderId, TrackingHistoryWriter>()
     private val scrobblers = mutableMapOf<TrackingProviderId, TrackingScrobbler>()
 
-    fun register(provider: TrackingAuthProvider) = synchronized(lock) {
-        authProviders[provider.descriptor.id] = provider
-        profileStores += provider
+    private val _connectedProviderIds = MutableStateFlow<Set<TrackingProviderId>>(emptySet())
+    val connectedProviderIds: StateFlow<Set<TrackingProviderId>> = _connectedProviderIds.asStateFlow()
+
+    fun register(provider: TrackingAuthProvider) {
+        val previousJob = synchronized(lock) {
+            authProviders[provider.descriptor.id] = provider
+            profileStores += provider
+            authObservationJobs.remove(provider.descriptor.id)
+        }
+        previousJob?.cancel()
+        val observationJob = scope.launch {
+            provider.isAuthenticated.collectLatest { isAuthenticated ->
+                _connectedProviderIds.update { connected ->
+                    if (isAuthenticated) connected + provider.providerId else connected - provider.providerId
+                }
+            }
+        }
+        synchronized(lock) {
+            authObservationJobs[provider.descriptor.id] = observationJob
+        }
     }
 
     fun registerProfileStore(store: TrackingProfileStore) = synchronized(lock) {
@@ -92,11 +120,12 @@ object TrackingProviderRegistry {
     fun isAuthenticated(id: TrackingProviderId): Boolean =
         authProvider(id)?.also(TrackingAuthProvider::ensureLoaded)?.isAuthenticated?.value == true
 
-    fun connectedProviderIds(): Set<TrackingProviderId> =
-        providerSnapshot()
-            .onEach(TrackingAuthProvider::ensureLoaded)
+    fun connectedProviderIdsSnapshot(): Set<TrackingProviderId> {
+        providerSnapshot().forEach(TrackingAuthProvider::ensureLoaded)
+        return providerSnapshot()
             .filterTo(linkedSetOf()) { provider -> provider.isAuthenticated.value }
             .mapTo(linkedSetOf()) { provider -> provider.descriptor.id }
+    }
 
     fun providersWith(capability: TrackingCapability): List<TrackingAuthProvider> =
         providerSnapshot()
