@@ -2,6 +2,7 @@ package com.nuvio.app.features.tracking
 
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibrarySection
+import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
 import kotlinx.coroutines.flow.Flow
 
 enum class TrackingLibraryTabKind {
@@ -50,4 +51,9 @@ interface TrackingLibraryProvider {
         desiredMembership: Map<String, Boolean>,
     )
     suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem)
+}
+
+/** Provider adapter for watched-history projection and explicit history mutations. */
+interface TrackingWatchedProvider : WatchedSyncAdapter {
+    val providerId: TrackingProviderId
 }

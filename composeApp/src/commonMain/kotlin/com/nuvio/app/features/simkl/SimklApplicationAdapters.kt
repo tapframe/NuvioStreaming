@@ -11,8 +11,8 @@ import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingListStatus
 import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingWatchedProvider
 import com.nuvio.app.features.watched.WatchedItem
-import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -171,7 +171,8 @@ object SimklTrackingLibraryProvider : TrackingLibraryProvider {
     }
 }
 
-object SimklWatchedSyncAdapter : WatchedSyncAdapter {
+object SimklWatchedSyncAdapter : TrackingWatchedProvider {
+    override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
     override suspend fun pull(profileId: Int, pageSize: Int): List<WatchedItem> {
         if (profileId != ProfileRepository.activeProfileId) return emptyList()
         SimklSyncRepository.ensureFresh()

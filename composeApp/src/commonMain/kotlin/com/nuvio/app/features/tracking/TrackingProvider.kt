@@ -75,6 +75,7 @@ object TrackingProviderRegistry {
     private val historyWriters = mutableMapOf<TrackingProviderId, TrackingHistoryWriter>()
     private val scrobblers = mutableMapOf<TrackingProviderId, TrackingScrobbler>()
     private val libraryProviders = mutableMapOf<TrackingProviderId, TrackingLibraryProvider>()
+    private val watchedProviders = mutableMapOf<TrackingProviderId, TrackingWatchedProvider>()
 
     private val _connectedProviderIds = MutableStateFlow<Set<TrackingProviderId>>(emptySet())
     val connectedProviderIds: StateFlow<Set<TrackingProviderId>> = _connectedProviderIds.asStateFlow()
@@ -118,6 +119,10 @@ object TrackingProviderRegistry {
         libraryProviders[provider.providerId] = provider
     }
 
+    fun registerWatchedProvider(provider: TrackingWatchedProvider) = synchronized(lock) {
+        watchedProviders[provider.providerId] = provider
+    }
+
     fun authProvider(id: TrackingProviderId): TrackingAuthProvider? = synchronized(lock) {
         authProviders[id]
     }
@@ -159,6 +164,10 @@ object TrackingProviderRegistry {
             .map { (_, provider) -> provider }
     }
 
+    fun watchedProvider(id: TrackingProviderId): TrackingWatchedProvider? = synchronized(lock) {
+        watchedProviders[id]
+    }
+
     fun connectedListWriters(): List<TrackingListWriter> =
         connectedPorts(listWriters, TrackingCapability.LIBRARY_WRITE)
 
@@ -170,6 +179,9 @@ object TrackingProviderRegistry {
 
     fun connectedLibraryProviders(): List<TrackingLibraryProvider> =
         connectedPorts(libraryProviders, TrackingCapability.LIBRARY_READ)
+
+    fun connectedWatchedProviders(): List<TrackingWatchedProvider> =
+        connectedPorts(watchedProviders, TrackingCapability.WATCHED_READ)
 
     fun handleAuthCallback(url: String): Boolean =
         providersWith(TrackingCapability.AUTHENTICATION)

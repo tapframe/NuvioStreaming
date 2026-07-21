@@ -8,9 +8,9 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tracking.DEFAULT_WATCH_PROGRESS_SOURCE
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.tracking.effectiveWatchProgressSource
-import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -235,7 +235,7 @@ object WatchProgressSourceCoordinator {
             if (observeJob?.isActive == true) return
             observeJob = scope.launch {
                 combine(
-                    TraktSettingsRepository.uiState,
+                    TrackingSettingsRepository.uiState,
                     TrackingProviderRegistry.connectedProviderIds,
                     AuthRepository.state,
                     ProfileRepository.state,
@@ -264,7 +264,7 @@ object WatchProgressSourceCoordinator {
     private fun ensureSourceStateLoaded() {
         ensureTrackingProvidersRegistered()
         TrackingProviderRegistry.ensureLoaded()
-        TraktSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
     }
 
     suspend fun selectSource(
@@ -275,7 +275,7 @@ object WatchProgressSourceCoordinator {
         ensureSourceStateLoadedForGeneration(operationGeneration)
         synchronized(startLock) {
             ensureCoordinatorGeneration(operationGeneration)
-            TraktSettingsRepository.setWatchProgressSource(source, profileId)
+            TrackingSettingsRepository.setWatchProgressSource(source, profileId)
         }
         val context = currentContext(profileId)
         return try {
@@ -481,7 +481,7 @@ object WatchProgressSourceCoordinator {
 
     private fun currentContext(profileId: Int): WatchProgressSourceContext = buildContext(
         profileId = profileId,
-        requestedSource = TraktSettingsRepository.uiState.value.watchProgressSource,
+        requestedSource = TrackingSettingsRepository.uiState.value.watchProgressSource,
         connectedProviderIds = TrackingProviderRegistry.connectedProviderIdsSnapshot(),
         authState = AuthRepository.state.value,
     )

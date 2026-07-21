@@ -24,6 +24,9 @@ object TrackingSettingsRepository {
     fun setLibrarySourceMode(source: LibrarySourceMode) =
         TraktSettingsRepository.setLibrarySourceMode(source)
 
+    fun setWatchProgressSource(source: WatchProgressSource, profileId: Int) =
+        TraktSettingsRepository.setWatchProgressSource(source, profileId)
+
     fun setContinueWatchingDaysCap(days: Int) =
         TraktSettingsRepository.setContinueWatchingDaysCap(days)
 

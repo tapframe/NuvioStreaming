@@ -2,6 +2,7 @@ package com.nuvio.app.features.watched
 
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.WatchProgressSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -136,23 +137,23 @@ class WatchedRepositoryTest {
     }
 
     @Test
-    fun playbackCompletionWatchedMarks_doNotMirrorToTraktHistory() {
+    fun playbackCompletionWatchedMarks_doNotMirrorToTrackerHistory() {
         assertFalse(
-            shouldMirrorWatchedMarkToTraktHistory(
-                sync = WatchedTraktHistorySync.Skip,
-                isTraktAuthenticated = true,
+            shouldMirrorWatchedMarkToTrackers(
+                sync = WatchedTrackerHistorySync.Skip,
+                hasConnectedTracker = true,
             ),
         )
         assertTrue(
-            shouldMirrorWatchedMarkToTraktHistory(
-                sync = WatchedTraktHistorySync.Mirror,
-                isTraktAuthenticated = true,
+            shouldMirrorWatchedMarkToTrackers(
+                sync = WatchedTrackerHistorySync.Mirror,
+                hasConnectedTracker = true,
             ),
         )
         assertFalse(
-            shouldMirrorWatchedMarkToTraktHistory(
-                sync = WatchedTraktHistorySync.Mirror,
-                isTraktAuthenticated = false,
+            shouldMirrorWatchedMarkToTrackers(
+                sync = WatchedTrackerHistorySync.Mirror,
+                hasConnectedTracker = false,
             ),
         )
     }
@@ -168,8 +169,10 @@ class WatchedRepositoryTest {
             watchedItemsForSource(
                 source = WatchProgressSource.NUVIO_SYNC,
                 nuvioItems = listOf(nuvioItem),
-                traktItems = listOf(traktItem),
-                simklItems = listOf(simklItem),
+                providerItems = mapOf(
+                    TrackingProviderId.TRAKT to listOf(traktItem),
+                    TrackingProviderId.SIMKL to listOf(simklItem),
+                ),
             ),
         )
         assertEquals(
@@ -177,8 +180,10 @@ class WatchedRepositoryTest {
             watchedItemsForSource(
                 source = WatchProgressSource.TRAKT,
                 nuvioItems = listOf(nuvioItem),
-                traktItems = listOf(traktItem),
-                simklItems = listOf(simklItem),
+                providerItems = mapOf(
+                    TrackingProviderId.TRAKT to listOf(traktItem),
+                    TrackingProviderId.SIMKL to listOf(simklItem),
+                ),
             ),
         )
         assertEquals(
@@ -186,8 +191,10 @@ class WatchedRepositoryTest {
             watchedItemsForSource(
                 source = WatchProgressSource.SIMKL,
                 nuvioItems = listOf(nuvioItem),
-                traktItems = listOf(traktItem),
-                simklItems = listOf(simklItem),
+                providerItems = mapOf(
+                    TrackingProviderId.TRAKT to listOf(traktItem),
+                    TrackingProviderId.SIMKL to listOf(simklItem),
+                ),
             ),
         )
     }
@@ -205,19 +212,22 @@ class WatchedRepositoryTest {
         val previousTraktItem = watchedItem(id = "old-trakt", markedAtEpochMs = 2_000L)
         val refreshedTraktItem = watchedItem(id = "new-trakt", markedAtEpochMs = 3_000L)
         val nuvioItems = mutableMapOf("nuvio" to nuvioItem)
-        val traktItems = mutableMapOf("old-trakt" to previousTraktItem)
-        val simklItems = mutableMapOf<String, WatchedItem>()
+        val providerItems = mutableMapOf(
+            TrackingProviderId.TRAKT to mutableMapOf("old-trakt" to previousTraktItem),
+        )
 
         replaceWatchedItemsForSource(
             source = WatchProgressSource.TRAKT,
             nuvioItems = nuvioItems,
-            traktItems = traktItems,
-            simklItems = simklItems,
+            providerItems = providerItems,
             replacement = mapOf("new-trakt" to refreshedTraktItem),
         )
 
         assertEquals(mapOf("nuvio" to nuvioItem), nuvioItems)
-        assertEquals(mapOf("new-trakt" to refreshedTraktItem), traktItems)
+        assertEquals(
+            mapOf("new-trakt" to refreshedTraktItem),
+            providerItems[TrackingProviderId.TRAKT].orEmpty(),
+        )
     }
 
     @Test
@@ -226,14 +236,14 @@ class WatchedRepositoryTest {
             WatchProgressSource.NUVIO_SYNC,
             effectiveWatchedSource(
                 requestedSource = WatchProgressSource.TRAKT,
-                isTraktAuthenticated = false,
+                connectedProviderIds = emptySet(),
             ),
         )
         assertEquals(
             WatchProgressSource.TRAKT,
             effectiveWatchedSource(
                 requestedSource = WatchProgressSource.TRAKT,
-                isTraktAuthenticated = true,
+                connectedProviderIds = setOf(TrackingProviderId.TRAKT),
             ),
         )
     }
@@ -244,7 +254,7 @@ class WatchedRepositoryTest {
             WatchProgressSource.SIMKL,
             effectiveWatchedSource(
                 requestedSource = WatchProgressSource.SIMKL,
-                connectedProviderIds = setOf(com.nuvio.app.features.tracking.TrackingProviderId.SIMKL),
+                connectedProviderIds = setOf(TrackingProviderId.SIMKL),
             ),
         )
         assertEquals(
