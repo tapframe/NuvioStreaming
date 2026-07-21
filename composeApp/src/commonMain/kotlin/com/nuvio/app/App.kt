@@ -887,7 +887,7 @@ private fun MainAppContent(
     val collectionsTitle = stringResource(Res.string.collections_header)
     val newCollectionTitle = stringResource(Res.string.collections_new)
     val detailsFallbackTitle = stringResource(Res.string.meta_section_details_title)
-    val isTraktLibrarySource = libraryUiState.sourceMode == LibrarySourceMode.TRAKT
+    val isRemoteLibrarySource = libraryUiState.sourceMode != LibrarySourceMode.LOCAL
     var initialHomeReady by rememberSaveable(ownsAppRuntime) {
         mutableStateOf(!ownsAppRuntime)
     }
@@ -1682,10 +1682,10 @@ private fun MainAppContent(
             )
         }
 
-        val librarySectionSubtitle = if (libraryUiState.sourceMode == LibrarySourceMode.TRAKT) {
-            stringResource(Res.string.compose_catalog_subtitle_trakt_library)
-        } else {
-            stringResource(Res.string.compose_catalog_subtitle_library)
+        val librarySectionSubtitle = when (libraryUiState.sourceMode) {
+            LibrarySourceMode.LOCAL -> stringResource(Res.string.compose_catalog_subtitle_library)
+            LibrarySourceMode.TRAKT -> stringResource(Res.string.compose_catalog_subtitle_trakt_library)
+            LibrarySourceMode.SIMKL -> stringResource(Res.string.compose_catalog_subtitle_simkl_library)
         }
 
         val onLibrarySectionViewAllClick: (LibrarySection, LibrarySortOption) -> Unit = { section, sortOption ->
@@ -3298,10 +3298,10 @@ private fun MainAppContent(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = preview,
                     )
-                    // Trakt items long-pressed outside the library open the list picker
+                    // Remote-library items long-pressed outside the library open the list picker
                     // instead of removing, so only true removals disintegrate.
                     val removesFromLibrary = isSaved &&
-                        (posterActionTarget.libraryItem != null || !isTraktLibrarySource)
+                        (posterActionTarget.libraryItem != null || !isRemoteLibrarySource)
                     NuvioPosterZoomActionOverlay(
                         imageUrl = selectedPosterAnchor?.imageUrl ?: preview.poster,
                         title = preview.name,
@@ -3326,7 +3326,7 @@ private fun MainAppContent(
                                     val libraryItem = posterActionTarget.libraryItem
                                         ?: preview.toLibraryItem(savedAtEpochMs = 0L)
                                     if (posterActionTarget.libraryItem != null) {
-                                        if (isTraktLibrarySource) {
+                                        if (isRemoteLibrarySource) {
                                             coroutineScope.launch {
                                                 runCatching {
                                                     val listKey = posterActionTarget.libraryListKey
@@ -3349,7 +3349,7 @@ private fun MainAppContent(
                                             LibraryRepository.remove(libraryItem.id)
                                         }
                                     } else {
-                                        if (!isTraktLibrarySource) {
+                                        if (!isRemoteLibrarySource) {
                                             LibraryRepository.toggleSaved(libraryItem)
                                         } else {
                                             pickerItem = libraryItem

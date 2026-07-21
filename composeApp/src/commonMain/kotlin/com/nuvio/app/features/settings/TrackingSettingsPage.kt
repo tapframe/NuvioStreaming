@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,25 +34,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.simkl.SimklAuthError
+import com.nuvio.app.features.simkl.SimklAuthRepository
+import com.nuvio.app.features.simkl.SimklAuthUiState
+import com.nuvio.app.features.simkl.SimklConnectionMode
 import com.nuvio.app.features.trakt.TraktAuthRepository
-import com.nuvio.app.features.trakt.TraktBrandAsset
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.TraktContinueWatchingDaysOptions
 import com.nuvio.app.features.trakt.MoreLikeThisSourcePreference
-import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.TraktSettingsUiState
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
+import com.nuvio.app.features.tracking.TrackingSettingsUiState
 import com.nuvio.app.features.tracking.WatchProgressSource
+import com.nuvio.app.features.tracking.effectiveLibrarySourceMode
+import com.nuvio.app.features.tracking.effectiveWatchProgressSource
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
-import com.nuvio.app.features.trakt.traktBrandPainter
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -73,6 +78,27 @@ import nuvio.composeapp.generated.resources.settings_trakt_missing_credentials
 import nuvio.composeapp.generated.resources.settings_trakt_open_login
 import nuvio.composeapp.generated.resources.settings_trakt_save_actions_description
 import nuvio.composeapp.generated.resources.settings_trakt_sign_in_description
+import nuvio.composeapp.generated.resources.settings_tracking_approval_redirect
+import nuvio.composeapp.generated.resources.settings_tracking_features
+import nuvio.composeapp.generated.resources.settings_tracking_intro_description
+import nuvio.composeapp.generated.resources.settings_simkl_authorization_expired
+import nuvio.composeapp.generated.resources.settings_simkl_authorization_revoked
+import nuvio.composeapp.generated.resources.settings_simkl_connect
+import nuvio.composeapp.generated.resources.settings_simkl_connected_as
+import nuvio.composeapp.generated.resources.settings_simkl_connected_description
+import nuvio.composeapp.generated.resources.settings_simkl_default_user
+import nuvio.composeapp.generated.resources.settings_simkl_disconnect
+import nuvio.composeapp.generated.resources.settings_simkl_finish_sign_in
+import nuvio.composeapp.generated.resources.settings_simkl_invalid_callback
+import nuvio.composeapp.generated.resources.settings_simkl_missing_credentials
+import nuvio.composeapp.generated.resources.settings_simkl_open_login
+import nuvio.composeapp.generated.resources.settings_simkl_sign_in_description
+import nuvio.composeapp.generated.resources.settings_simkl_sign_in_failed
+import nuvio.composeapp.generated.resources.settings_simkl_visit
+import nuvio.composeapp.generated.resources.tracking_library_source_simkl_selected
+import nuvio.composeapp.generated.resources.tracking_source_simkl
+import nuvio.composeapp.generated.resources.tracking_watch_progress_dialog_subtitle
+import nuvio.composeapp.generated.resources.tracking_watch_progress_simkl_selected
 import nuvio.composeapp.generated.resources.trakt_all_history
 import nuvio.composeapp.generated.resources.trakt_continue_watching_subtitle
 import nuvio.composeapp.generated.resources.trakt_continue_watching_window
@@ -103,56 +129,73 @@ import nuvio.composeapp.generated.resources.trakt_watch_progress_title
 import nuvio.composeapp.generated.resources.trakt_watch_progress_trakt_selected
 import org.jetbrains.compose.resources.stringResource
 
-internal fun LazyListScope.traktSettingsContent(
+internal fun LazyListScope.trackingSettingsContent(
     isTablet: Boolean,
-    uiState: TraktAuthUiState,
-    settingsUiState: TraktSettingsUiState,
+    traktUiState: TraktAuthUiState,
+    simklUiState: SimklAuthUiState,
+    settingsUiState: TrackingSettingsUiState,
     commentsEnabled: Boolean,
     onCommentsEnabledChange: (Boolean) -> Unit,
 ) {
     item {
         SettingsGroup(isTablet = isTablet) {
-            TraktBrandIntro(isTablet = isTablet)
+            TrackingIntro(isTablet = isTablet)
         }
     }
 
     item {
         SettingsSection(
-            title = stringResource(Res.string.settings_trakt_authentication),
+            title = "TRAKT",
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 TraktConnectionCard(
                     isTablet = isTablet,
-                    uiState = uiState,
+                    uiState = traktUiState,
                 )
             }
         }
     }
 
-    if (uiState.mode == TraktConnectionMode.CONNECTED) {
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.settings_trakt_features),
-                isTablet = isTablet,
-            ) {
-                SettingsGroup(isTablet = isTablet) {
-                    TraktFeatureRows(
-                        isTablet = isTablet,
-                        settingsUiState = settingsUiState,
-                        commentsEnabled = commentsEnabled,
-                        onCommentsEnabledChange = onCommentsEnabledChange,
-                    )
-                }
+    item {
+        SettingsSection(
+            title = "SIMKL",
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SimklConnectionCard(
+                    isTablet = isTablet,
+                    uiState = simklUiState,
+                )
+            }
+        }
+    }
+
+    item {
+        SettingsSection(
+            title = stringResource(Res.string.settings_tracking_features),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                TrackingFeatureRows(
+                    isTablet = isTablet,
+                    settingsUiState = settingsUiState,
+                    traktConnected = traktUiState.mode == TraktConnectionMode.CONNECTED,
+                    simklConnected = simklUiState.mode == SimklConnectionMode.CONNECTED,
+                    commentsEnabled = commentsEnabled,
+                    onCommentsEnabledChange = onCommentsEnabledChange,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TraktFeatureRows(
+private fun TrackingFeatureRows(
     isTablet: Boolean,
-    settingsUiState: TraktSettingsUiState,
+    settingsUiState: TrackingSettingsUiState,
+    traktConnected: Boolean,
+    simklConnected: Boolean,
     commentsEnabled: Boolean,
     onCommentsEnabledChange: (Boolean) -> Unit,
 ) {
@@ -163,16 +206,39 @@ private fun TraktFeatureRows(
     var statusMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    val librarySourceValue = librarySourceModeLabel(settingsUiState.librarySourceMode)
-    val watchProgressValue = watchProgressSourceLabel(settingsUiState.watchProgressSource)
+    val connectedProviders = buildSet {
+        if (traktConnected) add(TrackingProviderId.TRAKT)
+        if (simklConnected) add(TrackingProviderId.SIMKL)
+    }
+    val selectedLibrarySource = effectiveLibrarySourceMode(settingsUiState.librarySourceMode) {
+        providerId -> providerId in connectedProviders
+    }
+    val selectedWatchProgressSource = effectiveWatchProgressSource(settingsUiState.watchProgressSource) {
+        providerId -> providerId in connectedProviders
+    }
+    val availableLibrarySources = buildList {
+        add(LibrarySourceMode.LOCAL)
+        if (traktConnected) add(LibrarySourceMode.TRAKT)
+        if (simklConnected) add(LibrarySourceMode.SIMKL)
+    }
+    val availableWatchProgressSources = buildList {
+        add(WatchProgressSource.NUVIO_SYNC)
+        if (traktConnected) add(WatchProgressSource.TRAKT)
+        if (simklConnected) add(WatchProgressSource.SIMKL)
+    }
+
+    val librarySourceValue = librarySourceModeLabel(selectedLibrarySource)
+    val watchProgressValue = watchProgressSourceLabel(selectedWatchProgressSource)
     val continueWatchingWindowValue = continueWatchingDaysCapLabel(settingsUiState.continueWatchingDaysCap)
     val moreLikeThisSourceValue = moreLikeThisSourceLabel(settingsUiState.moreLikeThisSource)
     val traktProgressSelectedMessage = stringResource(Res.string.trakt_watch_progress_trakt_selected)
+    val simklProgressSelectedMessage = stringResource(Res.string.tracking_watch_progress_simkl_selected)
     val nuvioProgressSelectedMessage = stringResource(Res.string.trakt_watch_progress_nuvio_selected)
     val traktLibrarySelectedMessage = stringResource(Res.string.trakt_library_source_trakt_selected)
+    val simklLibrarySelectedMessage = stringResource(Res.string.tracking_library_source_simkl_selected)
     val nuvioLibrarySelectedMessage = stringResource(Res.string.trakt_library_source_nuvio_selected)
 
-    TraktSettingsActionRow(
+    TrackingSettingsActionRow(
         title = stringResource(Res.string.trakt_library_source_title),
         description = stringResource(Res.string.trakt_library_source_subtitle),
         value = librarySourceValue,
@@ -180,7 +246,7 @@ private fun TraktFeatureRows(
         onClick = { showLibrarySourceDialog = true },
     )
     SettingsGroupDivider(isTablet = isTablet)
-    TraktSettingsActionRow(
+    TrackingSettingsActionRow(
         title = stringResource(Res.string.trakt_watch_progress_title),
         description = stringResource(Res.string.trakt_watch_progress_subtitle),
         value = watchProgressValue,
@@ -188,32 +254,34 @@ private fun TraktFeatureRows(
         onClick = { showWatchProgressDialog = true },
     )
     SettingsGroupDivider(isTablet = isTablet)
-    TraktSettingsActionRow(
+    TrackingSettingsActionRow(
         title = stringResource(Res.string.trakt_continue_watching_window),
         description = stringResource(Res.string.trakt_continue_watching_subtitle),
         value = continueWatchingWindowValue,
         isTablet = isTablet,
         onClick = { showContinueWatchingWindowDialog = true },
     )
-    SettingsGroupDivider(isTablet = isTablet)
-    SettingsSwitchRow(
-        title = stringResource(Res.string.settings_trakt_comments),
-        description = stringResource(Res.string.settings_trakt_comments_description),
-        checked = commentsEnabled,
-        isTablet = isTablet,
-        onCheckedChange = onCommentsEnabledChange,
-    )
-    SettingsGroupDivider(isTablet = isTablet)
-    TraktSettingsActionRow(
-        title = stringResource(Res.string.trakt_more_like_this_source_title),
-        description = stringResource(Res.string.trakt_more_like_this_source_subtitle),
-        value = moreLikeThisSourceValue,
-        isTablet = isTablet,
-        onClick = { showMoreLikeThisSourceDialog = true },
-    )
+    if (traktConnected) {
+        SettingsGroupDivider(isTablet = isTablet)
+        SettingsSwitchRow(
+            title = stringResource(Res.string.settings_trakt_comments),
+            description = stringResource(Res.string.settings_trakt_comments_description),
+            checked = commentsEnabled,
+            isTablet = isTablet,
+            onCheckedChange = onCommentsEnabledChange,
+        )
+        SettingsGroupDivider(isTablet = isTablet)
+        TrackingSettingsActionRow(
+            title = stringResource(Res.string.trakt_more_like_this_source_title),
+            description = stringResource(Res.string.trakt_more_like_this_source_subtitle),
+            value = moreLikeThisSourceValue,
+            isTablet = isTablet,
+            onClick = { showMoreLikeThisSourceDialog = true },
+        )
+    }
     statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
         SettingsGroupDivider(isTablet = isTablet)
-        TraktInfoRow(
+        TrackingInfoRow(
             isTablet = isTablet,
             text = message,
         )
@@ -221,13 +289,14 @@ private fun TraktFeatureRows(
 
     if (showLibrarySourceDialog) {
         LibrarySourceModeDialog(
-            selectedSource = settingsUiState.librarySourceMode,
+            selectedSource = selectedLibrarySource,
+            availableSources = availableLibrarySources,
             onSourceSelected = { source ->
-                TraktSettingsRepository.setLibrarySourceMode(source)
-                statusMessage = if (source == LibrarySourceMode.TRAKT) {
-                    traktLibrarySelectedMessage
-                } else {
-                    nuvioLibrarySelectedMessage
+                TrackingSettingsRepository.setLibrarySourceMode(source)
+                statusMessage = when (source) {
+                    LibrarySourceMode.LOCAL -> nuvioLibrarySelectedMessage
+                    LibrarySourceMode.TRAKT -> traktLibrarySelectedMessage
+                    LibrarySourceMode.SIMKL -> simklLibrarySelectedMessage
                 }
                 showLibrarySourceDialog = false
             },
@@ -237,7 +306,8 @@ private fun TraktFeatureRows(
 
     if (showWatchProgressDialog) {
         WatchProgressSourceDialog(
-            selectedSource = settingsUiState.watchProgressSource,
+            selectedSource = selectedWatchProgressSource,
+            availableSources = availableWatchProgressSources,
             onSourceSelected = { source ->
                 scope.launch {
                     val result = WatchProgressSourceCoordinator.selectSource(
@@ -245,10 +315,10 @@ private fun TraktFeatureRows(
                         source = source,
                     )
                     statusMessage = if (result.succeeded) {
-                        if (result.requestedSource == WatchProgressSource.TRAKT) {
-                            traktProgressSelectedMessage
-                        } else {
-                            nuvioProgressSelectedMessage
+                        when (result.requestedSource) {
+                            WatchProgressSource.TRAKT -> traktProgressSelectedMessage
+                            WatchProgressSource.SIMKL -> simklProgressSelectedMessage
+                            WatchProgressSource.NUVIO_SYNC -> nuvioProgressSelectedMessage
                         }
                     } else {
                         null
@@ -264,7 +334,7 @@ private fun TraktFeatureRows(
         ContinueWatchingWindowDialog(
             selectedDaysCap = settingsUiState.continueWatchingDaysCap,
             onDaysCapSelected = { days ->
-                TraktSettingsRepository.setContinueWatchingDaysCap(days)
+                TrackingSettingsRepository.setContinueWatchingDaysCap(days)
                 showContinueWatchingWindowDialog = false
             },
             onDismiss = { showContinueWatchingWindowDialog = false },
@@ -275,7 +345,7 @@ private fun TraktFeatureRows(
         MoreLikeThisSourceDialog(
             selectedSource = settingsUiState.moreLikeThisSource,
             onSourceSelected = { source ->
-                TraktSettingsRepository.setMoreLikeThisSource(source)
+                TrackingSettingsRepository.setMoreLikeThisSource(source)
                 showMoreLikeThisSourceDialog = false
             },
             onDismiss = { showMoreLikeThisSourceDialog = false },
@@ -284,7 +354,7 @@ private fun TraktFeatureRows(
 }
 
 @Composable
-private fun TraktSettingsActionRow(
+private fun TrackingSettingsActionRow(
     title: String,
     description: String,
     value: String,
@@ -333,7 +403,7 @@ private fun TraktSettingsActionRow(
 }
 
 @Composable
-private fun TraktInfoRow(
+private fun TrackingInfoRow(
     isTablet: Boolean,
     text: String,
 ) {
@@ -355,7 +425,7 @@ private fun librarySourceModeLabel(source: LibrarySourceMode): String =
     when (source) {
         LibrarySourceMode.TRAKT -> stringResource(Res.string.trakt_library_source_trakt)
         LibrarySourceMode.LOCAL -> stringResource(Res.string.trakt_library_source_nuvio)
-        LibrarySourceMode.SIMKL -> "Simkl"
+        LibrarySourceMode.SIMKL -> stringResource(Res.string.tracking_source_simkl)
     }
 
 @Composable
@@ -363,7 +433,7 @@ private fun watchProgressSourceLabel(source: WatchProgressSource): String =
     when (source) {
         WatchProgressSource.TRAKT -> stringResource(Res.string.trakt_watch_progress_source_trakt)
         WatchProgressSource.NUVIO_SYNC -> stringResource(Res.string.trakt_watch_progress_source_nuvio)
-        WatchProgressSource.SIMKL -> "Simkl"
+        WatchProgressSource.SIMKL -> stringResource(Res.string.tracking_source_simkl)
     }
 
 @Composable
@@ -387,6 +457,7 @@ private fun continueWatchingDaysCapLabel(daysCap: Int): String {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun LibrarySourceModeDialog(
     selectedSource: LibrarySourceMode,
+    availableSources: List<LibrarySourceMode>,
     onSourceSelected: (LibrarySourceMode) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -416,8 +487,8 @@ private fun LibrarySourceModeDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    listOf(LibrarySourceMode.TRAKT, LibrarySourceMode.LOCAL).forEach { source ->
-                        TraktDialogOption(
+                    availableSources.forEach { source ->
+                        TrackingDialogOption(
                             label = librarySourceModeLabel(source),
                             selected = source == selectedSource,
                             onClick = { onSourceSelected(source) },
@@ -440,6 +511,7 @@ private fun LibrarySourceModeDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun WatchProgressSourceDialog(
     selectedSource: WatchProgressSource,
+    availableSources: List<WatchProgressSource>,
     onSourceSelected: (WatchProgressSource) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -460,7 +532,7 @@ private fun WatchProgressSourceDialog(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = stringResource(Res.string.trakt_watch_progress_dialog_subtitle),
+                    text = stringResource(Res.string.tracking_watch_progress_dialog_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -469,8 +541,8 @@ private fun WatchProgressSourceDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    listOf(WatchProgressSource.TRAKT, WatchProgressSource.NUVIO_SYNC).forEach { source ->
-                        TraktDialogOption(
+                    availableSources.forEach { source ->
+                        TrackingDialogOption(
                             label = watchProgressSourceLabel(source),
                             selected = source == selectedSource,
                             onClick = { onSourceSelected(source) },
@@ -526,7 +598,7 @@ private fun ContinueWatchingWindowDialog(
                 ) {
                     TraktContinueWatchingDaysOptions.forEach { days ->
                         val normalizedDays = normalizeTraktContinueWatchingDaysCap(days)
-                        TraktDialogOption(
+                        TrackingDialogOption(
                             label = continueWatchingDaysCapLabel(days),
                             selected = normalizedDays == normalizedSelected,
                             onClick = { onDaysCapSelected(days) },
@@ -579,7 +651,7 @@ private fun MoreLikeThisSourceDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     listOf(MoreLikeThisSourcePreference.TRAKT, MoreLikeThisSourcePreference.TMDB).forEach { source ->
-                        TraktDialogOption(
+                        TrackingDialogOption(
                             label = moreLikeThisSourceLabel(source),
                             selected = source == selectedSource,
                             onClick = { onSourceSelected(source) },
@@ -599,7 +671,7 @@ private fun MoreLikeThisSourceDialog(
 }
 
 @Composable
-private fun TraktDialogOption(
+private fun TrackingDialogOption(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -646,37 +718,24 @@ private fun TraktDialogOption(
 }
 
 @Composable
-private fun TraktBrandIntro(
-    isTablet: Boolean,
-) {
+private fun TrackingIntro(isTablet: Boolean) {
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 18.dp else 16.dp
 
-    Column(
+    Text(
+        text = stringResource(Res.string.settings_tracking_intro_description),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalAlignment = Alignment.Start,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            androidx.compose.foundation.Image(
-                painter = traktBrandPainter(TraktBrandAsset.Glyph),
-                contentDescription = null,
-                modifier = Modifier.size(if (isTablet) 84.dp else 72.dp),
-                contentScale = ContentScale.Fit,
-            )
-            Text(
-                text = stringResource(Res.string.settings_trakt_intro_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private enum class ConnectionCardMode {
+    DISCONNECTED,
+    AWAITING_APPROVAL,
+    CONNECTED,
 }
 
 @Composable
@@ -684,10 +743,114 @@ private fun TraktConnectionCard(
     isTablet: Boolean,
     uiState: TraktAuthUiState,
 ) {
+    ProviderConnectionCard(
+        isTablet = isTablet,
+        mode = when (uiState.mode) {
+            TraktConnectionMode.DISCONNECTED -> ConnectionCardMode.DISCONNECTED
+            TraktConnectionMode.AWAITING_APPROVAL -> ConnectionCardMode.AWAITING_APPROVAL
+            TraktConnectionMode.CONNECTED -> ConnectionCardMode.CONNECTED
+        },
+        credentialsConfigured = uiState.credentialsConfigured,
+        isLoading = uiState.isLoading,
+        connectedLabel = stringResource(
+            Res.string.settings_trakt_connected_as,
+            uiState.username ?: stringResource(Res.string.settings_trakt_default_user),
+        ),
+        connectedDescription = stringResource(Res.string.settings_trakt_save_actions_description),
+        signInDescription = stringResource(Res.string.settings_trakt_sign_in_description),
+        finishSignInLabel = stringResource(Res.string.settings_trakt_finish_sign_in),
+        approvalDescription = stringResource(Res.string.settings_trakt_approval_redirect),
+        connectLabel = stringResource(Res.string.settings_trakt_connect),
+        openLoginLabel = stringResource(Res.string.settings_trakt_open_login),
+        disconnectLabel = stringResource(Res.string.settings_trakt_disconnect),
+        missingCredentialsMessage = stringResource(Res.string.settings_trakt_missing_credentials),
+        statusMessage = uiState.statusMessage,
+        errorMessage = uiState.errorMessage,
+        onConnectRequested = TraktAuthRepository::onConnectRequested,
+        onResumeAuthorization = {
+            TraktAuthRepository.pendingAuthorizationUrl()
+                ?: TraktAuthRepository.onConnectRequested()
+        },
+        onCancelAuthorization = TraktAuthRepository::onCancelAuthorization,
+        onDisconnect = TraktAuthRepository::onDisconnectRequested,
+    )
+}
+
+@Composable
+private fun SimklConnectionCard(
+    isTablet: Boolean,
+    uiState: SimklAuthUiState,
+) {
+    ProviderConnectionCard(
+        isTablet = isTablet,
+        mode = when (uiState.mode) {
+            SimklConnectionMode.DISCONNECTED -> ConnectionCardMode.DISCONNECTED
+            SimklConnectionMode.AWAITING_APPROVAL -> ConnectionCardMode.AWAITING_APPROVAL
+            SimklConnectionMode.CONNECTED -> ConnectionCardMode.CONNECTED
+        },
+        credentialsConfigured = uiState.credentialsConfigured,
+        isLoading = uiState.isLoading,
+        connectedLabel = stringResource(
+            Res.string.settings_simkl_connected_as,
+            uiState.username ?: stringResource(Res.string.settings_simkl_default_user),
+        ),
+        connectedDescription = stringResource(Res.string.settings_simkl_connected_description),
+        signInDescription = stringResource(Res.string.settings_simkl_sign_in_description),
+        finishSignInLabel = stringResource(Res.string.settings_simkl_finish_sign_in),
+        approvalDescription = stringResource(Res.string.settings_tracking_approval_redirect),
+        connectLabel = stringResource(Res.string.settings_simkl_connect),
+        openLoginLabel = stringResource(Res.string.settings_simkl_open_login),
+        disconnectLabel = stringResource(Res.string.settings_simkl_disconnect),
+        missingCredentialsMessage = stringResource(Res.string.settings_simkl_missing_credentials),
+        errorMessage = simklErrorMessage(uiState.error),
+        websiteLabel = stringResource(Res.string.settings_simkl_visit),
+        websiteUrl = SIMKL_WEBSITE_URL,
+        onConnectRequested = SimklAuthRepository::onConnectRequested,
+        onResumeAuthorization = {
+            SimklAuthRepository.pendingAuthorizationUrl()
+                ?: SimklAuthRepository.onConnectRequested()
+        },
+        onCancelAuthorization = SimklAuthRepository::onCancelAuthorization,
+        onDisconnect = SimklAuthRepository::onDisconnectRequested,
+    )
+}
+
+@Composable
+private fun ProviderConnectionCard(
+    isTablet: Boolean,
+    mode: ConnectionCardMode,
+    credentialsConfigured: Boolean,
+    isLoading: Boolean,
+    connectedLabel: String,
+    connectedDescription: String,
+    signInDescription: String,
+    finishSignInLabel: String,
+    approvalDescription: String,
+    connectLabel: String,
+    openLoginLabel: String,
+    disconnectLabel: String,
+    missingCredentialsMessage: String,
+    statusMessage: String? = null,
+    errorMessage: String? = null,
+    websiteLabel: String? = null,
+    websiteUrl: String? = null,
+    onConnectRequested: () -> String?,
+    onResumeAuthorization: () -> String?,
+    onCancelAuthorization: () -> Unit,
+    onDisconnect: () -> Unit,
+) {
     val uriHandler = LocalUriHandler.current
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 18.dp else 16.dp
     val failedOpenBrowserMessage = stringResource(Res.string.settings_trakt_failed_open_browser)
+    var browserError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun openUrl(url: String?) {
+        if (url.isNullOrBlank()) return
+        browserError = null
+        runCatching { uriHandler.openUri(url) }
+            .onFailure { error -> browserError = error.message ?: failedOpenBrowserMessage }
+    }
 
     Column(
         modifier = Modifier
@@ -695,72 +858,59 @@ private fun TraktConnectionCard(
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        when (uiState.mode) {
-            TraktConnectionMode.CONNECTED -> {
+        when (mode) {
+            ConnectionCardMode.CONNECTED -> {
                 Text(
-                    text = stringResource(
-                        Res.string.settings_trakt_connected_as,
-                        uiState.username ?: stringResource(Res.string.settings_trakt_default_user),
-                    ),
+                    text = connectedLabel,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = stringResource(Res.string.settings_trakt_save_actions_description),
+                    text = connectedDescription,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
-                    onClick = TraktAuthRepository::onDisconnectRequested,
-                    enabled = !uiState.isLoading,
+                    onClick = onDisconnect,
+                    enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
                 ) {
-                    if (uiState.isLoading) {
+                    if (isLoading) {
                         NuvioLoadingIndicator(
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(18.dp),
                         )
                     } else {
-                        Text(stringResource(Res.string.settings_trakt_disconnect))
+                        Text(disconnectLabel)
                     }
                 }
             }
 
-            TraktConnectionMode.AWAITING_APPROVAL -> {
+            ConnectionCardMode.AWAITING_APPROVAL -> {
                 Text(
-                    text = stringResource(Res.string.settings_trakt_finish_sign_in),
+                    text = finishSignInLabel,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = stringResource(Res.string.settings_trakt_approval_redirect),
+                    text = approvalDescription,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
-                    onClick = {
-                        val authUrl = TraktAuthRepository.pendingAuthorizationUrl()
-                            ?: TraktAuthRepository.onConnectRequested()
-                        if (authUrl == null) return@Button
-                        runCatching { uriHandler.openUri(authUrl) }
-                            .onFailure {
-                                TraktAuthRepository.onAuthLaunchFailed(
-                                    it.message ?: failedOpenBrowserMessage,
-                                )
-                            }
-                    },
-                    enabled = !uiState.isLoading,
+                    onClick = { openUrl(onResumeAuthorization()) },
+                    enabled = !isLoading,
                 ) {
-                    Text(stringResource(Res.string.settings_trakt_open_login))
+                    Text(openLoginLabel)
                 }
                 Button(
-                    onClick = TraktAuthRepository::onCancelAuthorization,
-                    enabled = !uiState.isLoading,
+                    onClick = onCancelAuthorization,
+                    enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -770,36 +920,28 @@ private fun TraktConnectionCard(
                 }
             }
 
-            TraktConnectionMode.DISCONNECTED -> {
+            ConnectionCardMode.DISCONNECTED -> {
                 Text(
-                    text = stringResource(Res.string.settings_trakt_sign_in_description),
+                    text = signInDescription,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
-                    onClick = {
-                        val authUrl = TraktAuthRepository.onConnectRequested() ?: return@Button
-                        runCatching { uriHandler.openUri(authUrl) }
-                            .onFailure {
-                                TraktAuthRepository.onAuthLaunchFailed(
-                                    it.message ?: failedOpenBrowserMessage,
-                                )
-                            }
-                    },
-                    enabled = uiState.credentialsConfigured && !uiState.isLoading,
+                    onClick = { openUrl(onConnectRequested()) },
+                    enabled = credentialsConfigured && !isLoading,
                 ) {
-                    if (uiState.isLoading) {
+                    if (isLoading) {
                         NuvioLoadingIndicator(
                             color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(18.dp),
                         )
                     } else {
-                        Text(stringResource(Res.string.settings_trakt_connect))
+                        Text(connectLabel)
                     }
                 }
-                if (!uiState.credentialsConfigured) {
+                if (!credentialsConfigured) {
                     Text(
-                        text = stringResource(Res.string.settings_trakt_missing_credentials),
+                        text = missingCredentialsMessage,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -807,19 +949,52 @@ private fun TraktConnectionCard(
             }
         }
 
-        uiState.statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
+        if (!websiteLabel.isNullOrBlank() && !websiteUrl.isNullOrBlank()) {
+            TextButton(onClick = { openUrl(websiteUrl) }) {
+                Text(websiteLabel)
+            }
+        }
+        statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        uiState.errorMessage?.takeIf { it.isNotBlank() }?.let { message ->
+        errorMessage?.takeIf { it.isNotBlank() }?.let { message ->
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        browserError?.let {
+            Text(
+                text = failedOpenBrowserMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
+
+@Composable
+private fun simklErrorMessage(error: SimklAuthError?): String? =
+    when (error) {
+        null, SimklAuthError.MISSING_CLIENT_ID -> null
+        SimklAuthError.INVALID_CALLBACK,
+        SimklAuthError.INVALID_CALLBACK_STATE
+        -> stringResource(Res.string.settings_simkl_invalid_callback)
+
+        SimklAuthError.AUTHORIZATION_EXPIRED ->
+            stringResource(Res.string.settings_simkl_authorization_expired)
+
+        SimklAuthError.TOKEN_EXCHANGE_FAILED,
+        SimklAuthError.INVALID_TOKEN_RESPONSE
+        -> stringResource(Res.string.settings_simkl_sign_in_failed)
+
+        SimklAuthError.AUTHORIZATION_REVOKED ->
+            stringResource(Res.string.settings_simkl_authorization_revoked)
+    }
+
+private const val SIMKL_WEBSITE_URL = "https://simkl.com"

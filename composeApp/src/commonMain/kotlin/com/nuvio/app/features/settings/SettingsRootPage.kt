@@ -45,13 +45,13 @@ import nuvio.composeapp.generated.resources.compose_settings_root_integrations_d
 import nuvio.composeapp.generated.resources.compose_settings_root_notifications_description
 import nuvio.composeapp.generated.resources.compose_settings_root_switch_profile_description
 import nuvio.composeapp.generated.resources.compose_settings_root_switch_profile_title
-import nuvio.composeapp.generated.resources.compose_settings_root_trakt_description
+import nuvio.composeapp.generated.resources.compose_settings_root_tracking_description
 import nuvio.composeapp.generated.resources.compose_settings_root_about_section
 import nuvio.composeapp.generated.resources.compose_settings_root_account_section
 import nuvio.composeapp.generated.resources.compose_settings_root_advanced_description
 import nuvio.composeapp.generated.resources.compose_settings_root_advanced_section
 import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
-import nuvio.composeapp.generated.resources.compose_settings_page_trakt
+import nuvio.composeapp.generated.resources.compose_settings_page_tracking
 import nuvio.composeapp.generated.resources.settings_playback_subtitle
 import nuvio.composeapp.generated.resources.updates_debug_test_description
 import nuvio.composeapp.generated.resources.updates_debug_test_title
@@ -67,7 +67,7 @@ internal fun LazyListScope.settingsRootContent(
     onNotificationsClick: () -> Unit,
     onContentDiscoveryClick: () -> Unit,
     onIntegrationsClick: () -> Unit,
-    onTraktClick: () -> Unit,
+    onTrackingClick: () -> Unit,
     onSupportersContributorsClick: () -> Unit,
     onLicensesAttributionsClick: () -> Unit,
     onCheckForUpdatesClick: (() -> Unit)? = null,
@@ -107,11 +107,11 @@ internal fun LazyListScope.settingsRootContent(
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
-                        title = stringResource(Res.string.compose_settings_page_trakt),
-                        description = stringResource(Res.string.compose_settings_root_trakt_description),
-                        iconPainter = integrationLogoPainter(IntegrationLogo.Trakt),
+                        title = stringResource(Res.string.compose_settings_page_tracking),
+                        description = stringResource(Res.string.compose_settings_root_tracking_description),
+                        icon = Icons.Rounded.Link,
                         isTablet = isTablet,
-                        onClick = onTraktClick,
+                        onClick = onTrackingClick,
                     )
                 }
             }

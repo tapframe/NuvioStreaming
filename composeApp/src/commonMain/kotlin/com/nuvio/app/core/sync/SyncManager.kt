@@ -11,11 +11,12 @@ import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
-import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.effectiveLibrarySourceMode
-import com.nuvio.app.features.trakt.shouldUseTraktProgress
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.WatchProgressSource
+import com.nuvio.app.features.tracking.effectiveLibrarySourceMode
+import com.nuvio.app.features.tracking.effectiveWatchProgressSource
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -427,19 +428,18 @@ object SyncManager {
                     continue
                 }
 
-                TraktAuthRepository.ensureLoaded()
+                TrackingProviderRegistry.ensureLoaded()
                 TraktSettingsRepository.ensureLoaded()
 
-                val traktAuthenticated = TraktAuthRepository.isAuthenticated.value
                 val settings = TraktSettingsRepository.uiState.value
                 val shouldPullLibrary = effectiveLibrarySourceMode(
-                    isAuthenticated = traktAuthenticated,
-                    source = settings.librarySourceMode,
+                    requestedSource = settings.librarySourceMode,
+                    isProviderAuthenticated = TrackingProviderRegistry::isAuthenticated,
                 ) == LibrarySourceMode.LOCAL
-                val shouldPullWatchProgress = !shouldUseTraktProgress(
-                    isAuthenticated = traktAuthenticated,
-                    source = settings.watchProgressSource,
-                )
+                val shouldPullWatchProgress = effectiveWatchProgressSource(
+                    requestedSource = settings.watchProgressSource,
+                    isProviderAuthenticated = TrackingProviderRegistry::isAuthenticated,
+                ) == WatchProgressSource.NUVIO_SYNC
 
                 if (!shouldPullLibrary && !shouldPullWatchProgress) {
                     continue

@@ -140,7 +140,7 @@ fun LibraryScreen(
     var selectedLibraryType by rememberSaveable { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
-    val isTraktSource = uiState.sourceMode == LibrarySourceMode.TRAKT
+    val isRemoteSource = uiState.sourceMode != LibrarySourceMode.LOCAL
     val effectiveSortOption = effectiveLibrarySortOption(
         selected = displaySettings.sortOption,
         sourceMode = uiState.sourceMode,
@@ -174,7 +174,7 @@ fun LibraryScreen(
         }
     }
 
-    LaunchedEffect(networkStatusUiState.condition, isTraktSource) {
+    LaunchedEffect(networkStatusUiState.condition, isRemoteSource) {
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
@@ -185,7 +185,7 @@ fun LibraryScreen(
             NetworkCondition.Online -> {
                 if (!observedOfflineState) return@LaunchedEffect
                 observedOfflineState = false
-                if (isTraktSource) {
+                if (isRemoteSource) {
                     coroutineScope.launch {
                         LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
                     }
@@ -246,10 +246,12 @@ fun LibraryScreen(
                         NuvioScreenHeader(
                             title = if (sourceMode == LibraryViewMode.Cloud) {
                                 stringResource(Res.string.library_title)
-                            } else if (isTraktSource) {
-                                stringResource(Res.string.library_trakt_title)
                             } else {
-                                stringResource(Res.string.library_title)
+                                when (uiState.sourceMode) {
+                                    LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
+                                    LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
+                                    LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
+                                }
                             },
                             modifier = Modifier.padding(horizontal = 16.dp),
                             actions = {
@@ -352,10 +354,10 @@ fun LibraryScreen(
                             } else {
                                 HomeEmptyStateCard(
                                     modifier = Modifier.padding(horizontal = 16.dp),
-                                    title = if (isTraktSource) {
-                                        stringResource(Res.string.library_trakt_load_failed)
-                                    } else {
-                                        stringResource(Res.string.library_load_failed)
+                                    title = when (uiState.sourceMode) {
+                                        LibrarySourceMode.LOCAL -> stringResource(Res.string.library_load_failed)
+                                        LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_load_failed)
+                                        LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_load_failed)
                                     },
                                     message = uiState.errorMessage.orEmpty(),
                                     actionLabel = stringResource(Res.string.action_retry),
@@ -367,7 +369,7 @@ fun LibraryScreen(
 
                     uiState.sections.isEmpty() -> {
                         item {
-                            if (networkStatusUiState.isOfflineLike && isTraktSource) {
+                            if (networkStatusUiState.isOfflineLike && isRemoteSource) {
                                 NuvioNetworkOfflineCard(
                                     condition = networkStatusUiState.condition,
                                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -376,15 +378,15 @@ fun LibraryScreen(
                             } else {
                                 HomeEmptyStateCard(
                                     modifier = Modifier.padding(horizontal = 16.dp),
-                                    title = if (isTraktSource) {
-                                        stringResource(Res.string.library_trakt_empty_title)
-                                    } else {
-                                        stringResource(Res.string.library_empty_title)
+                                    title = when (uiState.sourceMode) {
+                                        LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_title)
+                                        LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_title)
+                                        LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_empty_title)
                                     },
-                                    message = if (isTraktSource) {
-                                        stringResource(Res.string.library_trakt_empty_message)
-                                    } else {
-                                        stringResource(Res.string.library_empty_message)
+                                    message = when (uiState.sourceMode) {
+                                        LibrarySourceMode.LOCAL -> stringResource(Res.string.library_empty_message)
+                                        LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_empty_message)
+                                        LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_empty_message)
                                     },
                                 )
                             }
