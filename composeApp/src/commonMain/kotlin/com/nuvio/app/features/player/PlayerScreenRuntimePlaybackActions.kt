@@ -65,6 +65,8 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
     val videoIdentity = "$identity:$activeVideoId:$activeSeasonNumber:$activeEpisodeNumber"
     if (lastResetVideoIdentity != videoIdentity) {
         lastResetVideoIdentity = videoIdentity
+        showSubtitleModal = false
+        subtitleModalVideoId = null
         trackPreferenceRestoreApplied = false
         preferredSubtitleSelectionApplied = false
         selectedAddonSubtitleId = null

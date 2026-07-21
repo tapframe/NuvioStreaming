@@ -222,6 +222,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onSpeedClick = { cyclePlaybackSpeed() },
             onSubtitleClick = {
                 refreshTracks()
+                subtitleModalVideoId = playbackSession.videoId
                 showSubtitleModal = true
             },
             onAudioClick = {
@@ -416,7 +417,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
                 playerController?.selectSubtitleTrack(index)
             }
         },
-        onAddonSubtitleSelected = { addon ->
+        onAddonSubtitleSelected = selection@{ addon ->
+            if (!isSubtitleModalSelectionCurrent(subtitleModalVideoId, playbackSession.videoId)) {
+                return@selection
+            }
             selectedAddonSubtitleId = addon.id
             selectedSubtitleIndex = -1
             useCustomSubtitles = true
@@ -430,7 +434,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
         onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
         onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
-        onSubtitleModalDismissed = { showSubtitleModal = false },
+        onSubtitleModalDismissed = {
+            showSubtitleModal = false
+            subtitleModalVideoId = null
+        },
         showVideoSettingsModal = showVideoSettingsModal,
         playerSettings = playerSettingsUiState,
         onVideoSettingsChanged = {

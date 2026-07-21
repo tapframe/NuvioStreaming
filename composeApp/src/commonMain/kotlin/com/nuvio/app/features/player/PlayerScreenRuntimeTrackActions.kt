@@ -76,13 +76,14 @@ internal fun PlayerScreenRuntime.persistAddonSubtitlePreference(subtitle: AddonS
     }
 }
 
-internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
-    if (trackPreferenceRestoreApplied) return
+internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Boolean {
+    if (trackPreferenceRestoreApplied) return false
     val preference = PlayerTrackPreferenceStorage.load(parentMetaId)
     if (preference == null) {
         trackPreferenceRestoreApplied = true
-        return
+        return false
     }
+    var subtitleTracksInvalidated = false
 
     if (
         audioTracks.isNotEmpty() &&
@@ -100,11 +101,12 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
 
     when (preference.subtitleType) {
         PersistedSubtitleSelectionType.DISABLED -> {
-            playerController?.selectSubtitleTrack(-1)
+            playerController?.clearExternalSubtitle()
             selectedSubtitleIndex = -1
             selectedAddonSubtitleId = null
             useCustomSubtitles = false
             preferredSubtitleSelectionApplied = true
+            subtitleTracksInvalidated = true
         }
         PersistedSubtitleSelectionType.INTERNAL -> {
             if (subtitleTracks.isNotEmpty()) {
@@ -112,6 +114,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
                 if (restoredSubtitleIndex >= 0) {
                     if (useCustomSubtitles) {
                         playerController?.clearExternalSubtitleAndSelect(restoredSubtitleIndex)
+                        subtitleTracksInvalidated = true
                     } else {
                         playerController?.selectSubtitleTrack(restoredSubtitleIndex)
                     }
@@ -138,11 +141,13 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
                 selectedAddonSubtitleId = null
                 selectedSubtitleIndex = -1
                 useCustomSubtitles = false
+                subtitleTracksInvalidated = true
             }
         }
     }
 
     trackPreferenceRestoreApplied = true
+    return subtitleTracksInvalidated
 }
 
 internal fun PlayerScreenRuntime.refreshTracks() {
@@ -154,7 +159,10 @@ internal fun PlayerScreenRuntime.refreshTracks() {
     val selectedSub = subtitleTracks.firstOrNull { it.isSelected }
     if (selectedSub != null && !useCustomSubtitles) selectedSubtitleIndex = selectedSub.index
 
-    restorePersistedTrackPreferenceIfNeeded()
+    if (restorePersistedTrackPreferenceIfNeeded()) {
+        subtitleTracks = ctrl.getSubtitleTracks()
+        selectedSubtitleIndex = subtitleTracks.firstOrNull { it.isSelected }?.index ?: -1
+    }
 
     val preferredAudioTargets = resolvePreferredAudioLanguageTargets(
         preferredAudioLanguage = playerSettingsUiState.preferredAudioLanguage,

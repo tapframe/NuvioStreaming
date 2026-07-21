@@ -266,6 +266,17 @@ class PlayerTrackSelectionTest {
         assertEquals(null, persistedAddonSubtitleUrlForVideo(preference, "series:1:1"))
     }
 
+    @Test
+    fun subtitleModalSelectionIsAcceptedForTheSameEpisode() {
+        assertEquals(true, isSubtitleModalSelectionCurrent("series:1:1", "series:1:1"))
+    }
+
+    @Test
+    fun subtitleModalSelectionIsRejectedAfterEpisodeChanges() {
+        assertEquals(false, isSubtitleModalSelectionCurrent("series:1:1", "series:1:2"))
+        assertEquals(false, isSubtitleModalSelectionCurrent(null, "series:1:2"))
+    }
+
     private fun subtitleTrack(
         index: Int,
         language: String?,

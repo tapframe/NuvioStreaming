@@ -228,3 +228,8 @@ internal fun persistedAddonSubtitleUrlForVideo(
     if (persistedVideoId != videoId.takeIf { it.isNotBlank() }) return null
     return preference.addonSubtitleUrl?.takeIf { it.isNotBlank() }
 }
+
+internal fun isSubtitleModalSelectionCurrent(
+    modalVideoId: String?,
+    currentVideoId: String,
+): Boolean = !modalVideoId.isNullOrBlank() && modalVideoId == currentVideoId
