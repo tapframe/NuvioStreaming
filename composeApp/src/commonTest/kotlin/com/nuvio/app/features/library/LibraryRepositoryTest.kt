@@ -5,6 +5,9 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.trakt.TraktListTab
 import com.nuvio.app.features.trakt.TraktListType
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -278,6 +281,70 @@ class LibraryRepositoryTest {
 
         assertFalse(result.preservedLocalItems)
         assertEquals(listOf("remote-new"), result.snapshot.items.map { it.id })
+    }
+
+    @Test
+    fun `server pull cannot restore items after pending delete all`() {
+        val state = LibraryLocalState()
+        val token = state.beginProfileLoad(profileId = 1).snapshot.token
+        state.completeProfileLoad(
+            token = token,
+            activeProfileId = 1,
+            items = listOf(libraryItem(id = "last-item", savedAtEpochMs = 1L)),
+        )
+        state.remove("last-item", "movie")
+        val pullSnapshot = assertNotNull(state.markPullStarted(token))
+
+        val result = assertNotNull(
+            state.applyServerItems(
+                pullSnapshot = pullSnapshot,
+                serverItems = listOf(libraryItem(id = "last-item", savedAtEpochMs = 1L)),
+            ),
+        )
+
+        assertTrue(result.preservedLocalItems)
+        assertTrue(result.snapshot.items.isEmpty())
+        assertNotNull(result.snapshot.pendingItemsForSync())
+    }
+
+    @Test
+    fun `pending empty push survives storage round trip`() {
+        val state = LibraryLocalState()
+        val token = state.beginProfileLoad(profileId = 1).snapshot.token
+        state.completeProfileLoad(
+            token = token,
+            activeProfileId = 1,
+            items = listOf(libraryItem(id = "last-item", savedAtEpochMs = 1L)),
+        )
+        val pendingSnapshot = state.remove("last-item", "movie").snapshot
+        val payload = Json.encodeToString(
+            StoredLibraryPayload(
+                items = pendingSnapshot.items,
+                hasPendingPush = pendingSnapshot.hasPendingPush,
+            ),
+        )
+        val restoredPayload = Json.decodeFromString<StoredLibraryPayload>(payload)
+        val restoredState = LibraryLocalState()
+        val restoredToken = restoredState.beginProfileLoad(profileId = 1).snapshot.token
+        val restoredSnapshot = assertNotNull(
+            restoredState.completeProfileLoad(
+                token = restoredToken,
+                activeProfileId = 1,
+                items = restoredPayload.items,
+                hasPendingPush = restoredPayload.hasPendingPush,
+            ),
+        )
+
+        assertTrue(restoredSnapshot.hasPendingPush)
+        assertEquals(emptyList(), restoredSnapshot.pendingItemsForSync())
+    }
+
+    @Test
+    fun `library push retry delay backs off with a cap`() {
+        assertEquals(500L, libraryPushDelayMs(attempt = 0))
+        assertEquals(1_000L, libraryPushDelayMs(attempt = 1))
+        assertEquals(4_000L, libraryPushDelayMs(attempt = 3))
+        assertEquals(4_000L, libraryPushDelayMs(attempt = 10))
     }
 
     @Test
