@@ -18,6 +18,7 @@ private enum NuvioComposeHost {
     static func wrap(
         _ contentController: UIViewController,
         disablesInteractiveContentPopGesture: Bool = false,
+        hidesContainingTabBar: Bool = false,
         onTabBarControllerAvailable: ((UITabBarController) -> Void)? = nil
     ) -> RootComposeViewController {
         _ = registerPlayerBridge
@@ -25,6 +26,7 @@ private enum NuvioComposeHost {
         return RootComposeViewController(
             contentController: contentController,
             disablesInteractiveContentPopGesture: disablesInteractiveContentPopGesture,
+            hidesContainingTabBar: hidesContainingTabBar,
             onTabBarControllerAvailable: onTabBarControllerAvailable
         )
     }
@@ -36,15 +38,18 @@ private enum NuvioComposeHost {
 final class RootComposeViewController: UIViewController {
     private let contentController: UIViewController
     private let disablesInteractiveContentPopGesture: Bool
+    private let hidesContainingTabBar: Bool
     private let onTabBarControllerAvailable: ((UITabBarController) -> Void)?
 
     init(
         contentController: UIViewController,
         disablesInteractiveContentPopGesture: Bool,
+        hidesContainingTabBar: Bool,
         onTabBarControllerAvailable: ((UITabBarController) -> Void)?
     ) {
         self.contentController = contentController
         self.disablesInteractiveContentPopGesture = disablesInteractiveContentPopGesture
+        self.hidesContainingTabBar = hidesContainingTabBar
         self.onTabBarControllerAvailable = onTabBarControllerAvailable
         super.init(nibName: nil, bundle: nil)
     }
@@ -72,16 +77,22 @@ final class RootComposeViewController: UIViewController {
         contentController.didMove(toParent: self)
     }
 
+    deinit {
+        if let immersiveSystemUIObserver {
+            NotificationCenter.default.removeObserver(immersiveSystemUIObserver)
+        }
+    }
+
     override var childForHomeIndicatorAutoHidden: UIViewController? {
-        immersiveController(in: contentController) ?? contentController
+        nil
     }
 
     override var childForScreenEdgesDeferringSystemGestures: UIViewController? {
-        immersiveController(in: contentController) ?? contentController
+        nil
     }
 
     override var childForStatusBarHidden: UIViewController? {
-        immersiveController(in: contentController) ?? contentController
+        nil
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
@@ -103,14 +114,23 @@ final class RootComposeViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         configureBackGestures(isVisible: true)
+        refreshContainingTabBarVisibility()
+        refreshImmersiveSystemUI()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureBackGestures(isVisible: true)
+        refreshContainingTabBarVisibility()
+        refreshImmersiveSystemUI()
         if let tabBarController {
             onTabBarControllerAvailable?(tabBarController)
         }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        enforceContainingTabBarVisibility()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -118,10 +138,28 @@ final class RootComposeViewController: UIViewController {
         super.viewWillDisappear(animated)
     }
 
+    func refreshContainingTabBarVisibility() {
+        enforceContainingTabBarVisibility()
+        DispatchQueue.main.async { [weak self] in
+            self?.enforceContainingTabBarVisibility()
+        }
+    }
+
+    private func enforceContainingTabBarVisibility() {
+        guard hidesContainingTabBar, let tabBar = tabBarController?.tabBar else { return }
+        tabBar.isHidden = true
+        tabBar.alpha = 0
+        tabBar.isUserInteractionEnabled = false
+    }
+
     func refreshImmersiveSystemUI() {
-        setNeedsUpdateOfHomeIndicatorAutoHidden()
-        setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
-        setNeedsStatusBarAppearanceUpdate()
+        var controller: UIViewController? = self
+        while let current = controller {
+            current.setNeedsUpdateOfHomeIndicatorAutoHidden()
+            current.setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+            current.setNeedsStatusBarAppearanceUpdate()
+            controller = current.parent
+        }
     }
 
     private func configureBackGestures(isVisible: Bool) {
@@ -696,13 +734,18 @@ struct NativeNavComposeView: UIViewControllerRepresentable {
         )
         return NuvioComposeHost.wrap(
             controller,
+            hidesContainingTabBar: !usesNativeTabBar,
             onTabBarControllerAvailable: { tabBarController in
-                appCoordinator.profileTabInteraction.attach(to: tabBarController)
+                if usesNativeTabBar {
+                    appCoordinator.profileTabInteraction.attach(to: tabBarController)
+                }
             }
         )
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        (uiViewController as? RootComposeViewController)?.refreshContainingTabBarVisibility()
+    }
 }
 
 @available(iOS 16.0, *)
@@ -1196,7 +1239,7 @@ struct NativeNavContentView: View {
     }
 
     private var legacyTabs: some View {
-        TabView(selection: tabSelection) {
+        ZStack {
             ForEach(NuvioAppTab.allCases, id: \.self) { tab in
                 TabContentView(
                     tab: tab,
@@ -1205,26 +1248,12 @@ struct NativeNavContentView: View {
                     coordinator: appCoordinator.coordinator(for: tab),
                     appCoordinator: appCoordinator
                 )
-                .tabItem {
-                    Label {
-                        Text(appCoordinator.title(for: tab))
-                    } icon: {
-                        Image(
-                            uiImage: iconStore.image(
-                                for: tab,
-                                selected: appCoordinator.selectedTab == tab
-                            )
-                        )
-                        .id(
-                            "\(tab.rawValue)-\(iconStore.revision)-" +
-                                "\(appCoordinator.selectedTab == tab)"
-                        )
-                    }
-                }
-                .tag(tab)
+                .opacity(appCoordinator.selectedTab == tab ? 1 : 0)
+                .allowsHitTesting(appCoordinator.selectedTab == tab)
+                .accessibilityHidden(appCoordinator.selectedTab != tab)
+                .zIndex(appCoordinator.selectedTab == tab ? 1 : 0)
             }
         }
-        .tint(Color(uiColor: iconStore.accentColor))
     }
 
     @available(iOS 26.0, *)
