@@ -31,7 +31,6 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
         val projection = snapshot.toSimklWatchedProjection()
         SimklWatchDiagnostics.logProjection(
             stage = "items-pull",
-            profileId = profileId,
             snapshot = snapshot,
             projection = projection,
         )
@@ -45,7 +44,6 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
         val projection = snapshot.toSimklWatchedProjection()
         SimklWatchDiagnostics.logProjection(
             stage = "fully-watched-pull",
-            profileId = profileId,
             snapshot = snapshot,
             projection = projection,
         )
@@ -149,7 +147,11 @@ object SimklProgressRepository {
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
-                log.w { "Failed to remove Simkl playback $sessionId: ${error.message}" }
+                val apiError = error as? SimklApiException
+                log.w {
+                    "Failed to remove Simkl playback: status=${apiError?.status} " +
+                        "code=${apiError?.errorCode ?: "transport_failure"}"
+                }
             }
         }
         SimklSyncRepository.commitPlaybackRemoval(removed)

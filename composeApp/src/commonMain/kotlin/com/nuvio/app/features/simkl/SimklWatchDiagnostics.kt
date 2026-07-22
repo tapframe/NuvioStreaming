@@ -2,10 +2,8 @@ package com.nuvio.app.features.simkl
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
-import com.nuvio.app.features.watched.watchedItemKey
 
 internal object SimklWatchDiagnostics {
-    private const val SAMPLE_LIMIT = 10
     private val log = Logger.withTag("SimklDiag")
 
     fun logSnapshot(
@@ -21,24 +19,7 @@ internal object SimklWatchDiagnostics {
                 season.episodes.count { episode -> !episode.watchedAt.isNullOrBlank() }
             }
         }
-        val entrySamples = entries
-            .asSequence()
-            .filter { entry ->
-                entry.status == SimklListStatus.COMPLETED ||
-                    entry.watchedEpisodesCount > 0 ||
-                    entry.seasons.isNotEmpty()
-            }
-            .take(SAMPLE_LIMIT)
-            .joinToString(separator = ",") { entry ->
-                val exactRows = entry.seasons.sumOf { season ->
-                    season.episodes.count { episode -> !episode.watchedAt.isNullOrBlank() }
-                }
-                "${entry.mediaType.apiValue}:${entry.media?.canonicalContentId() ?: "missing"}:" +
-                    "${entry.status?.apiValue ?: "none"}:" +
-                    "${entry.watchedEpisodesCount}/${entry.totalEpisodesCount}:exact=$exactRows"
-            }
-
-        log.i {
+        log.d {
             "snapshot stage=$stage initialized=${snapshot.isInitialized} entries=${entries.size} " +
                 "movies=${entries.count { it.mediaType == SimklMediaType.MOVIES }} " +
                 "shows=${entries.count { it.mediaType == SimklMediaType.SHOWS }} " +
@@ -51,8 +32,7 @@ internal object SimklWatchDiagnostics {
                 "playbackMovies=${snapshot.playback.count { it.mediaType == SimklMediaType.MOVIES }} " +
                 "playbackEpisodes=${snapshot.playback.count { it.mediaType != SimklMediaType.MOVIES }} " +
                 "missingCanonicalIds=${entries.count { it.media?.canonicalContentId() == null }} " +
-                "watermark=${snapshot.watermark} lastChecked=${snapshot.lastCheckedAtEpochMs} " +
-                "samples=[$entrySamples]"
+                "hasWatermark=${snapshot.watermark != null} hasLastChecked=${snapshot.lastCheckedAtEpochMs != null}"
         }
     }
 
@@ -63,10 +43,10 @@ internal object SimklWatchDiagnostics {
         snapshot: SimklSyncSnapshot,
         errorMessage: String?,
     ) {
-        log.i {
+        log.d {
             "refresh request intent=$intent generation=$profileGeneration authenticated=$authenticated " +
-                "initialized=${snapshot.isInitialized} lastChecked=${snapshot.lastCheckedAtEpochMs} " +
-                "watermark=${snapshot.watermark} hasError=${errorMessage != null}"
+                "initialized=${snapshot.isInitialized} hasLastChecked=${snapshot.lastCheckedAtEpochMs != null} " +
+                "hasWatermark=${snapshot.watermark != null} hasError=${errorMessage != null}"
         }
     }
 
@@ -78,9 +58,9 @@ internal object SimklWatchDiagnostics {
         hasError: Boolean,
         eligible: Boolean,
     ) {
-        log.i {
+        log.d {
             "refresh decision intent=$intent eligible=$eligible authenticated=$authenticated " +
-                "hasError=$hasError now=$nowEpochMs lastChecked=$lastCheckedAtEpochMs " +
+                "hasError=$hasError " +
                 "elapsedMs=${lastCheckedAtEpochMs?.let { nowEpochMs - it }}"
         }
     }
@@ -90,42 +70,29 @@ internal object SimklWatchDiagnostics {
         before: SimklSyncUiState,
         after: SimklSyncUiState,
     ) {
-        log.i {
-            "refresh completion intent=$intent checkedBefore=${before.snapshot.lastCheckedAtEpochMs} " +
-                "checkedAfter=${after.snapshot.lastCheckedAtEpochMs} " +
-                "watermarkBefore=${before.snapshot.watermark} watermarkAfter=${after.snapshot.watermark} " +
+        log.d {
+            "refresh completion intent=$intent checkedChanged=" +
+                "${before.snapshot.lastCheckedAtEpochMs != after.snapshot.lastCheckedAtEpochMs} " +
+                "watermarkChanged=${before.snapshot.watermark != after.snapshot.watermark} " +
                 "entriesBefore=${before.snapshot.entries.size} entriesAfter=${after.snapshot.entries.size} " +
                 "playbackBefore=${before.snapshot.playback.size} playbackAfter=${after.snapshot.playback.size} " +
-                "loading=${after.isLoading} hasLoaded=${after.hasLoaded} error=${after.errorMessage}"
+                "loading=${after.isLoading} hasLoaded=${after.hasLoaded} hasError=${after.errorMessage != null}"
         }
     }
 
     fun logProjection(
         stage: String,
-        profileId: Int,
         snapshot: SimklSyncSnapshot,
         projection: SimklWatchedProjection,
     ) {
         val items = projection.items
-        val itemSamples = items
-            .asSequence()
-            .take(SAMPLE_LIMIT)
-            .joinToString(separator = ",") { item ->
-                watchedItemKey(item.type, item.id, item.season, item.episode)
-            }
-        val fullyWatchedSamples = projection.fullyWatchedSeriesKeys
-            .asSequence()
-            .take(SAMPLE_LIMIT)
-            .joinToString(separator = ",")
-
-        log.i {
-            "watched projection stage=$stage profile=$profileId inputEntries=${snapshot.entries.size} " +
+        log.d {
+            "watched projection stage=$stage inputEntries=${snapshot.entries.size} " +
                 "inputExactEpisodeRows=${snapshot.exactWatchedEpisodeRowCount()} " +
                 "outputItems=${items.size} outputMovies=${items.count { it.type == "movie" }} " +
                 "outputEpisodes=${items.count { it.season != null && it.episode != null }} " +
                 "outputSeriesSummaries=${items.count { it.type == "series" && it.season == null }} " +
-                "fullyWatchedSeries=${projection.fullyWatchedSeriesKeys.size} " +
-                "itemKeys=[$itemSamples] fullyWatchedKeys=[$fullyWatchedSamples]"
+                "fullyWatchedSeries=${projection.fullyWatchedSeriesKeys.size}"
         }
     }
 }

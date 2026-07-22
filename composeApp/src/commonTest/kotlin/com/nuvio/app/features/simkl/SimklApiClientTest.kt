@@ -87,6 +87,31 @@ class SimklApiClientTest {
     }
 
     @Test
+    fun `sync response diagnostics exclude response bodies and query values`() {
+        val body = """{"movies":[{"movie":{"title":"Private title"}}]}"""
+        val request = SimklApiRequest(
+            method = SimklHttpMethod.GET,
+            path = "/sync/all-items/",
+            query = mapOf("date_from" to "2026-07-22T08:48:07Z"),
+        )
+
+        val message = simklSyncResponseLogMessage(
+            request = request,
+            response = response(
+                status = 200,
+                body = body,
+                headers = mapOf("Content-Type" to "application/json"),
+            ),
+            attempt = 1,
+        )
+
+        assertTrue("queryKeys=[date_from]" in message)
+        assertTrue("bodyChars=${body.length}" in message)
+        assertFalse("Private title" in message)
+        assertFalse("2026-07-22T08:48:07Z" in message)
+    }
+
+    @Test
     fun `single use unauthenticated posts keep metadata and never retry`() = runBlocking {
         val engine = RecordingEngine(response(503), response(200))
         val harness = TestHarness(engine)
