@@ -1221,7 +1221,7 @@ private fun MainAppContent(
         val activeProfileId = profileState.activeProfile?.profileIndex ?: return@LaunchedEffect
         SyncManager.pullAllForProfile(activeProfileId)
         AppForegroundMonitor.events().collect {
-            SyncManager.requestForegroundPull(activeProfileId)
+            SyncManager.requestForegroundPull(activeProfileId, force = true)
         }
     }
     var resumePromptItem by remember { mutableStateOf<ContinueWatchingItem?>(null) }

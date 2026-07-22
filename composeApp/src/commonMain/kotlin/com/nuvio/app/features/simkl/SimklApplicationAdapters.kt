@@ -170,6 +170,9 @@ object SimklProgressRepository {
     }
 }
 
+internal fun simklProgressRefreshIntent(sourceChanged: Boolean): TrackingRefreshIntent =
+    if (sourceChanged) TrackingRefreshIntent.INVALIDATED else TrackingRefreshIntent.AUTOMATIC
+
 object SimklTrackingProgressProvider : TrackingProgressProvider {
     override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
     override val changes: Flow<Unit> = SimklProgressRepository.uiState.map { Unit }
@@ -179,9 +182,7 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
     override fun onProfileChanged() = SimklProgressRepository.ensureLoaded()
 
     override suspend fun refresh(force: Boolean, sourceChanged: Boolean) =
-        SimklProgressRepository.refresh(
-            if (sourceChanged) TrackingRefreshIntent.INVALIDATED else TrackingRefreshIntent.AUTOMATIC,
-        )
+        SimklProgressRepository.refresh(simklProgressRefreshIntent(sourceChanged))
 
     override fun snapshot(): TrackingProgressSnapshot {
         val state = SimklProgressRepository.uiState.value

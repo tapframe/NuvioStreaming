@@ -11,6 +11,18 @@ import kotlin.test.assertTrue
 
 class SimklRefreshPolicyTest {
     @Test
+    fun `progress refresh keeps provider policy unless the source changes`() {
+        assertEquals(
+            TrackingRefreshIntent.AUTOMATIC,
+            simklProgressRefreshIntent(sourceChanged = false),
+        )
+        assertEquals(
+            TrackingRefreshIntent.INVALIDATED,
+            simklProgressRefreshIntent(sourceChanged = true),
+        )
+    }
+
+    @Test
     fun `automatic refresh is throttled for fifteen minutes`() {
         val lastCheckedAt = 1_000L
 
