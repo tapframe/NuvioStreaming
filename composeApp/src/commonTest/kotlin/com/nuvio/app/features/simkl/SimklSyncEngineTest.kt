@@ -50,9 +50,14 @@ class SimklSyncEngineTest {
         assertEquals(1, result.playback.size)
         assertEquals(500L, result.lastSyncedAtEpochMs)
         assertTrue(remote.isExhausted)
-        assertTrue(remote.allItemsRequests.all { request ->
-            request.dateFrom == null && !request.includeEpisodeDetails && !request.idsOnly
-        })
+        assertEquals(
+            listOf<SimklAllItemsRequest>(
+                SimklAllItemsRequest.Bootstrap(SimklMediaType.SHOWS),
+                SimklAllItemsRequest.Bootstrap(SimklMediaType.MOVIES),
+                SimklAllItemsRequest.Bootstrap(SimklMediaType.ANIME),
+            ),
+            remote.allItemsRequests,
+        )
     }
 
     @Test
@@ -112,9 +117,13 @@ class SimklSyncEngineTest {
         )
         assertEquals("3", result.playback.single().media?.ids?.idValue("simkl"))
         assertEquals("v2", result.watermark)
-        assertTrue(remote.allItemsRequests[0].includeEpisodeDetails)
-        assertEquals("v1", remote.allItemsRequests[0].dateFrom)
-        assertTrue(remote.allItemsRequests[1].idsOnly)
+        assertEquals(
+            listOf<SimklAllItemsRequest>(
+                SimklAllItemsRequest.Changes("v1"),
+                SimklAllItemsRequest.CurrentIds,
+            ),
+            remote.allItemsRequests,
+        )
         assertTrue(remote.isExhausted)
     }
 
@@ -139,7 +148,7 @@ class SimklSyncEngineTest {
     }
 
     @Test
-    fun `remote keeps initial pull minimal and adds rich flags only to dated delta`() = runBlocking {
+    fun `remote applies documented bootstrap delta and reconciliation parameters`() = runBlocking {
         var now = 0L
         val urls = mutableListOf<String>()
         val engine = SimklHttpEngine { _, url, _, _ ->
@@ -156,21 +165,20 @@ class SimklSyncEngineTest {
         )
         val remote = SimklApiSyncRemote(client)
 
-        remote.fetchAllItems(SimklAllItemsRequest(type = SimklMediaType.SHOWS))
-        remote.fetchAllItems(
-            SimklAllItemsRequest(
-                dateFrom = "2026-05-08T14:23:11Z",
-                includeEpisodeDetails = true,
-            ),
-        )
-        remote.fetchAllItems(SimklAllItemsRequest(idsOnly = true))
+        remote.fetchAllItems(SimklAllItemsRequest.Bootstrap(SimklMediaType.SHOWS))
+        remote.fetchAllItems(SimklAllItemsRequest.Changes("2026-05-08T14:23:11Z"))
+        remote.fetchAllItems(SimklAllItemsRequest.CurrentIds)
 
         assertFalse("date_from=" in urls[0])
-        assertFalse("extended=" in urls[0])
+        assertTrue("extended=full" in urls[0])
+        assertTrue("episode_watched_at=yes" in urls[0])
+        assertTrue("include_all_episodes=yes" in urls[0])
+        assertFalse("episode_tvdb_id=" in urls[0])
         assertTrue("date_from=2026-05-08T14%3A23%3A11Z" in urls[1])
         assertTrue("extended=full_anime_seasons" in urls[1])
         assertTrue("episode_watched_at=yes" in urls[1])
-        assertTrue("include_all_episodes=original" in urls[1])
+        assertTrue("episode_tvdb_id=yes" in urls[1])
+        assertTrue("include_all_episodes=yes" in urls[1])
         assertTrue("extended=simkl_ids_only" in urls[2])
     }
 
@@ -190,7 +198,7 @@ class SimklSyncEngineTest {
             )
 
             val response = SimklApiSyncRemote(client).fetchAllItems(
-                SimklAllItemsRequest(type = SimklMediaType.ANIME),
+                SimklAllItemsRequest.Bootstrap(SimklMediaType.ANIME),
             )
 
             assertTrue(response.entriesFor(SimklMediaType.ANIME).isEmpty())

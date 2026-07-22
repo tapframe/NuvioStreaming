@@ -16,18 +16,11 @@ internal class SimklSyncEngine(
         }
         if (current.watermark == null) return initialSync()
 
-        val delta = remote.fetchAllItems(
-            SimklAllItemsRequest(
-                dateFrom = current.watermark,
-                includeEpisodeDetails = true,
-            ),
-        )
+        val delta = remote.fetchAllItems(SimklAllItemsRequest.Changes(current.watermark))
         var entries = mergeDelta(current.entries, delta)
 
         if (hasRemovalActivityChanged(current.activities, activities)) {
-            val authoritativeIds = remote.fetchAllItems(
-                SimklAllItemsRequest(idsOnly = true),
-            )
+            val authoritativeIds = remote.fetchAllItems(SimklAllItemsRequest.CurrentIds)
             entries = reconcileRemovedEntries(entries, authoritativeIds)
         }
 
@@ -52,7 +45,7 @@ internal class SimklSyncEngine(
         val entries = buildList {
             SimklMediaType.entries.forEach { type ->
                 addAll(
-                    remote.fetchAllItems(SimklAllItemsRequest(type = type))
+                    remote.fetchAllItems(SimklAllItemsRequest.Bootstrap(type))
                         .entriesFor(type),
                 )
             }
