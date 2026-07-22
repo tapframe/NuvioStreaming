@@ -46,6 +46,33 @@ internal sealed interface TraktScrobbleItem {
     }
 }
 
+internal data class TraktEpisodeMappingInput(
+    val contentId: String,
+    val contentType: String,
+    val videoId: String?,
+    val season: Int,
+    val episode: Int,
+    val episodeTitle: String?,
+)
+
+internal fun TrackingMediaReference.toTraktEpisodeMappingInput(): TraktEpisodeMappingInput? {
+    val episodeReference = episode ?: return null
+    val season = episodeReference.season ?: return null
+    val contentId = catalog?.contentId?.takeIf(String::isNotBlank)
+        ?: ids.imdb?.takeIf(String::isNotBlank)
+        ?: ids.tmdb?.let { value -> "tmdb:$value" }
+        ?: ids.trakt?.let { value -> "trakt:$value" }
+        ?: return null
+    return TraktEpisodeMappingInput(
+        contentId = contentId,
+        contentType = catalog?.contentType?.takeIf(String::isNotBlank) ?: "series",
+        videoId = catalog?.videoId?.takeIf(String::isNotBlank),
+        season = season,
+        episode = episodeReference.number,
+        episodeTitle = episodeReference.title,
+    )
+}
+
 internal object TraktScrobbleRepository : TrackingScrobbler {
     override val providerId: TrackingProviderId = TrackingProviderId.TRAKT
 
@@ -170,27 +197,22 @@ internal object TraktScrobbleRepository : TrackingScrobbler {
             )
         }
 
-        val episode = media.episode ?: return null
-        val season = episode.season ?: return null
-        val contentId = ids.imdb
-            ?: ids.tmdb?.let { value -> "tmdb:$value" }
-            ?: ids.trakt?.let { value -> "trakt:$value" }
-            ?: return null
+        val mappingInput = media.toTraktEpisodeMappingInput() ?: return null
         val mappedEpisode = TraktEpisodeMappingService.resolveEpisodeMapping(
-            contentId = contentId,
-            contentType = "series",
-            videoId = null,
-            season = season,
-            episode = episode.number,
-            episodeTitle = episode.title,
+            contentId = mappingInput.contentId,
+            contentType = mappingInput.contentType,
+            videoId = mappingInput.videoId,
+            season = mappingInput.season,
+            episode = mappingInput.episode,
+            episodeTitle = mappingInput.episodeTitle,
         )
         return TraktScrobbleItem.Episode(
             showTitle = media.title,
             showYear = media.year,
             showIds = ids,
-            season = mappedEpisode?.season ?: season,
-            number = mappedEpisode?.episode ?: episode.number,
-            episodeTitle = episode.title,
+            season = mappedEpisode?.season ?: mappingInput.season,
+            number = mappedEpisode?.episode ?: mappingInput.episode,
+            episodeTitle = mappingInput.episodeTitle,
         )
     }
 

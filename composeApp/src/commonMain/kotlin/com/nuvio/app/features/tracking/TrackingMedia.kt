@@ -48,12 +48,19 @@ data class TrackingEpisode(
     val title: String? = null,
 )
 
+data class TrackingCatalogReference(
+    val contentId: String,
+    val contentType: String,
+    val videoId: String? = null,
+)
+
 data class TrackingMediaReference(
     val kind: TrackingMediaKind,
     val title: String? = null,
     val year: Int? = null,
     val ids: TrackingExternalIds = TrackingExternalIds(),
     val episode: TrackingEpisode? = null,
+    val catalog: TrackingCatalogReference? = null,
 ) {
     val hasResolvableIdentity: Boolean
         get() = ids.hasAny || !title.isNullOrBlank()
@@ -146,6 +153,11 @@ fun buildTrackingMediaReference(
                 title = episodeTitle,
             )
         },
+        catalog = TrackingCatalogReference(
+            contentId = parentMetaId.trim(),
+            contentType = contentType.trim(),
+            videoId = videoId?.trim()?.takeIf(String::isNotBlank),
+        ),
     )
 }
 

@@ -51,5 +51,8 @@ class TrackingMediaTest {
         assertEquals(2016, media.year)
         assertEquals(2, media.episode?.season)
         assertEquals(7, media.episode?.number)
+        assertEquals("addon_specific_identifier", media.catalog?.contentId)
+        assertEquals("series", media.catalog?.contentType)
+        assertEquals("tt4574334:2:7", media.catalog?.videoId)
     }
 }
