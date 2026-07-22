@@ -14,6 +14,14 @@ import kotlin.test.assertTrue
 
 class SimklProjectionsTest {
     @Test
+    fun `library presentation uses status names without a provider prefix`() {
+        assertEquals(
+            listOf("Watching", "Plan to Watch", "On Hold", "Completed", "Dropped"),
+            simklLibraryStatusDefinitions.map { definition -> definition.title },
+        )
+    }
+
+    @Test
     fun `library projection exposes every populated status with attribution`() {
         val plan = entry(
             type = SimklMediaType.MOVIES,

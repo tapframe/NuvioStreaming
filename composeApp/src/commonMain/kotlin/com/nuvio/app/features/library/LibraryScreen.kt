@@ -260,18 +260,6 @@ fun LibraryScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             actions = {
                                 if (sourceMode == LibraryViewMode.Saved) {
-                                    if (isRemoteSource) {
-                                        IconButton(
-                                            onClick = retryLibraryLoad,
-                                            enabled = !uiState.isLoading,
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Refresh,
-                                                contentDescription = stringResource(Res.string.library_refresh),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
                                     val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
                                         LibraryLayoutMode.VERTICAL
                                     } else {

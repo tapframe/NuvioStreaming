@@ -1679,7 +1679,6 @@
     <string name="library_filter_type">Select type</string>
     <string name="library_layout_show_horizontal">Show horizontal shelves</string>
     <string name="library_layout_show_vertical">Show vertical grid</string>
-    <string name="library_refresh">Refresh library</string>
     <string name="library_load_failed">Couldn't load library</string>
     <string name="library_other">Other</string>
     <string name="library_sort_added_asc">Oldest added</string>
