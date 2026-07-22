@@ -1,0 +1,58 @@
+package com.nuvio.app.features.simkl
+
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal const val SIMKL_AUTOMATIC_REFRESH_INTERVAL_MS = 15L * 60L * 1_000L
+
+internal fun shouldRunSimklRefresh(
+    intent: TrackingRefreshIntent,
+    lastCheckedAtEpochMs: Long?,
+    nowEpochMs: Long,
+    hasError: Boolean,
+    automaticIntervalMs: Long = SIMKL_AUTOMATIC_REFRESH_INTERVAL_MS,
+): Boolean {
+    if (intent != TrackingRefreshIntent.AUTOMATIC) return true
+    if (hasError || lastCheckedAtEpochMs == null) return true
+
+    val elapsedMs = nowEpochMs - lastCheckedAtEpochMs
+    return elapsedMs < 0L || elapsedMs >= automaticIntervalMs
+}
+
+/**
+ * Serializes provider refreshes and coalesces callers that overlap for the same profile generation.
+ *
+ * Library, watched, and progress are projections of one Simkl snapshot. They may request the same
+ * refresh concurrently, but only the first request should reach the network.
+ */
+internal class SimklRefreshGate {
+    private val mutex = Mutex()
+    private val completionSequence = atomic(0L)
+    private var lastCompletedProfileGeneration: Long? = null
+
+    suspend fun runIfNeeded(
+        profileGeneration: Long,
+        shouldRun: () -> Boolean,
+        block: suspend () -> Unit,
+    ) {
+        val observedSequence = completionSequence.value
+        mutex.withLock {
+            if (
+                completionSequence.value != observedSequence &&
+                lastCompletedProfileGeneration == profileGeneration
+            ) {
+                return
+            }
+            if (!shouldRun()) return
+
+            try {
+                block()
+            } finally {
+                lastCompletedProfileGeneration = profileGeneration
+                completionSequence.incrementAndGet()
+            }
+        }
+    }
+}

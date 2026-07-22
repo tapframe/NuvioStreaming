@@ -346,6 +346,11 @@ object SyncManager {
             }
         }
 
+        synchronized(pullStateLock) {
+            lastFullPullAtMs = EpisodeReleaseDatePlatform.nowEpochMs()
+            lastFullPullProfileId = profileId
+        }
+
         log.i { "Foreground sync completed profile=$profileId" }
     }
 

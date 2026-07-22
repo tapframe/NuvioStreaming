@@ -7,6 +7,7 @@ import com.nuvio.app.features.tracking.TrackingCapability
 import com.nuvio.app.features.tracking.TrackingProviderDescriptor
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -262,7 +263,7 @@ object SimklAuthRepository : TrackingAuthProvider {
             persistMetadata()
             publish(isLoading = false, error = null)
             fetchAndStoreUserSettings()
-            SimklSyncRepository.refreshAsync()
+            SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
         }
 
     private suspend fun fetchAndStoreUserSettings(): String? {

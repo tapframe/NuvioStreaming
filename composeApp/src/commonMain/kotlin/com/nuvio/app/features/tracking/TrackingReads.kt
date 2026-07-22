@@ -28,6 +28,18 @@ data class TrackingLibrarySnapshot(
     val errorMessage: String? = null,
 )
 
+/** Why a provider refresh was requested. Providers own the matching cache policy. */
+enum class TrackingRefreshIntent {
+    /** Lifecycle, startup, reconnect, or other application-driven refresh. */
+    AUTOMATIC,
+
+    /** An explicit user action, such as Sync now or pull-to-refresh. */
+    USER_INITIATED,
+
+    /** A successful write or authentication change made the local snapshot stale. */
+    INVALIDATED,
+}
+
 /**
  * Provider-owned projection of remote library state into application models.
  *
@@ -42,7 +54,7 @@ interface TrackingLibraryProvider {
     fun prepare() = Unit
     fun onProfileChanged() = Unit
     fun clearLocalState() = Unit
-    suspend fun refresh()
+    suspend fun refresh(intent: TrackingRefreshIntent)
     fun snapshot(): TrackingLibrarySnapshot
     fun contains(contentId: String, contentType: String? = null): Boolean
     fun find(contentId: String): LibraryItem?

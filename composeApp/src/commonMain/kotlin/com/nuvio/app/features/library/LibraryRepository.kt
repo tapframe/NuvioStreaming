@@ -13,6 +13,7 @@ import com.nuvio.app.features.tracking.TrackingLibraryProvider
 import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
 import com.nuvio.app.features.tracking.providerId
@@ -97,7 +98,11 @@ object LibraryRepository {
             TrackingProviderRegistry.connectedProviderIds.collectLatest {
                 TrackingProviderRegistry.connectedLibraryProviders().forEach(TrackingLibraryProvider::prepare)
                 activeLibraryProvider()?.let { provider ->
-                    refreshLibraryProvider(provider, "authentication change")
+                    refreshLibraryProvider(
+                        provider = provider,
+                        reason = "authentication change",
+                        intent = TrackingRefreshIntent.INVALIDATED,
+                    )
                 }
                 publish()
             }
@@ -206,14 +211,21 @@ object LibraryRepository {
         ) != null
     }
 
-    suspend fun pullFromServer(profileId: Int) {
+    suspend fun pullFromServer(
+        profileId: Int,
+        refreshIntent: TrackingRefreshIntent = TrackingRefreshIntent.AUTOMATIC,
+    ) {
         val operationToken = activeOperationToken(profileId) ?: run {
             log.d { "Skipping library pull for inactive profile $profileId" }
             return
         }
 
         activeLibraryProvider()?.let { provider ->
-            refreshLibraryProvider(provider, "explicit pull")
+            refreshLibraryProvider(
+                provider = provider,
+                reason = "explicit pull",
+                intent = refreshIntent,
+            )
             if (!isActiveOperation(operationToken)) return
             publish()
             return
@@ -566,7 +578,11 @@ object LibraryRepository {
 
     private fun refreshLibraryProviderAsync(provider: TrackingLibraryProvider) {
         syncScope.launch {
-            refreshLibraryProvider(provider, "background refresh")
+            refreshLibraryProvider(
+                provider = provider,
+                reason = "background refresh",
+                intent = TrackingRefreshIntent.AUTOMATIC,
+            )
             publish()
         }
     }
@@ -574,9 +590,10 @@ object LibraryRepository {
     private suspend fun refreshLibraryProvider(
         provider: TrackingLibraryProvider,
         reason: String,
+        intent: TrackingRefreshIntent,
     ) {
         try {
-            provider.refresh()
+            provider.refresh(intent)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {

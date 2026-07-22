@@ -13,6 +13,7 @@ import com.nuvio.app.features.tracking.TrackingListStatus
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProgressProvider
 import com.nuvio.app.features.tracking.TrackingProgressSnapshot
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingWatchedProvider
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
@@ -52,8 +53,8 @@ object SimklLibraryRepository {
         publish(SimklSyncRepository.state.value)
     }
 
-    suspend fun refreshNow() {
-        SimklSyncRepository.refreshNow()
+    suspend fun refresh(intent: TrackingRefreshIntent) {
+        SimklSyncRepository.refresh(intent)
         publish(SimklSyncRepository.state.value)
     }
 
@@ -93,7 +94,7 @@ object SimklLibraryRepository {
         check(result.isComplete) {
             "Simkl could not match ${result.notFoundCount} of ${result.attemptedCount} library items"
         }
-        refreshNow()
+        refresh(TrackingRefreshIntent.INVALIDATED)
     }
 
     private fun publish(syncState: SimklSyncUiState) {
@@ -114,7 +115,8 @@ object SimklTrackingLibraryProvider : TrackingLibraryProvider {
 
     override fun onProfileChanged() = SimklLibraryRepository.ensureLoaded()
 
-    override suspend fun refresh() = SimklLibraryRepository.refreshNow()
+    override suspend fun refresh(intent: TrackingRefreshIntent) =
+        SimklLibraryRepository.refresh(intent)
 
     override fun snapshot(): TrackingLibrarySnapshot {
         val state = SimklLibraryRepository.uiState.value
@@ -179,13 +181,13 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
     override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
     override suspend fun pull(profileId: Int, pageSize: Int): List<WatchedItem> {
         if (profileId != ProfileRepository.activeProfileId) return emptyList()
-        SimklSyncRepository.ensureFresh()
+        SimklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
         return SimklSyncRepository.state.value.snapshot.toSimklWatchedProjection().items
     }
 
     override suspend fun pullFullyWatchedSeriesKeys(profileId: Int): Set<String>? {
         if (profileId != ProfileRepository.activeProfileId) return null
-        SimklSyncRepository.ensureFresh()
+        SimklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
         return SimklSyncRepository.state.value.snapshot.toSimklWatchedProjection().fullyWatchedSeriesKeys
     }
 
@@ -258,8 +260,8 @@ object SimklProgressRepository {
         publish(SimklSyncRepository.state.value)
     }
 
-    suspend fun refreshNow() {
-        SimklSyncRepository.refreshNow()
+    suspend fun refresh(intent: TrackingRefreshIntent) {
+        SimklSyncRepository.refresh(intent)
         publish(SimklSyncRepository.state.value)
     }
 
@@ -290,7 +292,9 @@ object SimklProgressRepository {
             }
         }
         SimklSyncRepository.commitPlaybackRemoval(removed)
-        if (removed.isNotEmpty()) SimklSyncRepository.refreshAsync()
+        if (removed.isNotEmpty()) {
+            SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
+        }
     }
 
     private fun publish(syncState: SimklSyncUiState) {
@@ -312,7 +316,9 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
     override fun onProfileChanged() = SimklProgressRepository.ensureLoaded()
 
     override suspend fun refresh(force: Boolean, sourceChanged: Boolean) =
-        SimklProgressRepository.refreshNow()
+        SimklProgressRepository.refresh(
+            if (sourceChanged) TrackingRefreshIntent.INVALIDATED else TrackingRefreshIntent.AUTOMATIC,
+        )
 
     override fun snapshot(): TrackingProgressSnapshot {
         val state = SimklProgressRepository.uiState.value

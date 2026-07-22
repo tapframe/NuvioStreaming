@@ -7,6 +7,7 @@ import com.nuvio.app.features.tracking.TrackingLibrarySnapshot
 import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -22,7 +23,12 @@ object TraktTrackingLibraryProvider : TrackingLibraryProvider {
 
     override fun clearLocalState() = TraktLibraryRepository.clearLocalState()
 
-    override suspend fun refresh() = TraktLibraryRepository.refreshNow()
+    override suspend fun refresh(intent: TrackingRefreshIntent) = when (intent) {
+        TrackingRefreshIntent.AUTOMATIC -> TraktLibraryRepository.ensureFresh()
+        TrackingRefreshIntent.USER_INITIATED,
+        TrackingRefreshIntent.INVALIDATED,
+        -> TraktLibraryRepository.refreshNow()
+    }
 
     override fun snapshot(): TrackingLibrarySnapshot {
         val state = TraktLibraryRepository.uiState.value

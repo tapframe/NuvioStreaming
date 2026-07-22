@@ -12,6 +12,7 @@ import com.nuvio.app.features.tracking.TrackingMediaReference
 import com.nuvio.app.features.tracking.TrackingMutationResult
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingScrobbleAction
 import com.nuvio.app.features.tracking.TrackingScrobbleEvent
 import com.nuvio.app.features.tracking.TrackingScrobbler
@@ -118,7 +119,9 @@ object SimklMutationRepository : TrackingListWriter, TrackingHistoryWriter, Trac
     private val service by lazy {
         SimklMutationService(
             client = SimklApi.client,
-            onMutationCommitted = SimklSyncRepository::refreshAsync,
+            onMutationCommitted = {
+                SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
+            },
         )
     }
 
