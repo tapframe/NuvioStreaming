@@ -32,11 +32,20 @@ data class TrackingScrobbleEvent(
 data class TrackingMutationResult(
     val attemptedCount: Int,
     val notFoundCount: Int = 0,
-    val resolvedListStatuses: List<TrackingListStatus> = emptyList(),
+    val resolutions: List<TrackingMutationResolution> = emptyList(),
 ) {
+    val resolvedListStatuses: List<TrackingListStatus>
+        get() = resolutions.mapNotNull(TrackingMutationResolution::listStatus)
+
     val isComplete: Boolean
         get() = notFoundCount == 0
 }
+
+data class TrackingMutationResolution(
+    val listStatus: TrackingListStatus? = null,
+    val mediaKind: TrackingMediaKind? = null,
+    val providerSubtype: String? = null,
+)
 
 interface TrackingListWriter {
     val providerId: TrackingProviderId

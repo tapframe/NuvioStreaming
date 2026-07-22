@@ -10,6 +10,7 @@ import com.nuvio.app.features.tracking.TrackingListWriter
 import com.nuvio.app.features.tracking.TrackingMediaKind
 import com.nuvio.app.features.tracking.TrackingMediaReference
 import com.nuvio.app.features.tracking.TrackingMutationResult
+import com.nuvio.app.features.tracking.TrackingMutationResolution
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
@@ -378,23 +379,63 @@ private fun SimklApiResponse.toMutationResult(attemptedCount: Int, json: Json): 
         ?.values
         ?.sumOf { value -> (value as? JsonArray)?.size ?: 0 }
         ?: 0
-    val resolvedListStatuses = payload
+    val added = payload
         ?.get("added")
         ?.let { value -> runCatching { value.jsonObject }.getOrNull() }
-        ?.values
-        .orEmpty()
-        .flatMap { value -> (value as? JsonArray).orEmpty() }
-        .mapNotNull { value ->
-            val wireValue = runCatching {
-                value.jsonObject["to"]?.jsonPrimitive?.content
-            }.getOrNull()
-            TrackingListStatus.fromWireValue(wireValue)
-        }
+    val resolutions = added?.toMutationResolutions().orEmpty()
     return TrackingMutationResult(
         attemptedCount = attemptedCount,
         notFoundCount = notFoundCount,
-        resolvedListStatuses = resolvedListStatuses,
+        resolutions = resolutions,
     )
+}
+
+private fun JsonObject.toMutationResolutions(): List<TrackingMutationResolution> {
+    val historyResolutions = (get("statuses") as? JsonArray)
+        .orEmpty()
+        .mapNotNull { element ->
+            val response = runCatching { element.jsonObject["response"]?.jsonObject }.getOrNull()
+                ?: return@mapNotNull null
+            response.toMutationResolution(statusKey = "status")
+        }
+    if (historyResolutions.isNotEmpty()) return historyResolutions
+
+    return entries.flatMap { (bucket, value) ->
+        (value as? JsonArray).orEmpty().mapNotNull { element ->
+            runCatching { element.jsonObject }.getOrNull()
+                ?.toMutationResolution(statusKey = "to", fallbackKind = bucket.toTrackingMediaKind())
+        }
+    }
+}
+
+private fun JsonObject.toMutationResolution(
+    statusKey: String,
+    fallbackKind: TrackingMediaKind? = null,
+): TrackingMutationResolution? {
+    val status = TrackingListStatus.fromWireValue(stringValue(statusKey))
+    val mediaKind = stringValue("simkl_type")?.toTrackingMediaKind()
+        ?: stringValue("type")?.toTrackingMediaKind()
+        ?: fallbackKind
+    val providerSubtype = stringValue("anime_type")
+    if (status == null && mediaKind == null && providerSubtype == null) return null
+    return TrackingMutationResolution(
+        listStatus = status,
+        mediaKind = mediaKind,
+        providerSubtype = providerSubtype,
+    )
+}
+
+private fun JsonObject.stringValue(key: String): String? =
+    runCatching { get(key)?.jsonPrimitive?.content }
+        .getOrNull()
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+
+private fun String.toTrackingMediaKind(): TrackingMediaKind? = when (lowercase()) {
+    "movie", "movies" -> TrackingMediaKind.MOVIE
+    "anime" -> TrackingMediaKind.ANIME
+    "tv", "show", "shows" -> TrackingMediaKind.SHOW
+    else -> null
 }
 
 private fun Double.clampAndRoundProgress(): Double = round(coerceIn(0.0, 100.0) * 100.0) / 100.0

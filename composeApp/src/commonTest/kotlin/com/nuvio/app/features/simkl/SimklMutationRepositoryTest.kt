@@ -142,6 +142,58 @@ class SimklMutationRepositoryTest {
     }
 
     @Test
+    fun `history response exposes resolved status catalog and anime subtype`() = runBlocking {
+        val engine = RecordingEngine(
+            response(
+                status = 201,
+                body = """
+                    {
+                      "added": {
+                        "movies": 0,
+                        "shows": 1,
+                        "episodes": 1,
+                        "statuses": [
+                          {
+                            "request": {"title":"Attack on Titan","type":"show"},
+                            "response": {
+                              "status":"watching",
+                              "simkl_type":"anime",
+                              "anime_type":"tv"
+                            }
+                          }
+                        ]
+                      },
+                      "not_found": {"movies":[],"shows":[],"episodes":[]}
+                    }
+                """.trimIndent(),
+            ),
+        )
+        val service = SimklMutationService(
+            client = SimklApiClient(
+                engine = engine,
+                accessToken = { "token" },
+                onUnauthorized = {},
+                nowEpochMs = { 0L },
+                sleep = {},
+                retryJitterMs = { 0L },
+            ),
+        )
+
+        val result = service.addToHistory(
+            listOf(
+                TrackingHistoryItem(
+                    media = anime(TrackingEpisode(number = 1)),
+                    watchedAtEpochMs = 1_700_000_000_000L,
+                ),
+            ),
+        )
+
+        assertEquals(listOf(TrackingListStatus.WATCHING), result.resolvedListStatuses)
+        assertEquals(TrackingMediaKind.ANIME, result.resolutions.single().mediaKind)
+        assertEquals("tv", result.resolutions.single().providerSubtype)
+    }
+
+    @Test
     fun `service leaves failed scrobble retry to the next player event`() = runBlocking {
         val engine = RecordingEngine(response(status = 503), response(status = 200))
         val service = SimklMutationService(
