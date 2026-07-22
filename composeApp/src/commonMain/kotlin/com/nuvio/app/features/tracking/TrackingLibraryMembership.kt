@@ -9,9 +9,23 @@ data class TrackingMembershipResolution(
         get() = requestedListKey != resolvedListKey
 }
 
+enum class TrackingMembershipRemovalImpact {
+    WATCHED_HISTORY,
+    RATING,
+}
+
+data class TrackingMembershipRemovalConfirmation(
+    val providerId: TrackingProviderId,
+    val impacts: Set<TrackingMembershipRemovalImpact>,
+)
+
 data class TrackingMembershipApplyResult(
     val resolutions: List<TrackingMembershipResolution> = emptyList(),
+    val requiredRemovalConfirmations: List<TrackingMembershipRemovalConfirmation> = emptyList(),
 ) {
     val rewrites: List<TrackingMembershipResolution>
         get() = resolutions.filter(TrackingMembershipResolution::wasRewritten)
+
+    val requiresRemovalConfirmation: Boolean
+        get() = requiredRemovalConfirmations.isNotEmpty()
 }

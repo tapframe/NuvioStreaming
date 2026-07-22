@@ -1,6 +1,7 @@
 package com.nuvio.app.features.simkl
 
 import com.nuvio.app.features.tracking.TrackingMediaKind
+import com.nuvio.app.features.tracking.TrackingMembershipRemovalImpact
 import com.nuvio.app.features.watchprogress.WatchProgressSourceSimklPlayback
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -231,6 +232,95 @@ class SimklProjectionsTest {
         assertEquals(16498L, reference.ids.mal)
         assertEquals(2, reference.episode?.season)
         assertEquals(4, reference.episode?.number)
+    }
+
+    @Test
+    fun `clean plan to watch removal needs no destructive confirmation`() {
+        val plan = entry(
+            type = SimklMediaType.MOVIES,
+            status = SimklListStatus.PLAN_TO_WATCH,
+            id = 53536,
+            imdb = "tt0181852",
+        )
+
+        val confirmation = SimklSyncSnapshot(entries = listOf(plan))
+            .membershipRemovalConfirmation("tt0181852")
+
+        assertNull(confirmation)
+    }
+
+    @Test
+    fun `watched or rated Simkl removal requires destructive confirmation`() {
+        val watchedPlan = entry(
+            type = SimklMediaType.MOVIES,
+            status = SimklListStatus.PLAN_TO_WATCH,
+            id = 53536,
+            imdb = "tt0181852",
+            lastWatchedAt = "2023-11-14T22:13:20Z",
+        )
+        val ratedPlan = entry(
+            type = SimklMediaType.MOVIES,
+            status = SimklListStatus.PLAN_TO_WATCH,
+            id = 53434,
+            imdb = "tt0068646",
+        ).copy(userRating = 9)
+        val episodePlan = entry(
+            type = SimklMediaType.SHOWS,
+            status = SimklListStatus.PLAN_TO_WATCH,
+            id = 2090,
+            imdb = "tt1520211",
+            seasons = listOf(
+                SimklSeason(
+                    number = 1,
+                    episodes = listOf(
+                        SimklEpisode(number = 1, watchedAt = "2023-11-14T22:13:20Z"),
+                    ),
+                ),
+            ),
+        )
+
+        val confirmation = assertNotNull(
+            SimklSyncSnapshot(entries = listOf(watchedPlan, ratedPlan, episodePlan))
+                .membershipRemovalConfirmation("tt0181852"),
+        )
+        assertNotNull(
+            SimklSyncSnapshot(entries = listOf(watchedPlan, ratedPlan, episodePlan))
+                .membershipRemovalConfirmation("tt0068646"),
+        )
+        assertNotNull(
+            SimklSyncSnapshot(entries = listOf(watchedPlan, ratedPlan, episodePlan))
+                .membershipRemovalConfirmation("tt1520211"),
+        )
+
+        assertEquals(
+            setOf(
+                TrackingMembershipRemovalImpact.WATCHED_HISTORY,
+                TrackingMembershipRemovalImpact.RATING,
+            ),
+            confirmation.impacts,
+        )
+    }
+
+    @Test
+    fun `Simkl default membership toggles only its mutually exclusive status`() {
+        val planKey = simklLibraryStatusDefinitions.single { definition ->
+            definition.status == SimklListStatus.PLAN_TO_WATCH
+        }.key
+        val watchingKey = simklLibraryStatusDefinitions.single { definition ->
+            definition.status == SimklListStatus.WATCHING
+        }.key
+        val emptyMembership = simklLibraryStatusDefinitions.associate { definition ->
+            definition.key to false
+        }
+
+        val added = SimklTrackingLibraryProvider.toggledDefaultMembership(emptyMembership)
+        val removed = SimklTrackingLibraryProvider.toggledDefaultMembership(
+            emptyMembership + (watchingKey to true),
+        )
+
+        assertTrue(added[planKey] == true)
+        assertTrue(added.filterKeys { key -> key != planKey }.values.none { it })
+        assertTrue(removed.values.none { it })
     }
 
     @Test

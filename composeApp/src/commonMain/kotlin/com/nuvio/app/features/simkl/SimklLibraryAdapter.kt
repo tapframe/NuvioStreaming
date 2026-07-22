@@ -7,6 +7,8 @@ import com.nuvio.app.features.tracking.TrackingLibraryProvider
 import com.nuvio.app.features.tracking.TrackingLibrarySnapshot
 import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
+import com.nuvio.app.features.tracking.TrackingMembershipRemovalConfirmation
+import com.nuvio.app.features.tracking.TrackingMembershipRemovalImpact
 import com.nuvio.app.features.tracking.TrackingMembershipResolution
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
@@ -68,6 +70,7 @@ object SimklLibraryRepository {
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
+        destructiveRemovalConfirmed: Boolean = false,
     ): TrackingMembershipResolution? {
         if (profileId != ProfileRepository.activeProfileId) return null
         ensureLoaded()
@@ -98,7 +101,10 @@ object SimklLibraryRepository {
             )
 
             currentStatus != null -> {
-                require(snapshot.canSafelyRemoveFromSimklLibrary(item.id)) {
+                require(
+                    snapshot.membershipRemovalConfirmation(item.id) == null ||
+                        destructiveRemovalConfirmed,
+                ) {
                     "Removing this item from Simkl would also clear watched history or a rating"
                 }
                 SimklMutationRepository.removeFromList(profileId = profileId, items = listOf(media))
@@ -123,6 +129,20 @@ object SimklLibraryRepository {
         }
         refresh(TrackingRefreshIntent.INVALIDATED)
         return resolution
+    }
+
+    fun membershipRemovalConfirmation(
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+    ): TrackingMembershipRemovalConfirmation? {
+        ensureLoaded()
+        val removesStatus = simklLibraryStatusDefinitions.none { definition ->
+            desiredMembership[definition.key] == true
+        } && findItem(item.id, item.type)?.listKeys.orEmpty().any { key ->
+            simklLibraryStatusDefinition(key) != null
+        }
+        if (!removesStatus) return null
+        return SimklSyncRepository.state.value.snapshot.membershipRemovalConfirmation(item.id)
     }
 
     private fun publish(syncState: SimklSyncUiState) {
@@ -191,39 +211,52 @@ object SimklTrackingLibraryProvider : TrackingLibraryProvider {
     override suspend fun membership(item: LibraryItem): Map<String, Boolean> =
         SimklLibraryRepository.statusMembership(item.id, item.type)
 
+    override fun toggledDefaultMembership(
+        currentMembership: Map<String, Boolean>,
+    ): Map<String, Boolean> = currentMembership.mapValues { false }.toMutableMap().apply {
+        if (currentMembership.values.none { isSelected -> isSelected }) {
+            this[simklLibraryStatusDefinitions.single { definition ->
+                definition.status == SimklListStatus.PLAN_TO_WATCH
+            }.key] = true
+        }
+    }
+
+    override fun membershipRemovalConfirmation(
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+    ): TrackingMembershipRemovalConfirmation? =
+        SimklLibraryRepository.membershipRemovalConfirmation(item, desiredMembership)
+
     override suspend fun applyMembership(
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
+        destructiveRemovalConfirmed: Boolean,
     ): TrackingMembershipResolution? =
         SimklLibraryRepository.applyStatusMembership(
             profileId = profileId,
             item = item,
             desiredMembership = desiredMembership,
+            destructiveRemovalConfirmed = destructiveRemovalConfirmed,
         )
-
-    override suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem) {
-        val current = SimklLibraryRepository.statusMembership(item.id, item.type)
-        val desired = current.mapValues { false }.toMutableMap()
-        if (current.values.none { isSelected -> isSelected }) {
-            desired[simklLibraryStatusDefinitions.single { definition ->
-                definition.status == SimklListStatus.PLAN_TO_WATCH
-            }.key] = true
-        }
-        SimklLibraryRepository.applyStatusMembership(
-            profileId = profileId,
-            item = item,
-            desiredMembership = desired,
-        )
-    }
 }
 
-private fun SimklSyncSnapshot.canSafelyRemoveFromSimklLibrary(contentId: String): Boolean =
+internal fun SimklSyncSnapshot.membershipRemovalConfirmation(
+    contentId: String,
+): TrackingMembershipRemovalConfirmation? =
     entries.firstOrNull { entry -> entry.media?.canonicalContentId().equals(contentId, ignoreCase = true) }
-        ?.let { entry ->
+        ?.takeUnless { entry ->
             entry.status == SimklListStatus.PLAN_TO_WATCH &&
                 entry.lastWatchedAt == null &&
                 entry.userRating == null &&
                 entry.seasons.none { season -> season.episodes.any { episode -> episode.watchedAt != null } }
         }
-        ?: true
+        ?.let {
+            TrackingMembershipRemovalConfirmation(
+                providerId = TrackingProviderId.SIMKL,
+                impacts = setOf(
+                    TrackingMembershipRemovalImpact.WATCHED_HISTORY,
+                    TrackingMembershipRemovalImpact.RATING,
+                ),
+            )
+        }

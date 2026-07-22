@@ -80,6 +80,7 @@ import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
+import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
@@ -106,6 +107,9 @@ import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
 import com.nuvio.app.features.details.components.TrailerPlayerPopup
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.library.PendingTrackingMembershipRemoval
+import com.nuvio.app.features.library.TrackingMembershipRemovalConfirmationHost
+import com.nuvio.app.features.library.executeTrackingMembershipOperation
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
@@ -118,6 +122,7 @@ import com.nuvio.app.features.trakt.TraktCommentsRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.TrackingMembershipApplyResult
 import com.nuvio.app.features.tracking.toggleTrackingLibraryMembership
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderId
@@ -224,6 +229,10 @@ fun MetaDetailsScreen(
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var pickerPending by remember(type, id) { mutableStateOf(false) }
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
+    var pendingTrackingRemoval by remember(type, id) {
+        mutableStateOf<PendingTrackingMembershipRemoval?>(null)
+    }
+    val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
     var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
 
@@ -507,9 +516,44 @@ fun MetaDetailsScreen(
                         Unit
                     }
                 }
-                val toggleSaved = remember(meta) {
+                val toggleSaved = remember(meta, trackingListsUpdateFailedMessage) {
                     {
-                        LibraryRepository.toggleSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
+                        val item = meta.toLibraryItem(savedAtEpochMs = 0L)
+                        detailsScope.launch {
+                            val toggleMembership: suspend (Set<TrackingProviderId>) ->
+                                TrackingMembershipApplyResult = { confirmedProviders ->
+                                LibraryRepository.toggleSaved(
+                                    item = item,
+                                    confirmedRemovalProviders = confirmedProviders,
+                                )
+                            }
+                            executeTrackingMembershipOperation(
+                                operation = { toggleMembership(emptySet()) },
+                                onSuccess = { result ->
+                                    if (result.requiresRemovalConfirmation) {
+                                        pendingTrackingRemoval = PendingTrackingMembershipRemoval(
+                                            itemTitle = item.name,
+                                            confirmations = result.requiredRemovalConfirmations,
+                                            retry = toggleMembership,
+                                            onApplied = ::showTrackingMembershipRewriteFeedback,
+                                            onFailure = { error ->
+                                                NuvioToastController.show(
+                                                    error.message ?: trackingListsUpdateFailedMessage,
+                                                )
+                                            },
+                                        )
+                                    } else {
+                                        showTrackingMembershipRewriteFeedback(result)
+                                    }
+                                },
+                                onFailure = { error ->
+                                    NuvioToastController.show(
+                                        error.message ?: trackingListsUpdateFailedMessage,
+                                    )
+                                },
+                            )
+                        }
+                        Unit
                     }
                 }
                 val toggleWatched = remember(metaPreview) {
@@ -1305,20 +1349,50 @@ fun MetaDetailsScreen(
                                 detailsScope.launch {
                                     pickerPending = true
                                     pickerError = null
-                                    runCatching {
+                                    val item = meta.toLibraryItem(savedAtEpochMs = 0L)
+                                    val desiredMembership = pickerMembership.toMap()
+                                    val applyMembership: suspend (Set<TrackingProviderId>) ->
+                                        TrackingMembershipApplyResult = { confirmedProviders ->
                                         LibraryRepository.applyMembershipChanges(
-                                            item = meta.toLibraryItem(savedAtEpochMs = 0L),
-                                            desiredMembership = pickerMembership,
+                                            item = item,
+                                            desiredMembership = desiredMembership,
+                                            confirmedRemovalProviders = confirmedProviders,
                                         )
-                                    }.onSuccess { result ->
+                                    }
+                                    val completeMembershipUpdate: suspend (TrackingMembershipApplyResult) -> Unit = { result ->
                                         showTrackingMembershipRewriteFeedback(result)
                                         showLibraryListPicker = false
-                                    }.onFailure { error ->
-                                        pickerError = error.message ?: getString(Res.string.tracking_lists_update_failed)
                                     }
+                                    executeTrackingMembershipOperation(
+                                        operation = { applyMembership(emptySet()) },
+                                        onSuccess = { result ->
+                                            if (result.requiresRemovalConfirmation) {
+                                                pendingTrackingRemoval = PendingTrackingMembershipRemoval(
+                                                    itemTitle = item.name,
+                                                    confirmations = result.requiredRemovalConfirmations,
+                                                    retry = applyMembership,
+                                                    onApplied = completeMembershipUpdate,
+                                                    onFailure = { error ->
+                                                        pickerError = error.message
+                                                            ?: trackingListsUpdateFailedMessage
+                                                    },
+                                                )
+                                            } else {
+                                                completeMembershipUpdate(result)
+                                            }
+                                        },
+                                        onFailure = { error ->
+                                            pickerError = error.message ?: trackingListsUpdateFailedMessage
+                                        },
+                                    )
                                     pickerPending = false
                                 }
                             },
+                        )
+
+                        TrackingMembershipRemovalConfirmationHost(
+                            pending = pendingTrackingRemoval,
+                            onPendingChange = { pendingTrackingRemoval = it },
                         )
 
                         selectedComment?.let { comment ->

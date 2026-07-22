@@ -66,10 +66,21 @@ object TraktTrackingLibraryProvider : TrackingLibraryProvider {
     override suspend fun membership(item: LibraryItem): Map<String, Boolean> =
         TraktLibraryRepository.getMembershipSnapshot(item).listMembership
 
+    override fun toggledDefaultMembership(
+        currentMembership: Map<String, Boolean>,
+    ): Map<String, Boolean> {
+        val watchlistKey = snapshot().tabs
+            .firstOrNull { tab -> tab.kind == TrackingLibraryTabKind.WATCHLIST }
+            ?.key
+            ?: return currentMembership
+        return toggledTraktWatchlistMembership(currentMembership, watchlistKey)
+    }
+
     override suspend fun applyMembership(
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
+        destructiveRemovalConfirmed: Boolean,
     ): TrackingMembershipResolution? {
         TraktLibraryRepository.applyMembershipChanges(
             item = item,
@@ -77,9 +88,13 @@ object TraktTrackingLibraryProvider : TrackingLibraryProvider {
         )
         return null
     }
+}
 
-    override suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem) =
-        TraktLibraryRepository.toggleWatchlist(item)
+internal fun toggledTraktWatchlistMembership(
+    currentMembership: Map<String, Boolean>,
+    watchlistKey: String,
+): Map<String, Boolean> = currentMembership.toMutableMap().apply {
+    this[watchlistKey] = currentMembership[watchlistKey] != true
 }
 
 private fun TraktListTab.toTrackingLibraryTab(): TrackingLibraryTab =

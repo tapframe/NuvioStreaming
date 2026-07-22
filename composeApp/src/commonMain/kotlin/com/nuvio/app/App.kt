@@ -107,6 +107,7 @@ import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
 import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
+import com.nuvio.app.core.ui.PosterZoomOverlayExitAnimation
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import com.nuvio.app.core.ui.NuvioStatusModal
@@ -162,6 +163,9 @@ import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
 import com.nuvio.app.features.library.LibrarySourceMode
+import com.nuvio.app.features.library.PendingTrackingMembershipRemoval
+import com.nuvio.app.features.library.TrackingMembershipRemovalConfirmationHost
+import com.nuvio.app.features.library.executeTrackingMembershipOperation
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
@@ -226,6 +230,8 @@ import com.nuvio.app.features.tracking.TrackingScrobbleCoordinator
 import com.nuvio.app.features.tracking.TrackingScrobbleEvent
 import com.nuvio.app.features.tracking.buildTrackingMediaReference
 import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.TrackingMembershipApplyResult
+import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.toggleTrackingLibraryMembership
 import com.nuvio.app.features.updater.AppUpdaterHost
 import com.nuvio.app.features.updater.AppUpdaterPlatform
@@ -820,6 +826,8 @@ private fun MainAppContent(
         var pickerMembership by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
         var pickerPending by remember { mutableStateOf(false) }
         var pickerError by remember { mutableStateOf<String?>(null) }
+        var pendingTrackingRemoval by remember { mutableStateOf<PendingTrackingMembershipRemoval?>(null) }
+        val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
         val addonsUiState by remember {
             AddonRepository.initialize()
             AddonRepository.uiState
@@ -3300,8 +3308,6 @@ private fun MainAppContent(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = preview,
                     )
-                    // Remote-library items long-pressed outside the library open the list picker
-                    // instead of removing, so only true removals disintegrate.
                     val removesFromLibrary = isSaved &&
                         (posterActionTarget.libraryItem != null || !isRemoteLibrarySource)
                     NuvioPosterZoomActionOverlay(
@@ -3324,35 +3330,66 @@ private fun MainAppContent(
                                     stringResource(Res.string.hero_add_to_library)
                                 },
                                 isDestructive = removesFromLibrary,
+                                exitAnimation = if (removesFromLibrary && !isRemoteLibrarySource) {
+                                    PosterZoomOverlayExitAnimation.DISINTEGRATE
+                                } else {
+                                    PosterZoomOverlayExitAnimation.COLLAPSE
+                                },
                                 onSelected = {
                                     val libraryItem = posterActionTarget.libraryItem
                                         ?: preview.toLibraryItem(savedAtEpochMs = 0L)
                                     if (posterActionTarget.libraryItem != null) {
                                         if (isRemoteLibrarySource) {
                                             coroutineScope.launch {
-                                                runCatching {
-                                                    val listKey = posterActionTarget.libraryListKey
+                                                val listKey = posterActionTarget.libraryListKey
+                                                val removeMembership: suspend (Set<TrackingProviderId>) ->
+                                                    TrackingMembershipApplyResult = { confirmedProviders ->
                                                     if (listKey.isNullOrBlank()) {
                                                         val currentMembership = LibraryRepository.getMembershipSnapshot(libraryItem)
                                                         LibraryRepository.applyMembershipChanges(
                                                             item = libraryItem,
                                                             desiredMembership = currentMembership.mapValues { false },
+                                                            confirmedRemovalProviders = confirmedProviders,
                                                         )
                                                     } else {
-                                                        LibraryRepository.removeFromList(libraryItem, listKey)
+                                                        LibraryRepository.removeFromList(
+                                                            item = libraryItem,
+                                                            listKey = listKey,
+                                                            confirmedRemovalProviders = confirmedProviders,
+                                                        )
                                                     }
-                                                }.onFailure { error ->
-                                                    NuvioToastController.show(
-                                                        error.message ?: getString(Res.string.tracking_lists_update_failed),
-                                                    )
                                                 }
+                                                executeTrackingMembershipOperation(
+                                                    operation = { removeMembership(emptySet()) },
+                                                    onSuccess = { result ->
+                                                        if (result.requiresRemovalConfirmation) {
+                                                            pendingTrackingRemoval = PendingTrackingMembershipRemoval(
+                                                                itemTitle = libraryItem.name,
+                                                                confirmations = result.requiredRemovalConfirmations,
+                                                                retry = removeMembership,
+                                                                onApplied = {},
+                                                                onFailure = { error ->
+                                                                    NuvioToastController.show(
+                                                                        error.message
+                                                                            ?: trackingListsUpdateFailedMessage,
+                                                                    )
+                                                                },
+                                                            )
+                                                        }
+                                                    },
+                                                    onFailure = { error ->
+                                                        NuvioToastController.show(
+                                                            error.message ?: trackingListsUpdateFailedMessage,
+                                                        )
+                                                    },
+                                                )
                                             }
                                         } else {
                                             LibraryRepository.remove(libraryItem.id)
                                         }
                                     } else {
                                         if (!isRemoteLibrarySource) {
-                                            LibraryRepository.toggleSaved(libraryItem)
+                                            LibraryRepository.toggleLocalSaved(libraryItem)
                                         } else {
                                             pickerItem = libraryItem
                                             pickerTitle = preview.name
@@ -3519,22 +3556,50 @@ private fun MainAppContent(
                     coroutineScope.launch {
                         pickerPending = true
                         pickerError = null
-                        runCatching {
+                        val desiredMembership = pickerMembership.toMap()
+                        val applyMembership: suspend (Set<TrackingProviderId>) ->
+                            TrackingMembershipApplyResult = { confirmedProviders ->
                             LibraryRepository.applyMembershipChanges(
                                 item = item,
-                                desiredMembership = pickerMembership,
+                                desiredMembership = desiredMembership,
+                                confirmedRemovalProviders = confirmedProviders,
                             )
-                        }.onSuccess { result ->
+                        }
+                        val completeMembershipUpdate: suspend (TrackingMembershipApplyResult) -> Unit = { result ->
                             showTrackingMembershipRewriteFeedback(result)
                             showLibraryListPicker = false
                             pickerItem = null
                             pickerError = null
-                        }.onFailure { error ->
-                            pickerError = error.message ?: getString(Res.string.tracking_lists_update_failed)
                         }
+                        executeTrackingMembershipOperation(
+                            operation = { applyMembership(emptySet()) },
+                            onSuccess = { result ->
+                                if (result.requiresRemovalConfirmation) {
+                                    pendingTrackingRemoval = PendingTrackingMembershipRemoval(
+                                        itemTitle = item.name,
+                                        confirmations = result.requiredRemovalConfirmations,
+                                        retry = applyMembership,
+                                        onApplied = completeMembershipUpdate,
+                                        onFailure = { error ->
+                                            pickerError = error.message ?: trackingListsUpdateFailedMessage
+                                        },
+                                    )
+                                } else {
+                                    completeMembershipUpdate(result)
+                                }
+                            },
+                            onFailure = { error ->
+                                pickerError = error.message ?: trackingListsUpdateFailedMessage
+                            },
+                        )
                         pickerPending = false
                     }
                 },
+            )
+
+            TrackingMembershipRemovalConfirmationHost(
+                pending = pendingTrackingRemoval,
+                onPendingChange = { pendingTrackingRemoval = it },
             )
 
             NuvioStatusModal(

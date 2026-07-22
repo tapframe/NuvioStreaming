@@ -89,12 +89,17 @@ interface TrackingLibraryProvider {
     fun contains(contentId: String, contentType: String? = null): Boolean
     fun find(contentId: String): LibraryItem?
     suspend fun membership(item: LibraryItem): Map<String, Boolean>
+    fun toggledDefaultMembership(currentMembership: Map<String, Boolean>): Map<String, Boolean>
+    fun membershipRemovalConfirmation(
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+    ): TrackingMembershipRemovalConfirmation? = null
     suspend fun applyMembership(
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
+        destructiveRemovalConfirmed: Boolean = false,
     ): TrackingMembershipResolution?
-    suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem)
 }
 
 /** Provider adapter for watched-history projection and explicit history mutations. */

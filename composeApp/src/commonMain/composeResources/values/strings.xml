@@ -13,6 +13,7 @@
     <string name="action_play">Play</string>
     <string name="action_previous">Previous</string>
     <string name="action_remove">Remove</string>
+    <string name="action_remove_anyway">Remove anyway</string>
     <string name="action_reorder">Reorder</string>
     <string name="action_reset">Reset to Default</string>
     <string name="action_resume">Resume</string>
@@ -1467,6 +1468,11 @@
     <string name="trakt_lists_update_failed">Failed to update Trakt lists</string>
     <string name="tracking_lists_update_failed">Failed to update tracking lists</string>
     <string name="tracking_list_status_rewritten">%1$s placed this title in %2$s instead of %3$s</string>
+    <string name="tracking_remove_confirmation_title">Remove from %1$s?</string>
+    <string name="tracking_remove_confirmation_message">Removing “%1$s” from %2$s will also clear its %3$s there. This can’t be undone.</string>
+    <string name="tracking_removal_impact_history">watched history</string>
+    <string name="tracking_removal_impact_rating">rating</string>
+    <string name="tracking_removal_impact_history_and_rating">watched history and rating</string>
     <string name="updates_asset_line">%1$s • %2$s</string>
     <string name="updates_check_failed">Update check failed</string>
     <string name="updates_download_failed">Download failed</string>
