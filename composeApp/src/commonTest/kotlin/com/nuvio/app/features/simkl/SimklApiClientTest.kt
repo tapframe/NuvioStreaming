@@ -31,6 +31,7 @@ class SimklApiClientTest {
         assertEquals(8_000L, retryDelayMs(3, null, 0L))
         assertEquals(16_000L, retryDelayMs(4, null, 0L))
         assertEquals(30_250L, retryDelayMs(0, "30", 250L))
+        assertEquals(60_000L, retryDelayMs(0, "120", 1_000L))
     }
 
     @Test
@@ -147,6 +148,66 @@ class SimklApiClientTest {
         }
         assertEquals("wrong_parameter", error.errorCode)
         assertEquals(1, deterministicEngine.requests.size)
+    }
+
+    @Test
+    fun `transient failures stop after five total attempts`() = runBlocking {
+        val engine = RecordingEngine(
+            response(503),
+            response(503),
+            response(503),
+            response(503),
+            response(503),
+            response(200),
+        )
+        val harness = TestHarness(engine)
+
+        assertFailsWith<SimklApiException> {
+            harness.client.execute(SimklApiRequest(SimklHttpMethod.GET, "/unavailable"))
+        }
+
+        assertEquals(5, engine.requests.size)
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L), harness.sleeps)
+    }
+
+    @Test
+    fun `sync write lock is retried once and other bad requests are not`() = runBlocking {
+        val lockedEngine = RecordingEngine(
+            response(400, """{"error":"rate_limit","error_description":"Another sync is in progress"}"""),
+            response(200),
+        )
+        val lockedHarness = TestHarness(lockedEngine)
+
+        lockedHarness.client.execute(
+            SimklApiRequest(
+                method = SimklHttpMethod.POST,
+                path = "/sync/history",
+                body = "{}",
+                retryPolicy = SimklRetryPolicy.SYNC_WRITE,
+            ),
+        )
+
+        assertEquals(2, lockedEngine.requests.size)
+        assertEquals(listOf(3_000L), lockedHarness.sleeps)
+
+        val invalidEngine = RecordingEngine(
+            response(400, """{"error":"wrong_parameter"}"""),
+            response(200),
+        )
+        val invalidHarness = TestHarness(invalidEngine)
+
+        assertFailsWith<SimklApiException> {
+            invalidHarness.client.execute(
+                SimklApiRequest(
+                    method = SimklHttpMethod.POST,
+                    path = "/sync/history",
+                    body = "{}",
+                    retryPolicy = SimklRetryPolicy.SYNC_WRITE,
+                ),
+            )
+        }
+
+        assertEquals(1, invalidEngine.requests.size)
     }
 
     @Test

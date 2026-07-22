@@ -49,6 +49,7 @@ internal class SimklMutationService(
                 method = SimklHttpMethod.POST,
                 path = "/sync/add-to-list",
                 body = buildSimklListMutationBody(candidates, destination, json),
+                retryPolicy = SimklRetryPolicy.SYNC_WRITE,
             ),
         )
         onMutationCommitted()
@@ -70,6 +71,7 @@ internal class SimklMutationService(
                 method = SimklHttpMethod.POST,
                 path = "/sync/history",
                 body = buildSimklHistoryMutationBody(candidates, json),
+                retryPolicy = SimklRetryPolicy.SYNC_WRITE,
             ),
         )
         onMutationCommitted()
@@ -84,6 +86,7 @@ internal class SimklMutationService(
                 method = SimklHttpMethod.POST,
                 path = "/sync/history/remove",
                 body = buildSimklHistoryRemovalBody(candidates, json),
+                retryPolicy = SimklRetryPolicy.SYNC_WRITE,
             ),
         )
         onMutationCommitted()
@@ -100,6 +103,7 @@ internal class SimklMutationService(
                 method = SimklHttpMethod.POST,
                 path = "/scrobble/${action.wireValue}",
                 body = buildSimklScrobbleBody(event, json),
+                retryPolicy = SimklRetryPolicy.NEVER,
                 scrobbleStopConflictIsSuccess = action == TrackingScrobbleAction.STOP,
             ),
         )

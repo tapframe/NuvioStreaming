@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -25,6 +26,7 @@ internal enum class SimklHttpMethod {
 
 internal enum class SimklRetryPolicy {
     TRANSIENT_FAILURES,
+    SYNC_WRITE,
     NEVER,
 }
 
@@ -86,12 +88,14 @@ internal class SimklApiClient(
             null
         }
 
-        var lastTransportFailure: Throwable? = null
-        val maxRetries = when (request.retryPolicy) {
-            SimklRetryPolicy.TRANSIENT_FAILURES -> MAX_RETRIES
-            SimklRetryPolicy.NEVER -> 0
+        val maxAttempts = when (request.retryPolicy) {
+            SimklRetryPolicy.TRANSIENT_FAILURES,
+            SimklRetryPolicy.SYNC_WRITE,
+            -> MAX_ATTEMPTS
+            SimklRetryPolicy.NEVER -> 1
         }
-        for (attempt in 0..maxRetries) {
+        var syncWriteLockRetried = false
+        for (attempt in 0 until maxAttempts) {
             awaitRateLimit(request.method)
             val response = try {
                 engine.execute(
@@ -106,8 +110,7 @@ internal class SimklApiClient(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
-                lastTransportFailure = error
-                if (attempt == maxRetries) {
+                if (attempt == maxAttempts - 1) {
                     throw SimklApiException(
                         status = null,
                         errorCode = "transport_failure",
@@ -125,6 +128,18 @@ internal class SimklApiClient(
                 attempt = attempt + 1,
             )
 
+            if (
+                request.retryPolicy == SimklRetryPolicy.SYNC_WRITE &&
+                response.status == 400 &&
+                !syncWriteLockRetried &&
+                response.errorCode(json) == "rate_limit" &&
+                attempt < maxAttempts - 1
+            ) {
+                syncWriteLockRetried = true
+                sleep(SYNC_WRITE_LOCK_RETRY_DELAY_MS)
+                continue
+            }
+
             when (classifySimklResponse(response.status, request.scrobbleStopConflictIsSuccess)) {
                 SimklResponseAction.SUCCESS -> return@withLock response.toApiResponse()
                 SimklResponseAction.SOFT_SUCCESS -> {
@@ -136,7 +151,7 @@ internal class SimklApiClient(
                 }
                 SimklResponseAction.FAIL -> throw response.toApiException(json)
                 SimklResponseAction.RETRY -> {
-                    if (attempt == maxRetries) throw response.toApiException(json)
+                    if (attempt == maxAttempts - 1) throw response.toApiException(json)
                     sleep(
                         retryDelayMs(
                             attempt = attempt,
@@ -148,12 +163,7 @@ internal class SimklApiClient(
             }
         }
 
-        throw SimklApiException(
-            status = null,
-            errorCode = "transport_failure",
-            message = "Simkl request failed",
-            cause = lastTransportFailure,
-        )
+        error("Simkl request loop completed without a response")
     }
 
     private suspend fun awaitRateLimit(method: SimklHttpMethod) {
@@ -173,7 +183,8 @@ internal class SimklApiClient(
     private companion object {
         const val GET_INTERVAL_MS = 100L
         const val POST_INTERVAL_MS = 1_000L
-        const val MAX_RETRIES = 5
+        const val MAX_ATTEMPTS = 5
+        const val SYNC_WRITE_LOCK_RETRY_DELAY_MS = 3_000L
         const val RETRY_JITTER_BOUND_MS = 1_000L
     }
 }
@@ -252,7 +263,8 @@ internal fun retryDelayMs(
         ?.coerceAtLeast(0L)
         ?.times(1_000L)
         ?: 0L
-    return max(exponentialDelayMs, retryAfterMs) + jitterMs.coerceIn(0L, 1_000L)
+    return (max(exponentialDelayMs, retryAfterMs) + jitterMs.coerceIn(0L, 1_000L))
+        .coerceAtMost(60_000L)
 }
 
 private fun RawHttpResponse.toApiResponse(isSoftSuccess: Boolean = false): SimklApiResponse =
@@ -264,17 +276,23 @@ private fun RawHttpResponse.toApiResponse(isSoftSuccess: Boolean = false): Simkl
     )
 
 private fun RawHttpResponse.toApiException(json: Json): SimklApiException {
-    val envelope = body.takeIf(String::isNotBlank)?.let { payload ->
-        runCatching { json.decodeFromString<SimklErrorEnvelope>(payload) }.getOrNull()
-    }
+    val envelope = errorEnvelope(json)
     return SimklApiException(
         status = status,
         errorCode = envelope?.error,
         message = envelope?.message?.takeIf(String::isNotBlank)
+            ?: envelope?.errorDescription?.takeIf(String::isNotBlank)
             ?: envelope?.error?.takeIf(String::isNotBlank)
             ?: "Simkl request failed with HTTP $status",
     )
 }
+
+private fun RawHttpResponse.errorCode(json: Json): String? = errorEnvelope(json)?.error
+
+private fun RawHttpResponse.errorEnvelope(json: Json): SimklErrorEnvelope? =
+    body.takeIf(String::isNotBlank)?.let { payload ->
+        runCatching { json.decodeFromString<SimklErrorEnvelope>(payload) }.getOrNull()
+    }
 
 private fun Map<String, String>.headerValue(name: String): String? =
     entries.firstOrNull { (key, _) -> key.equals(name, ignoreCase = true) }?.value
@@ -284,4 +302,5 @@ private data class SimklErrorEnvelope(
     val error: String? = null,
     val code: Int? = null,
     val message: String? = null,
+    @SerialName("error_description") val errorDescription: String? = null,
 )
