@@ -1,5 +1,6 @@
 package com.nuvio.app.features.simkl
 
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.RawHttpResponse
 import com.nuvio.app.features.addons.httpRequestRaw
 import kotlinx.coroutines.CancellationException
@@ -13,6 +14,8 @@ import kotlin.math.max
 import kotlin.random.Random
 
 private const val SIMKL_MAX_RESPONSE_BODY_BYTES = 8 * 1024 * 1024
+private const val SIMKL_RESPONSE_LOG_PREVIEW_CHARS = 2_048
+private val simklSyncLog = Logger.withTag("SimklSync")
 
 internal enum class SimklHttpMethod {
     GET,
@@ -116,6 +119,12 @@ internal class SimklApiClient(
                 continue
             }
 
+            logSyncReadResponse(
+                request = request,
+                response = response,
+                attempt = attempt + 1,
+            )
+
             when (classifySimklResponse(response.status, request.scrobbleStopConflictIsSuccess)) {
                 SimklResponseAction.SUCCESS -> return@withLock response.toApiResponse()
                 SimklResponseAction.SOFT_SUCCESS -> {
@@ -166,6 +175,29 @@ internal class SimklApiClient(
         const val POST_INTERVAL_MS = 1_000L
         const val MAX_RETRIES = 5
         const val RETRY_JITTER_BOUND_MS = 1_000L
+    }
+}
+
+private fun logSyncReadResponse(
+    request: SimklApiRequest,
+    response: RawHttpResponse,
+    attempt: Int,
+) {
+    if (request.method != SimklHttpMethod.GET || !request.path.startsWith("/sync/")) return
+
+    val preview = response.body
+        .take(SIMKL_RESPONSE_LOG_PREVIEW_CHARS)
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        .ifEmpty { "<empty>" }
+    val truncationMarker = if (response.body.length > SIMKL_RESPONSE_LOG_PREVIEW_CHARS) "…" else ""
+    val contentType = response.headers.headerValue("content-type") ?: "<missing>"
+
+    simklSyncLog.i {
+        "Simkl HTTP response: method=${request.method} path=${request.path} " +
+            "query=${request.query} status=${response.status} attempt=$attempt " +
+            "contentType=$contentType bodyChars=${response.body.length} " +
+            "bodyPreview=$preview$truncationMarker"
     }
 }
 
