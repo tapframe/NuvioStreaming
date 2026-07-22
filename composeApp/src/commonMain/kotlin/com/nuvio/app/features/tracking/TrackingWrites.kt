@@ -19,6 +19,11 @@ enum class TrackingScrobbleAction(val wireValue: String) {
     STOP("stop"),
 }
 
+enum class TrackingSeekScrobblePolicy {
+    NONE,
+    STOP_AND_RESTART,
+}
+
 data class TrackingHistoryItem(
     val media: TrackingMediaReference,
     val watchedAtEpochMs: Long? = null,
@@ -78,6 +83,8 @@ interface TrackingHistoryWriter {
 
 interface TrackingScrobbler {
     val providerId: TrackingProviderId
+    val seekScrobblePolicy: TrackingSeekScrobblePolicy
+        get() = TrackingSeekScrobblePolicy.NONE
 
     suspend fun scrobble(
         profileId: Int,

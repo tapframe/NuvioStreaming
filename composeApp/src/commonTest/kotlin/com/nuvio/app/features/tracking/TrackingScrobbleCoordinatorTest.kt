@@ -29,8 +29,35 @@ class TrackingScrobbleCoordinatorTest {
         assertEquals(listOf(TrackingProviderId.SIMKL), failures.map(TrackingScrobbleFailure::providerId))
     }
 
+    @Test
+    fun `seek fanout targets only providers that restart scrobbles`() = runBlocking {
+        val trakt = FakeScrobbler(
+            providerId = TrackingProviderId.TRAKT,
+            seekScrobblePolicy = TrackingSeekScrobblePolicy.STOP_AND_RESTART,
+        )
+        val simkl = FakeScrobbler(TrackingProviderId.SIMKL)
+        val event = TrackingScrobbleEvent(
+            media = TrackingMediaReference(
+                kind = TrackingMediaKind.MOVIE,
+                ids = TrackingExternalIds(imdb = "tt0111161"),
+            ),
+            progressPercent = 55.0,
+        )
+
+        dispatchTrackingSeekScrobble(
+            scrobblers = listOf(trakt, simkl),
+            profileId = 2,
+            action = TrackingScrobbleAction.STOP,
+            event = event,
+        )
+
+        assertEquals(1, trakt.callCount)
+        assertEquals(0, simkl.callCount)
+    }
+
     private class FakeScrobbler(
         override val providerId: TrackingProviderId,
+        override val seekScrobblePolicy: TrackingSeekScrobblePolicy = TrackingSeekScrobblePolicy.NONE,
         private val failure: Throwable? = null,
     ) : TrackingScrobbler {
         var callCount: Int = 0

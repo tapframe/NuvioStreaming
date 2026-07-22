@@ -35,7 +35,42 @@ object TrackingScrobbleCoordinator {
         }
         return failures
     }
+
+    suspend fun scrobbleSeek(
+        profileId: Int,
+        action: TrackingScrobbleAction,
+        event: TrackingScrobbleEvent,
+    ): List<TrackingScrobbleFailure> {
+        if (profileId != ProfileRepository.activeProfileId) return emptyList()
+        TrackingProviderRegistry.ensureLoaded()
+        val failures = dispatchTrackingSeekScrobble(
+            scrobblers = TrackingProviderRegistry.connectedScrobblers(),
+            profileId = profileId,
+            action = action,
+            event = event,
+        )
+        failures.forEach { failure ->
+            log.w(failure.cause) {
+                "${failure.providerId.storageId} seek scrobble ${action.wireValue} failed"
+            }
+        }
+        return failures
+    }
 }
+
+internal suspend fun dispatchTrackingSeekScrobble(
+    scrobblers: Collection<TrackingScrobbler>,
+    profileId: Int,
+    action: TrackingScrobbleAction,
+    event: TrackingScrobbleEvent,
+): List<TrackingScrobbleFailure> = dispatchTrackingScrobble(
+    scrobblers = scrobblers.filter { scrobbler ->
+        scrobbler.seekScrobblePolicy == TrackingSeekScrobblePolicy.STOP_AND_RESTART
+    },
+    profileId = profileId,
+    action = action,
+    event = event,
+)
 
 internal suspend fun dispatchTrackingScrobble(
     scrobblers: Collection<TrackingScrobbler>,

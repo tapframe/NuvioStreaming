@@ -11,6 +11,7 @@ import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingScrobbleAction
 import com.nuvio.app.features.tracking.TrackingScrobbleEvent
 import com.nuvio.app.features.tracking.TrackingScrobbler
+import com.nuvio.app.features.tracking.TrackingSeekScrobblePolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
@@ -75,6 +76,8 @@ internal fun TrackingMediaReference.toTraktEpisodeMappingInput(): TraktEpisodeMa
 
 internal object TraktScrobbleRepository : TrackingScrobbler {
     override val providerId: TrackingProviderId = TrackingProviderId.TRAKT
+    override val seekScrobblePolicy: TrackingSeekScrobblePolicy =
+        TrackingSeekScrobblePolicy.STOP_AND_RESTART
 
     private data class ScrobbleStamp(
         val profileId: Int,

@@ -5,7 +5,9 @@ import androidx.compose.ui.Modifier
 import com.nuvio.app.features.streams.StreamsUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PlayerScreenRuntimeStateTest {
 
@@ -19,6 +21,28 @@ class PlayerScreenRuntimeStateTest {
         runtime.sourceStreamsState = StreamsUiState(selectedFilter = "addon-id")
 
         assertEquals("addon-id", selectedFilter.value)
+    }
+
+    @Test
+    fun seekScrobbleUpdate_requiresActiveIncompletePlayback() {
+        assertTrue(
+            shouldUpdateTrackingScrobbleAfterSeek(
+                hasActiveScrobble = true,
+                progressPercent = 50f,
+            ),
+        )
+        assertFalse(
+            shouldUpdateTrackingScrobbleAfterSeek(
+                hasActiveScrobble = false,
+                progressPercent = 50f,
+            ),
+        )
+        assertFalse(
+            shouldUpdateTrackingScrobbleAfterSeek(
+                hasActiveScrobble = true,
+                progressPercent = 80f,
+            ),
+        )
     }
 
     private fun testPlayerScreenArgs() = PlayerScreenArgs(

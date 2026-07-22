@@ -59,6 +59,7 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
             (activeInitialProgressFraction == null || activeInitialProgressFraction!! <= 0f)
         lastProgressPersistEpochMs = 0L
         previousIsPlaying = false
+        pendingSeekScrobbleRestart = false
         autoFetchedAddonSubtitlesForKey = null
         trackPreferenceRestoreApplied = false
         preferredAudioSelectionApplied = false
@@ -70,6 +71,7 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
         lastResetVideoIdentity = videoIdentity
         hasRequestedScrobbleStartForCurrentItem = false
         scrobbleStartRequestGeneration = 0L
+        pendingSeekScrobbleRestart = false
         hasSentCompletionScrobbleForCurrentItem = false
         currentTrackingMedia = null
     }
@@ -179,6 +181,7 @@ private fun PlayerScreenRuntime.emitTrackingScrobbleTerminal(
     }
     currentTrackingMedia = null
     hasRequestedScrobbleStartForCurrentItem = false
+    pendingSeekScrobbleRestart = false
     scrobbleStartRequestGeneration += 1L
 }
 
@@ -192,6 +195,28 @@ internal fun PlayerScreenRuntime.emitStopScrobbleForCurrentProgress() {
     if (progressPercent >= 80f && !hasSentCompletionScrobbleForCurrentItem) {
         hasSentCompletionScrobbleForCurrentItem = true
         emitTrackingScrobbleStop(progressPercent)
+    }
+}
+
+internal fun shouldUpdateTrackingScrobbleAfterSeek(
+    hasActiveScrobble: Boolean,
+    progressPercent: Float,
+): Boolean = hasActiveScrobble && progressPercent >= 1f && progressPercent < 80f
+
+internal fun PlayerScreenRuntime.emitTrackingSeekScrobbleStart() {
+    val mediaSnapshot = currentTrackingMedia
+    val inputsSnapshot = snapshotTrackingScrobbleItemInputs()
+    scope.launch {
+        val media = mediaSnapshot ?: inputsSnapshot.buildMedia()
+        if (!media.hasResolvableIdentity) return@launch
+        TrackingScrobbleCoordinator.scrobbleSeek(
+            profileId = profileId,
+            action = TrackingScrobbleAction.START,
+            event = TrackingScrobbleEvent(
+                media = media,
+                progressPercent = currentPlaybackProgressPercent().toDouble(),
+            ),
+        )
     }
 }
 
@@ -230,6 +255,7 @@ internal fun PlayerScreenRuntime.flushWatchProgress(
 }
 
 internal fun PlayerScreenRuntime.scheduleProgressSyncAfterSeek() {
+    val shouldRestartScrobbleAfterSeek = shouldPlay || playbackSnapshot.isPlaying
     seekProgressSyncJob?.cancel()
     seekProgressSyncJob = scope.launch {
         delay(PlayerSeekProgressSyncDebounceMs)
@@ -238,6 +264,42 @@ internal fun PlayerScreenRuntime.scheduleProgressSyncAfterSeek() {
             snapshot = playbackSnapshot,
         )
 
+        val progressPercent = currentPlaybackProgressPercent()
+        if (
+            !shouldUpdateTrackingScrobbleAfterSeek(
+                hasActiveScrobble = hasRequestedScrobbleStartForCurrentItem,
+                progressPercent = progressPercent,
+            )
+        ) {
+            return@launch
+        }
+
+        val media = currentTrackingMedia ?: currentTrackingMedia()
+        if (!media.hasResolvableIdentity) return@launch
+        val stopEvent = TrackingScrobbleEvent(
+            media = media,
+            progressPercent = progressPercent.toDouble(),
+        )
+        scope.launch {
+            TrackingScrobbleCoordinator.scrobbleSeek(
+                profileId = profileId,
+                action = TrackingScrobbleAction.STOP,
+                event = stopEvent,
+            )
+            if (!shouldRestartScrobbleAfterSeek || !shouldPlay || playbackSnapshot.isEnded) return@launch
+            if (playbackSnapshot.isPlaying) {
+                pendingSeekScrobbleRestart = false
+                TrackingScrobbleCoordinator.scrobbleSeek(
+                    profileId = profileId,
+                    action = TrackingScrobbleAction.START,
+                    event = stopEvent.copy(
+                        progressPercent = currentPlaybackProgressPercent().toDouble(),
+                    ),
+                )
+            } else {
+                pendingSeekScrobbleRestart = true
+            }
+        }
     }
 }
 

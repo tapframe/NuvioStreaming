@@ -149,6 +149,7 @@ internal class PlayerScreenRuntime(
     var previousIsPlaying by mutableStateOf(false)
     var hasRequestedScrobbleStartForCurrentItem by mutableStateOf(false)
     var scrobbleStartRequestGeneration by mutableStateOf(0L)
+    var pendingSeekScrobbleRestart by mutableStateOf(false)
     var hasSentCompletionScrobbleForCurrentItem by mutableStateOf(false)
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
 
