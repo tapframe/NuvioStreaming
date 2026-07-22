@@ -1930,7 +1930,7 @@ private fun MainAppContent(
                             containerColor = Color.Transparent,
                             contentWindowInsets = WindowInsets(0),
                             bottomBar = {
-                                if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
+                                if (tabsRouteActive && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                                     NuvioClassicNavigationBar {
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Home,
@@ -1975,14 +1975,18 @@ private fun MainAppContent(
                         ) { innerPadding ->
                             Box(modifier = Modifier.fillMaxSize()) {
                                 CompositionLocalProvider(
-                                    LocalNuvioBottomNavigationOverlayPadding provides if (useNativeBottomTabs) 49.dp else if (!isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC) 72.dp else 0.dp,
+                                    LocalNuvioBottomNavigationOverlayPadding provides when {
+                                        tabsRouteActive && useNativeBottomTabs -> 49.dp
+                                        tabsRouteActive && !isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC -> 72.dp
+                                        else -> 0.dp
+                                    },
                                     LocalNuvioNavBarScrollState provides navBarScrollState,
                                 ) {
                                     AppTabHost(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .then(if (navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.hazeSource(state = navBarHazeState) else Modifier)
-                                            .then(if (navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
+                                            .then(if (tabsRouteActive && navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.hazeSource(state = navBarHazeState) else Modifier)
+                                            .then(if (tabsRouteActive && navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                                             .padding(innerPadding),
                                         selectedTab = selectedTab,
                                         searchFocusRequestCount = searchFocusRequestCount,
@@ -2130,7 +2134,7 @@ private fun MainAppContent(
                                 }
 
                                 // Floating pill navigation bar overlay
-                                if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
+                                if (tabsRouteActive && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
                                     // Force expand/collapse for non-adaptive modes
                                     when (navBarStyleSetting) {
                                         NavBarStyle.EXPANDED -> navBarScrollState.expand()
