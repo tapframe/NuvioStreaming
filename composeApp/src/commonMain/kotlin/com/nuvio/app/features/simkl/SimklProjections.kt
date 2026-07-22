@@ -4,6 +4,7 @@ import com.nuvio.app.features.tracking.TrackingEpisode
 import com.nuvio.app.features.tracking.TrackingExternalIds
 import com.nuvio.app.features.tracking.TrackingMediaKind
 import com.nuvio.app.features.tracking.TrackingMediaReference
+import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.extractTrackingYear
 import com.nuvio.app.features.tracking.parseTrackingExternalIds
 import com.nuvio.app.features.tracking.trackingMediaKind
@@ -28,6 +29,8 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
         val contentType = if (entry.mediaType == SimklMediaType.MOVIES) "movie" else "series"
         val title = media.title?.takeIf(String::isNotBlank) ?: contentId
         val poster = simklPosterUrl(media.poster)
+        val trackingProviderItemId = media.simklTrackingProviderItemId()
+        val trackingSourceUrl = buildSimklSourceUrl(entry.mediaType, media)
         val lastWatchedAt = parseSimklUtcEpochMs(entry.lastWatchedAt)
             ?: parseSimklUtcEpochMs(entry.addedToWatchlistAt)
             ?: 0L
@@ -40,6 +43,9 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
                     name = title,
                     poster = poster,
                     releaseInfo = media.year?.toString(),
+                    trackingProviderId = TrackingProviderId.SIMKL.storageId,
+                    trackingProviderItemId = trackingProviderItemId,
+                    trackingSourceUrl = trackingSourceUrl,
                     markedAtEpochMs = lastWatchedAt,
                 )
             }
@@ -61,6 +67,9 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
                     releaseInfo = media.year?.toString(),
                     season = seasonNumber,
                     episode = episodeNumber,
+                    trackingProviderId = TrackingProviderId.SIMKL.storageId,
+                    trackingProviderItemId = trackingProviderItemId,
+                    trackingSourceUrl = trackingSourceUrl,
                     markedAtEpochMs = watchedAt,
                 )
             }
@@ -75,6 +84,9 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
                     name = title,
                     poster = poster,
                     releaseInfo = media.year?.toString(),
+                    trackingProviderId = TrackingProviderId.SIMKL.storageId,
+                    trackingProviderItemId = trackingProviderItemId,
+                    trackingSourceUrl = trackingSourceUrl,
                     markedAtEpochMs = lastWatchedAt,
                 )
             }
@@ -252,10 +264,16 @@ private fun SimklPlaybackSession.toWatchProgressEntry(): WatchProgressEntry? {
         isCompleted = normalizedProgress >= SIMKL_WATCHED_THRESHOLD_PERCENT,
         progressPercent = normalizedProgress.toFloat(),
         source = WatchProgressSourceSimklPlayback,
+        trackingProviderId = TrackingProviderId.SIMKL.storageId,
+        trackingProviderItemId = media.simklTrackingProviderItemId(),
+        trackingSourceUrl = buildSimklSourceUrl(mediaType, media),
         progressKey = id?.let { "simkl-playback:$it" }
             ?: "simkl-playback:$parentId:${season ?: -1}:${episodeNumber ?: -1}",
     )
 }
+
+private fun SimklMedia.simklTrackingProviderItemId(): String? =
+    ids.simklIdValue()?.toLongOrNull()?.takeIf { it > 0L }?.let { id -> "simkl:$id" }
 
 private fun SimklLibraryEntry.matchesContentId(contentId: String): Boolean {
     val media = media ?: return false

@@ -121,6 +121,7 @@ import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.toggleTrackingLibraryMembership
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.resolveTrackingAttribution
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import com.nuvio.app.features.watched.WatchedRepository
@@ -457,13 +458,22 @@ fun MetaDetailsScreen(
                 ) {
                     LibraryRepository.isSaved(meta.id, meta.type)
                 }
-                val simklSourceUrl = remember(libraryUiState.items, meta.id) {
-                    libraryUiState.items
-                        .firstOrNull { item ->
-                            item.id == meta.id &&
-                                item.trackingProviderId == TrackingProviderId.SIMKL.storageId
-                        }
-                        ?.trackingSourceUrl
+                val simklSourceUrl = remember(
+                    libraryUiState.items,
+                    watchProgressUiState.entries,
+                    watchedUiState.items,
+                    meta.id,
+                ) {
+                    resolveTrackingAttribution(
+                        contentId = meta.id,
+                        providerId = TrackingProviderId.SIMKL,
+                        items = sequence {
+                            yieldAll(libraryUiState.items)
+                            yieldAll(watchProgressUiState.entries)
+                            yieldAll(watchedUiState.items)
+                        },
+                    )
+                        ?.sourceUrl
                         ?.takeIf { url -> url.startsWith("https://simkl.com/") }
                 }
                 val isWatched = remember(watchedUiState.watchedKeys, fullyWatchedSeriesKeys, metaPreview) {

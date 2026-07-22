@@ -3,6 +3,7 @@ package com.nuvio.app.features.watchprogress
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryProviderPosterUrl
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.tracking.TrackingAttributedItem
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.Serializable
 
@@ -53,9 +54,15 @@ data class WatchProgressEntry(
     val isCompleted: Boolean = false,
     val progressPercent: Float? = null,
     val source: String = WatchProgressSourceLocal,
+    override val trackingProviderId: String? = null,
+    override val trackingProviderItemId: String? = null,
+    override val trackingSourceUrl: String? = null,
     /** Stable server/storage identity. [videoId] remains the playback identity. */
     val progressKey: String? = null,
-) {
+) : TrackingAttributedItem {
+    override val trackingContentId: String
+        get() = parentMetaId
+
     val normalizedProgressPercent: Float?
         get() = progressPercent?.coerceIn(0f, 100f)
 

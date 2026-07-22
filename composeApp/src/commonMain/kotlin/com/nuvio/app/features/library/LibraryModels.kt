@@ -3,6 +3,7 @@ package com.nuvio.app.features.library
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.tracking.TrackingAttributedItem
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -24,11 +25,14 @@ data class LibraryItem(
     val imdbId: String? = null,
     val tmdbId: Int? = null,
     val traktId: Int? = null,
-    val trackingProviderId: String? = null,
-    val trackingProviderItemId: String? = null,
-    val trackingSourceUrl: String? = null,
+    override val trackingProviderId: String? = null,
+    override val trackingProviderItemId: String? = null,
+    override val trackingSourceUrl: String? = null,
     val savedAtEpochMs: Long,
-)
+) : TrackingAttributedItem {
+    override val trackingContentId: String
+        get() = id
+}
 
 data class LibrarySection(
     val type: String,

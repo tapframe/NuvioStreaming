@@ -113,7 +113,10 @@ class SimklProjectionsTest {
         ).toSimklWatchedProjection()
 
         assertEquals(3, projection.items.size)
-        assertNotNull(projection.items.singleOrNull { it.type == "movie" })
+        val movieEvent = assertNotNull(projection.items.singleOrNull { it.type == "movie" })
+        assertEquals("simkl", movieEvent.trackingProviderId)
+        assertEquals("simkl:53536", movieEvent.trackingProviderItemId)
+        assertEquals("https://simkl.com/movies/53536", movieEvent.trackingSourceUrl)
         val episode = projection.items.single { it.season == 1 && it.episode == 1 }
         assertEquals("tt1520211", episode.id)
         assertFalse(projection.items.any { it.episode == 2 })
@@ -197,6 +200,9 @@ class SimklProjectionsTest {
         assertEquals(1_266_000L, entry.lastPositionMs)
         assertEquals("simkl-playback:12345", entry.progressKey)
         assertEquals(WatchProgressSourceSimklPlayback, entry.source)
+        assertEquals("simkl", entry.trackingProviderId)
+        assertEquals("simkl:39687", entry.trackingProviderItemId)
+        assertEquals("https://simkl.com/tv/39687", entry.trackingSourceUrl)
         assertTrue(entry.poster.orEmpty().contains("simkl.in/posters/12/poster_ca.webp"))
         assertFalse(entry.isCompleted)
         assertEquals(1_714_515_180_250L, entry.lastUpdatedEpochMs)

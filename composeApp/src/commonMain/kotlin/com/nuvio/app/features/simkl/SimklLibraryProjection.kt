@@ -4,6 +4,7 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.tracking.TrackingListStatus
+import com.nuvio.app.features.tracking.TrackingProviderId
 
 internal const val SIMKL_STATUS_SELECTION_GROUP = "simkl:status"
 
@@ -109,7 +110,7 @@ private fun SimklLibraryEntry.toLibraryItem(
         listKeys = setOf(listKey),
         imdbId = media.ids.idValue("imdb"),
         tmdbId = media.ids.idValue("tmdb")?.toIntOrNull(),
-        trackingProviderId = "simkl",
+        trackingProviderId = TrackingProviderId.SIMKL.storageId,
         trackingProviderItemId = simklId?.let { "simkl:$it" },
         trackingSourceUrl = buildSimklSourceUrl(mediaType, media),
         savedAtEpochMs = parseSimklUtcEpochMs(addedToWatchlistAt)
