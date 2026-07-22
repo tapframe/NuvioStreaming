@@ -143,6 +143,36 @@ class SimklProjectionsTest {
     }
 
     @Test
+    fun `anime watched projection prefers mapped tvdb coordinates`() {
+        val anime = entry(
+            type = SimklMediaType.ANIME,
+            status = SimklListStatus.WATCHING,
+            id = 439744,
+            imdb = "tt2560140",
+            seasons = listOf(
+                SimklSeason(
+                    number = 1,
+                    episodes = listOf(
+                        SimklEpisode(
+                            number = 4,
+                            watchedAt = "2023-11-14T23:13:20Z",
+                            tvdb = SimklEpisodeMapping(season = 2, episode = 4),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val watched = SimklSyncSnapshot(entries = listOf(anime))
+            .toSimklWatchedProjection()
+            .items
+            .single()
+
+        assertEquals(2, watched.season)
+        assertEquals(4, watched.episode)
+    }
+
+    @Test
     fun `playback projection preserves Simkl session identity and percentage`() {
         val session = SimklPlaybackSession(
             id = 12345,

@@ -231,11 +231,17 @@ internal fun buildSimklScrobbleBody(
     json: Json = SimklMutationJson,
 ): String {
     val media = event.media.toScrobbleMediaDto()
+    val usesTvStyleAnimeCoordinates = event.media.kind == TrackingMediaKind.ANIME &&
+        event.media.episode?.season != null
     val request = SimklScrobbleRequestDto(
         progress = event.progressPercent.clampAndRoundProgress(),
         movie = media.takeIf { event.media.kind == TrackingMediaKind.MOVIE },
-        show = media.takeIf { event.media.kind == TrackingMediaKind.SHOW },
-        anime = media.takeIf { event.media.kind == TrackingMediaKind.ANIME },
+        show = media.takeIf {
+            event.media.kind == TrackingMediaKind.SHOW || usesTvStyleAnimeCoordinates
+        },
+        anime = media.takeIf {
+            event.media.kind == TrackingMediaKind.ANIME && !usesTvStyleAnimeCoordinates
+        },
         episode = event.media.episode?.toEpisodeDto(
             includeSeason = true,
             includeWatchedAt = false,
@@ -316,6 +322,7 @@ private fun buildShowHistoryItem(
         includeWatchedAt = includeWatchedAt,
         episodes = flatEpisodes,
         seasons = seasons,
+        useTvdbAnimeSeasons = first.media.kind == TrackingMediaKind.ANIME && seasons.isNotEmpty(),
     )
 }
 
@@ -325,6 +332,7 @@ private fun TrackingMediaReference.toHistoryItemDto(
     status: String? = null,
     episodes: List<SimklEpisodeMutationDto> = emptyList(),
     seasons: List<SimklSeasonMutationDto> = emptyList(),
+    useTvdbAnimeSeasons: Boolean = false,
 ): SimklHistoryItemDto = SimklHistoryItemDto(
     title = title.nonBlankOrNull(),
     year = year,
@@ -333,6 +341,7 @@ private fun TrackingMediaReference.toHistoryItemDto(
     status = status,
     episodes = episodes,
     seasons = seasons,
+    useTvdbAnimeSeasons = useTvdbAnimeSeasons,
 )
 
 private fun TrackingMediaReference.toScrobbleMediaDto(): SimklScrobbleMediaDto =
@@ -508,6 +517,7 @@ private data class SimklHistoryItemDto(
     val status: String? = null,
     val episodes: List<SimklEpisodeMutationDto> = emptyList(),
     val seasons: List<SimklSeasonMutationDto> = emptyList(),
+    @SerialName("use_tvdb_anime_seasons") val useTvdbAnimeSeasons: Boolean = false,
 )
 
 @Serializable

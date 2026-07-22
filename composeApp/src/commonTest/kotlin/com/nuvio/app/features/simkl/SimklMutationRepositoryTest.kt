@@ -68,6 +68,40 @@ class SimklMutationRepositoryTest {
     }
 
     @Test
+    fun `anime history uses tvdb mapping flag only for seasonal coordinates`() {
+        val seasonalBody = buildSimklHistoryMutationBody(
+            listOf(
+                TrackingHistoryItem(
+                    anime(TrackingEpisode(season = 2, number = 4)),
+                    watchedAtEpochMs = 1_700_000_000_000L,
+                ),
+            ),
+        ).asObject()
+        val seasonalAnime = seasonalBody.getValue("shows").jsonArray.single().jsonObject
+        assertTrue(seasonalAnime.getValue("use_tvdb_anime_seasons").jsonPrimitive.content.toBoolean())
+
+        val flatBody = buildSimklHistoryMutationBody(
+            listOf(
+                TrackingHistoryItem(
+                    anime(TrackingEpisode(number = 4)),
+                    watchedAtEpochMs = 1_700_000_000_000L,
+                ),
+            ),
+        ).asObject()
+        assertNull(flatBody.getValue("shows").jsonArray.single().jsonObject["use_tvdb_anime_seasons"])
+
+        val showBody = buildSimklHistoryMutationBody(
+            listOf(
+                TrackingHistoryItem(
+                    show(TrackingEpisode(season = 2, number = 4)),
+                    watchedAtEpochMs = 1_700_000_000_000L,
+                ),
+            ),
+        ).asObject()
+        assertNull(showBody.getValue("shows").jsonArray.single().jsonObject["use_tvdb_anime_seasons"])
+    }
+
+    @Test
     fun `anime removal uses shows array and contains no response-only or watch fields`() {
         val body = buildSimklHistoryRemovalBody(
             listOf(anime(TrackingEpisode(number = 4))),
@@ -78,6 +112,12 @@ class SimklMutationRepositoryTest {
         assertNull(item["watched_at"])
         assertNull(item["status"])
         assertEquals(4, item.getValue("episodes").jsonArray.single().jsonObject.getValue("number").jsonPrimitive.content.toInt())
+
+        val seasonalBody = buildSimklHistoryRemovalBody(
+            listOf(anime(TrackingEpisode(season = 2, number = 4))),
+        ).asObject()
+        val seasonalItem = seasonalBody.getValue("shows").jsonArray.single().jsonObject
+        assertTrue(seasonalItem.getValue("use_tvdb_anime_seasons").jsonPrimitive.content.toBoolean())
     }
 
     @Test
@@ -89,16 +129,27 @@ class SimklMutationRepositoryTest {
         assertTrue("movie" in movieBody)
         assertFalse("show" in movieBody)
 
-        val animeBody = buildSimklScrobbleBody(
+        val tvStyleAnimeBody = buildSimklScrobbleBody(
             TrackingScrobbleEvent(
                 anime(TrackingEpisode(season = 2, number = 4)),
                 progressPercent = 42.236,
             ),
         ).asObject()
-        assertEquals(42.24, animeBody.getValue("progress").jsonPrimitive.content.toDouble())
-        assertTrue("anime" in animeBody)
-        assertEquals(2, animeBody.getValue("episode").jsonObject.getValue("season").jsonPrimitive.content.toInt())
-        assertEquals(4, animeBody.getValue("episode").jsonObject.getValue("number").jsonPrimitive.content.toInt())
+        assertEquals(42.24, tvStyleAnimeBody.getValue("progress").jsonPrimitive.content.toDouble())
+        assertTrue("show" in tvStyleAnimeBody)
+        assertFalse("anime" in tvStyleAnimeBody)
+        assertEquals(2, tvStyleAnimeBody.getValue("episode").jsonObject.getValue("season").jsonPrimitive.content.toInt())
+        assertEquals(4, tvStyleAnimeBody.getValue("episode").jsonObject.getValue("number").jsonPrimitive.content.toInt())
+
+        val nativeAnimeBody = buildSimklScrobbleBody(
+            TrackingScrobbleEvent(
+                anime(TrackingEpisode(number = 4)),
+                progressPercent = 42.236,
+            ),
+        ).asObject()
+        assertTrue("anime" in nativeAnimeBody)
+        assertFalse("show" in nativeAnimeBody)
+        assertNull(nativeAnimeBody.getValue("episode").jsonObject["season"])
     }
 
     @Test

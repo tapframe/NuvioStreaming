@@ -48,9 +48,9 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
 
         var hasEpisodeHistory = false
         entry.seasons.forEach seasonLoop@{ season ->
-            val seasonNumber = season.number ?: return@seasonLoop
             season.episodes.forEach episodeLoop@{ episode ->
-                val episodeNumber = episode.number ?: return@episodeLoop
+                val seasonNumber = episode.tvdb?.season ?: season.number ?: return@episodeLoop
+                val episodeNumber = episode.tvdb?.episode ?: episode.number ?: return@episodeLoop
                 val watchedAt = parseSimklUtcEpochMs(episode.watchedAt) ?: return@episodeLoop
                 hasEpisodeHistory = true
                 watchedItems += WatchedItem(
