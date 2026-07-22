@@ -137,6 +137,33 @@ class WatchedRepositoryTest {
     }
 
     @Test
+    fun successfulTrackerPush_doesNotAcknowledgeFailedNuvioPush() {
+        val outcome = WatchedPushOutcome(
+            nuvioSyncSucceeded = false,
+            succeededTrackerProviderIds = setOf(TrackingProviderId.TRAKT),
+        )
+
+        assertFalse(
+            shouldAcknowledgeNuvioWatchedPush(
+                source = WatchProgressSource.NUVIO_SYNC,
+                outcome = outcome,
+            ),
+        )
+    }
+
+    @Test
+    fun successfulNuvioPush_acknowledgesNuvioDirtyState() {
+        val outcome = WatchedPushOutcome(nuvioSyncSucceeded = true)
+
+        assertTrue(
+            shouldAcknowledgeNuvioWatchedPush(
+                source = WatchProgressSource.NUVIO_SYNC,
+                outcome = outcome,
+            ),
+        )
+    }
+
+    @Test
     fun playbackCompletionWatchedMarks_doNotMirrorToTrackerHistory() {
         assertFalse(
             shouldMirrorWatchedMarkToTrackers(

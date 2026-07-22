@@ -47,6 +47,11 @@ internal enum class WatchedTrackerHistorySync {
     Skip,
 }
 
+internal data class WatchedPushOutcome(
+    val nuvioSyncSucceeded: Boolean = false,
+    val succeededTrackerProviderIds: Set<TrackingProviderId> = emptySet(),
+)
+
 internal fun shouldMirrorWatchedMarkToTrackers(
     sync: WatchedTrackerHistorySync,
     hasConnectedTracker: Boolean,
@@ -73,6 +78,11 @@ internal fun watchedItemsForSource(
 
 internal fun shouldPersistWatchedSource(source: WatchProgressSource): Boolean =
     source.providerId == null
+
+internal fun shouldAcknowledgeNuvioWatchedPush(
+    source: WatchProgressSource,
+    outcome: WatchedPushOutcome,
+): Boolean = shouldPersistWatchedSource(source) && outcome.nuvioSyncSucceeded
 
 internal fun replaceWatchedItemsForSource(
     source: WatchProgressSource,
@@ -881,13 +891,13 @@ object WatchedRepository {
         accountScopeSnapshot().launch {
             runCatching {
                 if (items.isEmpty()) return@runCatching
-                val pushed = pushToTargetsForSource(
+                val outcome = pushToTargetsForSource(
                     profileId = profileId,
                     items = items,
                     trackerHistorySync = trackerHistorySync,
                     source = source,
                 )
-                if (pushed && shouldPersistWatchedSource(source)) {
+                if (shouldAcknowledgeNuvioWatchedPush(source = source, outcome = outcome)) {
                     recordSuccessfulPush(
                         profileId = profileId,
                         operationGeneration = operationGeneration,
@@ -1009,12 +1019,13 @@ object WatchedRepository {
         items: Collection<WatchedItem>,
         trackerHistorySync: WatchedTrackerHistorySync,
         source: WatchProgressSource,
-    ): Boolean {
-        var anySucceeded = false
+    ): WatchedPushOutcome {
+        var nuvioSyncSucceeded = false
+        val succeededTrackerProviderIds = linkedSetOf<TrackingProviderId>()
         if (source.providerId == null) {
             try {
                 syncAdapter.push(profileId = profileId, items = items)
-                anySucceeded = true
+                nuvioSyncSucceeded = true
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -1026,7 +1037,7 @@ object WatchedRepository {
             TrackingProviderRegistry.connectedWatchedProviders().forEach { provider ->
                 try {
                     provider.push(profileId = profileId, items = items)
-                    anySucceeded = true
+                    succeededTrackerProviderIds += provider.providerId
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
@@ -1034,7 +1045,10 @@ object WatchedRepository {
                 }
             }
         }
-        return anySucceeded
+        return WatchedPushOutcome(
+            nuvioSyncSucceeded = nuvioSyncSucceeded,
+            succeededTrackerProviderIds = succeededTrackerProviderIds,
+        )
     }
 
     private suspend fun deleteFromTargetsForSource(
