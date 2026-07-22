@@ -84,6 +84,7 @@ import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.Flow
@@ -170,7 +171,10 @@ fun LibraryScreen(
     val retryLibraryLoad: () -> Unit = {
         NetworkStatusRepository.requestRefresh(force = true)
         coroutineScope.launch {
-            LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
+            LibraryRepository.pullFromServer(
+                profileId = ProfileRepository.activeProfileId,
+                refreshIntent = TrackingRefreshIntent.USER_INITIATED,
+            )
         }
     }
 
@@ -256,6 +260,18 @@ fun LibraryScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             actions = {
                                 if (sourceMode == LibraryViewMode.Saved) {
+                                    if (isRemoteSource) {
+                                        IconButton(
+                                            onClick = retryLibraryLoad,
+                                            enabled = !uiState.isLoading,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Refresh,
+                                                contentDescription = stringResource(Res.string.library_refresh),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
                                     val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
                                         LibraryLayoutMode.VERTICAL
                                     } else {

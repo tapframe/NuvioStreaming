@@ -1138,6 +1138,7 @@
     <string name="settings_simkl_invalid_callback">Simkl did not accept the sign-in callback. Please try again.</string>
     <string name="settings_simkl_authorization_expired">The Simkl sign-in request expired. Start again.</string>
     <string name="settings_simkl_sign_in_failed">Could not complete Simkl sign in. Please try again.</string>
+    <string name="settings_simkl_sync_now">Sync now</string>
     <string name="settings_simkl_authorization_revoked">Simkl authorization expired or was revoked. Connect again.</string>
     <string name="tracking_source_simkl">Simkl</string>
     <string name="tracking_library_source_simkl_selected">Simkl watchlist selected</string>
@@ -1651,6 +1652,7 @@
     <string name="library_filter_type">Select type</string>
     <string name="library_layout_show_horizontal">Show horizontal shelves</string>
     <string name="library_layout_show_vertical">Show vertical grid</string>
+    <string name="library_refresh">Refresh library</string>
     <string name="library_load_failed">Couldn't load library</string>
     <string name="library_other">Other</string>
     <string name="library_sort_added_asc">Oldest added</string>

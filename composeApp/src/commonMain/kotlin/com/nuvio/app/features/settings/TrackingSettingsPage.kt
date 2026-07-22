@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -38,18 +39,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.simkl.SimklAuthError
 import com.nuvio.app.features.simkl.SimklAuthRepository
 import com.nuvio.app.features.simkl.SimklAuthUiState
 import com.nuvio.app.features.simkl.SimklConnectionMode
+import com.nuvio.app.features.simkl.SimklSyncRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.TraktContinueWatchingDaysOptions
 import com.nuvio.app.features.trakt.MoreLikeThisSourcePreference
 import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.TrackingSettingsUiState
 import com.nuvio.app.features.tracking.WatchProgressSource
@@ -94,6 +98,7 @@ import nuvio.composeapp.generated.resources.settings_simkl_missing_credentials
 import nuvio.composeapp.generated.resources.settings_simkl_open_login
 import nuvio.composeapp.generated.resources.settings_simkl_sign_in_description
 import nuvio.composeapp.generated.resources.settings_simkl_sign_in_failed
+import nuvio.composeapp.generated.resources.settings_simkl_sync_now
 import nuvio.composeapp.generated.resources.settings_simkl_visit
 import nuvio.composeapp.generated.resources.tracking_library_source_simkl_selected
 import nuvio.composeapp.generated.resources.tracking_source_simkl
@@ -781,6 +786,12 @@ private fun SimklConnectionCard(
     isTablet: Boolean,
     uiState: SimklAuthUiState,
 ) {
+    val syncState by remember {
+        SimklSyncRepository.ensureLoaded()
+        SimklSyncRepository.state
+    }.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
     ProviderConnectionCard(
         isTablet = isTablet,
         mode = when (uiState.mode) {
@@ -801,8 +812,10 @@ private fun SimklConnectionCard(
         connectLabel = stringResource(Res.string.settings_simkl_connect),
         openLoginLabel = stringResource(Res.string.settings_simkl_open_login),
         disconnectLabel = stringResource(Res.string.settings_simkl_disconnect),
+        syncLabel = stringResource(Res.string.settings_simkl_sync_now),
+        isSyncing = syncState.isLoading,
         missingCredentialsMessage = stringResource(Res.string.settings_simkl_missing_credentials),
-        errorMessage = simklErrorMessage(uiState.error),
+        errorMessage = simklErrorMessage(uiState.error) ?: syncState.errorMessage,
         websiteLabel = stringResource(Res.string.settings_simkl_visit),
         websiteUrl = SIMKL_WEBSITE_URL,
         onConnectRequested = SimklAuthRepository::onConnectRequested,
@@ -811,6 +824,11 @@ private fun SimklConnectionCard(
                 ?: SimklAuthRepository.onConnectRequested()
         },
         onCancelAuthorization = SimklAuthRepository::onCancelAuthorization,
+        onSyncRequested = {
+            scope.launch {
+                SimklSyncRepository.refresh(TrackingRefreshIntent.USER_INITIATED)
+            }
+        },
         onDisconnect = SimklAuthRepository::onDisconnectRequested,
     )
 }
@@ -829,6 +847,8 @@ private fun ProviderConnectionCard(
     connectLabel: String,
     openLoginLabel: String,
     disconnectLabel: String,
+    syncLabel: String? = null,
+    isSyncing: Boolean = false,
     missingCredentialsMessage: String,
     statusMessage: String? = null,
     errorMessage: String? = null,
@@ -837,6 +857,7 @@ private fun ProviderConnectionCard(
     onConnectRequested: () -> String?,
     onResumeAuthorization: () -> String?,
     onCancelAuthorization: () -> Unit,
+    onSyncRequested: (() -> Unit)? = null,
     onDisconnect: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -871,9 +892,24 @@ private fun ProviderConnectionCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (syncLabel != null && onSyncRequested != null) {
+                    Button(
+                        onClick = onSyncRequested,
+                        enabled = !isLoading && !isSyncing,
+                    ) {
+                        if (isSyncing) {
+                            NuvioLoadingIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        } else {
+                            Text(syncLabel)
+                        }
+                    }
+                }
                 Button(
                     onClick = onDisconnect,
-                    enabled = !isLoading,
+                    enabled = !isLoading && !isSyncing,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurface,
