@@ -10,6 +10,11 @@ private let nuvioBackgroundColor = UIColor(
     alpha: 1.0
 )
 
+let nuvioPlayerImmersiveSystemUIVisibilityDidChange = Notification.Name(
+    "NuvioPlayerImmersiveSystemUIVisibilityDidChange"
+)
+let nuvioPlayerImmersiveSystemUIVisibleKey = "isVisible"
+
 private enum NuvioComposeHost {
     static let registerPlayerBridge: Void = {
         NuvioPlayerRegistration.register()
@@ -40,6 +45,8 @@ final class RootComposeViewController: UIViewController {
     private let disablesInteractiveContentPopGesture: Bool
     private let hidesContainingTabBar: Bool
     private let onTabBarControllerAvailable: ((UITabBarController) -> Void)?
+    private weak var visibleImmersivePlayer: UIViewController?
+    private var immersiveSystemUIObserver: NSObjectProtocol?
 
     init(
         contentController: UIViewController,
@@ -75,6 +82,14 @@ final class RootComposeViewController: UIViewController {
             contentController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         contentController.didMove(toParent: self)
+
+        immersiveSystemUIObserver = NotificationCenter.default.addObserver(
+            forName: nuvioPlayerImmersiveSystemUIVisibilityDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.updateVisibleImmersivePlayer(from: notification)
+        }
     }
 
     deinit {
@@ -96,15 +111,21 @@ final class RootComposeViewController: UIViewController {
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
-        immersiveController(in: contentController)?.prefersHomeIndicatorAutoHidden ?? false
+        visibleImmersivePlayer?.prefersHomeIndicatorAutoHidden
+            ?? immersiveController(in: contentController)?.prefersHomeIndicatorAutoHidden
+            ?? false
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
-        immersiveController(in: contentController)?.preferredScreenEdgesDeferringSystemGestures ?? []
+        visibleImmersivePlayer?.preferredScreenEdgesDeferringSystemGestures
+            ?? immersiveController(in: contentController)?.preferredScreenEdgesDeferringSystemGestures
+            ?? []
     }
 
     override var prefersStatusBarHidden: Bool {
-        immersiveController(in: contentController)?.prefersStatusBarHidden ?? false
+        visibleImmersivePlayer?.prefersStatusBarHidden
+            ?? immersiveController(in: contentController)?.prefersStatusBarHidden
+            ?? false
     }
 
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
@@ -160,6 +181,27 @@ final class RootComposeViewController: UIViewController {
             current.setNeedsStatusBarAppearanceUpdate()
             controller = current.parent
         }
+    }
+
+    private func updateVisibleImmersivePlayer(from notification: Notification) {
+        guard let player = notification.object as? UIViewController else { return }
+        let isVisible = notification.userInfo?[nuvioPlayerImmersiveSystemUIVisibleKey] as? Bool ?? false
+
+        if isVisible {
+            guard
+                let playerView = player.viewIfLoaded,
+                playerView === view || playerView.isDescendant(of: view)
+            else {
+                return
+            }
+            visibleImmersivePlayer = player
+        } else if visibleImmersivePlayer === player {
+            visibleImmersivePlayer = nil
+        } else {
+            return
+        }
+
+        refreshImmersiveSystemUI()
     }
 
     private func configureBackGestures(isVisible: Bool) {
