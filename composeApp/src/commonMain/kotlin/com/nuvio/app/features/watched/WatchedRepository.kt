@@ -98,6 +98,7 @@ object WatchedRepository {
     private const val watchedItemsDeltaPageSize = 900
     private const val watchedDeltaOperationUpsert = "upsert"
     private const val watchedDeltaOperationDelete = "delete"
+    private const val watchedDiagnosticSampleLimit = 10
 
     private val accountScopeLock = SynchronizedObject()
     private var accountScopeJob: Job = SupervisorJob()
@@ -231,7 +232,14 @@ object WatchedRepository {
     }
 
     private fun activateEffectiveSource(source: WatchProgressSource): WatchProgressSource {
-        if (activeSource == source) return source
+        if (activeSource == source) {
+            log.i {
+                "Watched source activation unchanged source=$source generation=$sourceGeneration " +
+                    "items=${itemCountForSource(source)} loaded=${hasLoadedSource(source)}"
+            }
+            return source
+        }
+        val previousSource = activeSource
         source.providerId?.let { providerId ->
             providerItemsByKey.getOrPut(providerId, ::mutableMapOf).clear()
             providerFullyWatchedSeriesKeys[providerId] = emptySet()
@@ -242,6 +250,10 @@ object WatchedRepository {
         }
         activeSource = source
         sourceGeneration += 1L
+        log.i {
+            "Watched source activated previous=$previousSource current=$source generation=$sourceGeneration " +
+                "provider=${source.providerId?.storageId}"
+        }
         publish()
         return source
     }
@@ -312,6 +324,11 @@ object WatchedRepository {
 
         val effectiveSource = activateEffectiveSource(source)
         val operation = newRefreshOperation(profileId) ?: return false
+        log.i {
+            "Watched refresh request profile=$profileId requestedSource=$source effectiveSource=$effectiveSource " +
+                "forceSnapshot=$forceSnapshot profileGeneration=$profileGeneration " +
+                "sourceGeneration=$sourceGeneration"
+        }
         if (effectiveSource.providerId == null) {
             val authState = AuthRepository.state.value
             if (authState !is AuthState.Authenticated || authState.isAnonymous) {
@@ -325,7 +342,10 @@ object WatchedRepository {
         return try {
             effectiveSource.providerId?.let { providerId ->
                 val provider = TrackingProviderRegistry.watchedProvider(providerId)
-                    ?: return false
+                    ?: run {
+                        log.w { "Watched provider missing provider=${providerId.storageId} source=$effectiveSource" }
+                        return false
+                    }
                 pullSnapshotFromAdapter(
                     adapter = provider,
                     operation = operation,
@@ -390,7 +410,26 @@ object WatchedRepository {
             pageSize = watchedItemsPageSize,
         )
         val fullyWatchedSeriesKeys = adapter.pullFullyWatchedSeriesKeys(profileId)
-        if (!isActiveOperation(operation)) return false
+        val source = operation.sourceOperation.source
+        log.i {
+            "Watched adapter result source=$source provider=${source.providerId?.storageId ?: "nuvio"} " +
+                "profile=$profileId serverItems=${serverItems.size} " +
+                "movies=${serverItems.count { it.type == "movie" }} " +
+                "episodes=${serverItems.count { it.season != null && it.episode != null }} " +
+                "seriesSummaries=${serverItems.count { it.type != "movie" && it.season == null }} " +
+                "fullyWatchedSeries=${fullyWatchedSeriesKeys?.size} " +
+                "itemKeys=[${diagnosticItemKeySample(serverItems)}] " +
+                "fullyWatchedKeys=[${fullyWatchedSeriesKeys.orEmpty().take(watchedDiagnosticSampleLimit).joinToString(",")}]"
+        }
+        if (!isActiveOperation(operation)) {
+            log.w {
+                "Watched adapter result discarded source=$source profile=$profileId " +
+                    "operationProfileGeneration=${operation.profileGeneration} currentProfileGeneration=$profileGeneration " +
+                    "operationSourceGeneration=${operation.sourceOperation.generation} currentSourceGeneration=$sourceGeneration " +
+                    "activeSource=$activeSource"
+            }
+            return false
+        }
         val localAtApply = itemsForSource(operation.sourceOperation.source).values.toList()
 
         val mergedSnapshot = mergeWatchedSnapshot(
@@ -627,6 +666,10 @@ object WatchedRepository {
     private fun hasLoadedSource(source: WatchProgressSource): Boolean =
         source.providerId?.let(loadedProviders::contains) ?: nuvioHasLoaded
 
+    private fun itemCountForSource(source: WatchProgressSource): Int = source.providerId
+        ?.let { providerId -> providerItemsByKey[providerId]?.size ?: 0 }
+        ?: nuvioItemsByKey.size
+
     fun toggleWatched(item: WatchedItem) {
         ensureLoaded()
         val source = activeSource
@@ -759,6 +802,12 @@ object WatchedRepository {
         )
         val seriesWatchedItem = meta.toSeriesWatchedItem()
         val hasSeriesWatchedMarker = isWatched(id = meta.id, type = meta.type)
+        log.i {
+            "Watched series reconciliation source=$activeSource content=${meta.type}:${meta.id} " +
+                "episodes=${meta.videos.size} shouldMarkSeries=$shouldMarkSeriesWatched " +
+                "hasSeriesMarker=$hasSeriesWatchedMarker " +
+                "matchingItems=${itemsForSource(activeSource).values.count { it.id == meta.id }}"
+        }
         if (shouldMarkSeriesWatched) {
             if (!hasSeriesWatchedMarker) {
                 markWatched(seriesWatchedItem)
@@ -878,18 +927,36 @@ object WatchedRepository {
         )
             .map(WatchedItem::normalizedMarkedAt)
             .sortedByDescending { it.markedAtEpochMs }
-        _fullyWatchedSeriesKeys.value = fullyWatchedSeriesKeysForSource(activeSource)
+        val fullyWatchedSeriesKeys = fullyWatchedSeriesKeysForSource(activeSource)
+        val watchedKeys = items.mapTo(linkedSetOf()) {
+            watchedItemKey(it.type, it.id, it.season, it.episode)
+        }
+        val isLoaded = hasLoadedSource(activeSource)
+        val hasLoadedRemoteItems = activeSource.providerId
+            ?.let(providersLoadedFromRemote::contains)
+            ?: nuvioHasLoadedRemote
+        _fullyWatchedSeriesKeys.value = fullyWatchedSeriesKeys
         _uiState.value = WatchedUiState(
             items = items,
-            watchedKeys = items.mapTo(linkedSetOf()) {
-                watchedItemKey(it.type, it.id, it.season, it.episode)
-            },
-            isLoaded = hasLoadedSource(activeSource),
-            hasLoadedRemoteItems = activeSource.providerId
-                ?.let(providersLoadedFromRemote::contains)
-                ?: nuvioHasLoadedRemote,
+            watchedKeys = watchedKeys,
+            isLoaded = isLoaded,
+            hasLoadedRemoteItems = hasLoadedRemoteItems,
         )
+        log.i {
+            "Watched publish source=$activeSource provider=${activeSource.providerId?.storageId ?: "nuvio"} " +
+                "items=${items.size} keys=${watchedKeys.size} fullyWatchedSeries=${fullyWatchedSeriesKeys.size} " +
+                "isLoaded=$isLoaded hasLoadedRemote=$hasLoadedRemoteItems " +
+                "itemKeys=[${diagnosticItemKeySample(items)}] " +
+                "fullyWatchedKeys=[${fullyWatchedSeriesKeys.take(watchedDiagnosticSampleLimit).joinToString(",")}]"
+        }
     }
+
+    private fun diagnosticItemKeySample(items: Collection<WatchedItem>): String = items
+        .asSequence()
+        .take(watchedDiagnosticSampleLimit)
+        .joinToString(separator = ",") { item ->
+            watchedItemKey(item.type, item.id, item.season, item.episode)
+        }
 
     private fun persistNuvio() {
         WatchedStorage.savePayload(

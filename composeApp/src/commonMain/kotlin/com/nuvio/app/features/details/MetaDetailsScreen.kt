@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import co.touchlab.kermit.Logger
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.TrailerPlaybackMode
@@ -125,6 +126,7 @@ import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.previousReleasedEpisodesBefore
 import com.nuvio.app.features.watched.releasedPlayableEpisodes
 import com.nuvio.app.features.watched.releasedEpisodesForSeason
+import com.nuvio.app.features.watched.watchedItemKey
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -139,6 +141,8 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+
+private val watchedMarkerDiagnosticLog = Logger.withTag("WatchedMarkerDiag")
 
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -220,6 +224,60 @@ fun MetaDetailsScreen(
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
     var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
+
+    LaunchedEffect(
+        displayedMeta?.id,
+        displayedMeta?.type,
+        displayedMeta?.name,
+        displayedMeta?.videos,
+        watchedUiState.items,
+        watchedUiState.isLoaded,
+        watchedUiState.hasLoadedRemoteItems,
+        fullyWatchedSeriesKeys,
+        watchProgressUiState.entries,
+        trackingSettingsUiState.watchProgressSource,
+    ) {
+        val meta = displayedMeta ?: return@LaunchedEffect
+        val posterKey = watchedItemKey(meta.type, meta.id)
+        val expectedEpisodeKeys = meta.videos.map { episode ->
+            watchedItemKey(meta.type, meta.id, episode.season, episode.episode)
+        }
+        val matchedEpisodeKeys = expectedEpisodeKeys.filter(watchedUiState.watchedKeys::contains)
+        val completedProgressMatches = meta.videos.count { episode ->
+            val videoId = buildPlaybackVideoId(
+                parentMetaId = meta.id,
+                seasonNumber = episode.season,
+                episodeNumber = episode.episode,
+                fallbackVideoId = episode.id,
+            )
+            progressByVideoId[videoId]?.isEffectivelyCompleted == true
+        }
+        val directItemKeys = watchedUiState.items
+            .asSequence()
+            .filter { item -> item.id == meta.id }
+            .take(10)
+            .joinToString(separator = ",") { item ->
+                watchedItemKey(item.type, item.id, item.season, item.episode)
+            }
+        val titleCandidateKeys = watchedUiState.items
+            .asSequence()
+            .filter { item -> item.name.equals(meta.name, ignoreCase = true) }
+            .take(10)
+            .joinToString(separator = ",") { item ->
+                watchedItemKey(item.type, item.id, item.season, item.episode)
+            }
+        watchedMarkerDiagnosticLog.i {
+            "marker state requestedSource=${trackingSettingsUiState.watchProgressSource} " +
+                "content=${meta.type}:${meta.id} repositoryLoaded=${watchedUiState.isLoaded} " +
+                "remoteLoaded=${watchedUiState.hasLoadedRemoteItems} repositoryItems=${watchedUiState.items.size} " +
+                "posterKey=$posterKey posterInWatched=${posterKey in watchedUiState.watchedKeys} " +
+                "posterInFullyWatched=${posterKey in fullyWatchedSeriesKeys} videos=${meta.videos.size} " +
+                "episodeMarkerMatches=${matchedEpisodeKeys.size} completedProgressMatches=$completedProgressMatches " +
+                "directItemKeys=[$directItemKeys] titleCandidateKeys=[$titleCandidateKeys] " +
+                "expectedEpisodeKeys=[${expectedEpisodeKeys.take(10).joinToString(",")}] " +
+                "repositoryKeySample=[${watchedUiState.watchedKeys.take(10).joinToString(",")}]"
+        }
+    }
 
     val shouldShowComments = commentsEnabled &&
         traktAuthUiState.mode == TraktConnectionMode.CONNECTED &&

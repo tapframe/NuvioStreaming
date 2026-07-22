@@ -27,13 +27,29 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
     override suspend fun pull(profileId: Int, pageSize: Int): List<WatchedItem> {
         if (profileId != ProfileRepository.activeProfileId) return emptyList()
         SimklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
-        return SimklSyncRepository.state.value.snapshot.toSimklWatchedProjection().items
+        val snapshot = SimklSyncRepository.state.value.snapshot
+        val projection = snapshot.toSimklWatchedProjection()
+        SimklWatchDiagnostics.logProjection(
+            stage = "items-pull",
+            profileId = profileId,
+            snapshot = snapshot,
+            projection = projection,
+        )
+        return projection.items
     }
 
     override suspend fun pullFullyWatchedSeriesKeys(profileId: Int): Set<String>? {
         if (profileId != ProfileRepository.activeProfileId) return null
         SimklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
-        return SimklSyncRepository.state.value.snapshot.toSimklWatchedProjection().fullyWatchedSeriesKeys
+        val snapshot = SimklSyncRepository.state.value.snapshot
+        val projection = snapshot.toSimklWatchedProjection()
+        SimklWatchDiagnostics.logProjection(
+            stage = "fully-watched-pull",
+            profileId = profileId,
+            snapshot = snapshot,
+            projection = projection,
+        )
+        return projection.fullyWatchedSeriesKeys
     }
 
     override suspend fun push(profileId: Int, items: Collection<WatchedItem>) {

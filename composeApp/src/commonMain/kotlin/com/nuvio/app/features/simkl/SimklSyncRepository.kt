@@ -57,6 +57,7 @@ object SimklSyncRepository : TrackingProfileStore {
             }
             ?: SimklSyncSnapshot()
         _state.value = SimklSyncUiState(snapshot = snapshot, hasLoaded = true)
+        SimklWatchDiagnostics.logSnapshot(stage = "cache-load", snapshot = snapshot)
     }
 
     fun refreshAsync(intent: TrackingRefreshIntent) {
@@ -66,22 +67,46 @@ object SimklSyncRepository : TrackingProfileStore {
     suspend fun refresh(intent: TrackingRefreshIntent) {
         ensureLoaded()
         val requestedGeneration = profileGeneration
+        val before = _state.value
+        SimklWatchDiagnostics.logRefreshRequest(
+            intent = intent,
+            profileGeneration = requestedGeneration,
+            authenticated = SimklAuthRepository.isAuthenticated.value,
+            snapshot = before.snapshot,
+            errorMessage = before.errorMessage,
+        )
         refreshGate.runIfNeeded(
             profileGeneration = requestedGeneration,
             shouldRun = {
                 val current = _state.value
-                requestedGeneration == profileGeneration &&
-                    SimklAuthRepository.isAuthenticated.value &&
+                val authenticated = SimklAuthRepository.isAuthenticated.value
+                val nowEpochMs = SimklPlatformClock.nowEpochMs()
+                val eligible = requestedGeneration == profileGeneration &&
+                    authenticated &&
                     shouldRunSimklRefresh(
                         intent = intent,
                         lastCheckedAtEpochMs = current.snapshot.lastCheckedAtEpochMs,
-                        nowEpochMs = SimklPlatformClock.nowEpochMs(),
+                        nowEpochMs = nowEpochMs,
                         hasError = current.errorMessage != null,
                     )
+                SimklWatchDiagnostics.logRefreshDecision(
+                    intent = intent,
+                    nowEpochMs = nowEpochMs,
+                    lastCheckedAtEpochMs = current.snapshot.lastCheckedAtEpochMs,
+                    authenticated = authenticated,
+                    hasError = current.errorMessage != null,
+                    eligible = eligible,
+                )
+                eligible
             },
         ) {
             refreshSnapshot(requestedGeneration)
         }
+        SimklWatchDiagnostics.logRefreshCompletion(
+            intent = intent,
+            before = before,
+            after = _state.value,
+        )
     }
 
     private suspend fun refreshSnapshot(generation: Long) {
@@ -111,6 +136,7 @@ object SimklSyncRepository : TrackingProfileStore {
             snapshot = result,
             hasLoaded = true,
         )
+        SimklWatchDiagnostics.logSnapshot(stage = "network-commit", snapshot = result)
     }
 
     internal fun commitPlaybackRemoval(sessionIds: Set<Long>) {
@@ -122,6 +148,7 @@ object SimklSyncRepository : TrackingProfileStore {
         val updatedSnapshot = current.snapshot.copy(playback = updatedPlayback)
         SimklSyncStorage.savePayload(json.encodeToString(updatedSnapshot))
         _state.value = current.copy(snapshot = updatedSnapshot)
+        SimklWatchDiagnostics.logSnapshot(stage = "playback-removal", snapshot = updatedSnapshot)
     }
 
     override fun onProfileChanged() {
