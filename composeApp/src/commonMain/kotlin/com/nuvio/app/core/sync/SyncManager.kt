@@ -62,6 +62,28 @@ internal data class ProfileSyncResult(
         get() = failedSteps.isEmpty()
 }
 
+internal data class ProfilePullFreshness(
+    val profileId: Int? = null,
+    val completedAtEpochMs: Long = 0L,
+) {
+    fun isRecent(profileId: Int, nowEpochMs: Long, minIntervalMs: Long): Boolean =
+        this.profileId == profileId && nowEpochMs - completedAtEpochMs < minIntervalMs
+
+    fun recordIfSuccessful(
+        profileId: Int,
+        completedAtEpochMs: Long,
+        result: ProfileSyncResult,
+    ): ProfilePullFreshness =
+        if (result.succeeded) {
+            ProfilePullFreshness(
+                profileId = profileId,
+                completedAtEpochMs = completedAtEpochMs,
+            )
+        } else {
+            this
+        }
+}
+
 internal suspend fun runOrderedProfileSync(
     profileId: Int,
     pluginsEnabled: Boolean,
@@ -211,8 +233,7 @@ object SyncManager {
     private var foregroundPullProfileId: Int? = null
     private var periodicNuvioSyncPullJob: Job? = null
     private var periodicNuvioSyncProfileId: Int? = null
-    private var lastFullPullAtMs: Long = 0L
-    private var lastFullPullProfileId: Int? = null
+    private var pullFreshness = ProfilePullFreshness()
 
     private val profileSyncOperations = ProfileSyncOperations(
         pullAddons = { profileId -> AddonRepository.pullFromServer(profileId) },
@@ -247,8 +268,7 @@ object SyncManager {
             foregroundPullJob.also {
                 foregroundPullJob = null
                 foregroundPullProfileId = null
-                lastFullPullAtMs = 0L
-                lastFullPullProfileId = null
+                pullFreshness = ProfilePullFreshness()
             }
         }
         foregroundJob?.cancel()
@@ -304,8 +324,11 @@ object SyncManager {
 
     private fun hasRecentFullPull(profileId: Int): Boolean =
         synchronized(pullStateLock) {
-            lastFullPullProfileId == profileId &&
-                EpisodeReleaseDatePlatform.nowEpochMs() - lastFullPullAtMs < FOREGROUND_PULL_MIN_INTERVAL_MS
+            pullFreshness.isRecent(
+                profileId = profileId,
+                nowEpochMs = EpisodeReleaseDatePlatform.nowEpochMs(),
+                minIntervalMs = FOREGROUND_PULL_MIN_INTERVAL_MS,
+            )
         }
 
     private suspend fun pullForegroundForProfile(profileId: Int) {
@@ -313,42 +336,25 @@ object SyncManager {
 
         runCatching { ProfileRepository.pullProfiles() }
             .onFailure { log.e(it) { "Foreground profiles pull failed" } }
-        runCatching { ProfileSettingsSync.pull(profileId) }
-            .onFailure { log.e(it) { "Foreground profile settings pull failed" } }
-
-        coroutineScope {
-            launch {
-                runCatching { AddonRepository.pullFromServer(profileId) }
-                    .onFailure { log.e(it) { "Foreground addons pull failed" } }
-            }
-            if (AppFeaturePolicy.pluginsEnabled) {
-                launch {
-                    runCatching { PluginRepository.pullFromServer(profileId) }
-                        .onFailure { log.e(it) { "Foreground plugins pull failed" } }
-                }
-            }
-            launch {
-                runCatching { LibraryRepository.pullFromServer(profileId) }
-                    .onFailure { log.e(it) { "Foreground library pull failed" } }
-            }
-            launch {
-                runCatching {
-                    WatchProgressSourceCoordinator.refreshActiveSource(profileId = profileId, force = true)
-                }.onFailure { log.e(it) { "Foreground active watch source pull failed" } }
-            }
-            launch {
-                runCatching { CollectionSyncService.pullFromServer(profileId) }
-                    .onFailure { log.e(it) { "Foreground collections pull failed" } }
-            }
-            launch {
-                runCatching { HomeCatalogSettingsSyncService.pullFromServer(profileId) }
-                    .onFailure { log.e(it) { "Foreground home catalog settings pull failed" } }
-            }
-        }
-
+        val syncResult = runOrderedProfileSync(
+            profileId = profileId,
+            pluginsEnabled = AppFeaturePolicy.pluginsEnabled,
+            operations = profileSyncOperations,
+            onFailure = { step, error ->
+                log.e(error) { "Foreground profile sync step failed profile=$profileId step=$step" }
+            },
+        )
         synchronized(pullStateLock) {
-            lastFullPullAtMs = EpisodeReleaseDatePlatform.nowEpochMs()
-            lastFullPullProfileId = profileId
+            pullFreshness = pullFreshness.recordIfSuccessful(
+                profileId = profileId,
+                completedAtEpochMs = EpisodeReleaseDatePlatform.nowEpochMs(),
+                result = syncResult,
+            )
+        }
+        if (!syncResult.succeeded) {
+            log.w {
+                "Foreground profile sync incomplete profile=$profileId failedSteps=${syncResult.failedSteps}"
+            }
         }
 
         log.i { "Foreground sync completed profile=$profileId" }
@@ -386,12 +392,14 @@ object SyncManager {
             } finally {
                 WatchProgressSourceCoordinator.resumeAutomaticTransitions()
             }
-            if (syncResult.succeeded) {
-                synchronized(pullStateLock) {
-                    lastFullPullAtMs = EpisodeReleaseDatePlatform.nowEpochMs()
-                    lastFullPullProfileId = profileId
-                }
-            } else {
+            synchronized(pullStateLock) {
+                pullFreshness = pullFreshness.recordIfSuccessful(
+                    profileId = profileId,
+                    completedAtEpochMs = EpisodeReleaseDatePlatform.nowEpochMs(),
+                    result = syncResult,
+                )
+            }
+            if (!syncResult.succeeded) {
                 log.w {
                     "Full profile sync incomplete profile=$profileId reason=$reason " +
                         "failedSteps=${syncResult.failedSteps}"
