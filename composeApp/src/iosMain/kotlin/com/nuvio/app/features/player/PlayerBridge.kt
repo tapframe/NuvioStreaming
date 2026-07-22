@@ -49,6 +49,7 @@ interface NuvioPlayerBridge {
     fun getVolume(): Float
     fun setVolume(volume: Float)
     fun setMuted(muted: Boolean)
+    fun setEmbeddedPreviewMode(enabled: Boolean)
     fun setResizeMode(mode: Int) // 0=Fit, 1=Fill, 2=Zoom
     fun syncVideoSurfaceLayout(width: Double, height: Double)
     fun getAudioTrackCount(): Int

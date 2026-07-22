@@ -114,6 +114,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func getVolume() -> Float { playerVC?.getVolume() ?? 1.0 }
     func setVolume(volume: Float) { playerVC?.setVolume(volume) }
     func setMuted(muted: Bool) { playerVC?.setMuted(muted) }
+    func setEmbeddedPreviewMode(enabled: Bool) { ensurePlayerViewController().setEmbeddedPreviewMode(enabled) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
     func syncVideoSurfaceLayout(width: Double, height: Double) {
         playerVC?.syncVideoSurfaceLayout(size: CGSize(width: width, height: height))
@@ -333,6 +334,7 @@ final class MPVPlayerViewController: UIViewController {
         return _currentErrorMessage ?? ""
     }
     private var _currentErrorMessage: String?
+    private var isEmbeddedPreviewMode = false
 
     init(experimentalSinglePrimaryPictureInPictureEnabled: Bool) {
         self.experimentalSinglePrimaryPictureInPictureEnabled = experimentalSinglePrimaryPictureInPictureEnabled
@@ -345,19 +347,19 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     override var canBecomeFirstResponder: Bool {
-        true
+        !isEmbeddedPreviewMode
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
-        true
+        !isEmbeddedPreviewMode
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
-        [.bottom, .left, .right]
+        isEmbeddedPreviewMode ? [] : [.bottom, .left, .right]
     }
 
     override var prefersStatusBarHidden: Bool {
-        true
+        !isEmbeddedPreviewMode
     }
 
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
@@ -384,7 +386,9 @@ final class MPVPlayerViewController: UIViewController {
         layoutPlayerSurfaces()
 
         setupMpv()
-        activateAudioSessionForPlayback()
+        if !isEmbeddedPreviewMode {
+            activateAudioSessionForPlayback()
+        }
         setupNotifications()
         if experimentalSinglePrimaryPictureInPictureEnabled {
             view.addGestureRecognizer(automaticPiPHomeSwipeRecognizer)
@@ -405,17 +409,21 @@ final class MPVPlayerViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        publishImmersiveSystemUIVisibility(isVisible: true)
-        refreshImmersiveSystemUI()
-        becomeFirstResponder()
-        UIApplication.shared.beginReceivingRemoteControlEvents()
-        publishCachedNowPlayingInfoIfNeeded()
+        if !isEmbeddedPreviewMode {
+            publishImmersiveSystemUIVisibility(isVisible: true)
+            refreshImmersiveSystemUI()
+            becomeFirstResponder()
+            UIApplication.shared.beginReceivingRemoteControlEvents()
+            publishCachedNowPlayingInfoIfNeeded()
+        }
         syncVideoSurfaceLayout()
         attemptStartPendingLoad()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
-        publishImmersiveSystemUIVisibility(isVisible: false)
+        if !isEmbeddedPreviewMode {
+            publishImmersiveSystemUIVisibility(isVisible: false)
+        }
         super.viewWillDisappear(animated)
     }
 
@@ -683,10 +691,14 @@ final class MPVPlayerViewController: UIViewController {
 
     func playPlayback() {
         guard mpv != nil else { return }
-        publishNowPlayingForPlaybackSession()
+        if !isEmbeddedPreviewMode {
+            publishNowPlayingForPlaybackSession()
+        }
         setFlag("pause", false)
         isPlayerPlaying = true
-        syncNowPlayingPlaybackState(isPlaying: true)
+        if !isEmbeddedPreviewMode {
+            syncNowPlayingPlaybackState(isPlaying: true)
+        }
         primaryRenderSurface?.setPaused(false)
         if experimentalSinglePrimaryPictureInPictureEnabled, !isPictureInPictureActive(), !isPictureInPictureStarting {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
@@ -699,7 +711,9 @@ final class MPVPlayerViewController: UIViewController {
         guard mpv != nil else { return }
         setFlag("pause", true)
         isPlayerPlaying = false
-        syncNowPlayingPlaybackState(isPlaying: false)
+        if !isEmbeddedPreviewMode {
+            syncNowPlayingPlaybackState(isPlaying: false)
+        }
         primaryRenderSurface?.setPaused(true)
     }
 
@@ -823,6 +837,17 @@ final class MPVPlayerViewController: UIViewController {
         var gainDb = 20.0 * log10(clamped)
         checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &baseVolume))
         checkError(mpv_set_property(mpv, "volume-gain", MPV_FORMAT_DOUBLE, &gainDb))
+    }
+
+
+    func setEmbeddedPreviewMode(_ enabled: Bool) {
+        guard isEmbeddedPreviewMode != enabled else { return }
+        isEmbeddedPreviewMode = enabled
+        if isViewLoaded {
+            setNeedsStatusBarAppearanceUpdate()
+            setNeedsUpdateOfHomeIndicatorAutoHidden()
+            setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+        }
     }
 
     func setMuted(_ muted: Bool) {
@@ -970,16 +995,22 @@ final class MPVPlayerViewController: UIViewController {
         stopPictureInPicture(source: "destroy")
         primaryRenderSurface?.detach()
         NotificationCenter.default.removeObserver(self)
-        UIApplication.shared.endReceivingRemoteControlEvents()
-        resignFirstResponder()
+        if !isEmbeddedPreviewMode {
+            UIApplication.shared.endReceivingRemoteControlEvents()
+            resignFirstResponder()
+        }
         pendingLoadRetryWorkItem?.cancel()
         pendingLoadRetryWorkItem = nil
         pendingSurfaceLayoutWorkItems.forEach { $0.cancel() }
         pendingSurfaceLayoutWorkItems.removeAll(keepingCapacity: false)
         pendingLoadRequest = nil
-        nowPlayingController.invalidate()
+        if !isEmbeddedPreviewMode {
+            nowPlayingController.invalidate()
+        }
         clearPlaybackError()
-        deactivateAudioSession()
+        if !isEmbeddedPreviewMode {
+            deactivateAudioSession()
+        }
         guard let ctx = mpv else { return }
         mpv = nil  // nil first so event loop stops reading
         mpv_terminate_destroy(ctx)
@@ -1145,7 +1176,8 @@ final class MPVPlayerViewController: UIViewController {
         bufferedMs = Int64(max(position + cached, 0) * 1000)
         currentSpeed = Float(speed > 0 ? speed : 1.0)
 
-        let shouldPublishNowPlayingState = !isPlayerLoading || isPlayerPlaying || durationMs > 0 || positionMs > 0
+        let shouldPublishNowPlayingState = !isEmbeddedPreviewMode &&
+            (!isPlayerLoading || isPlayerPlaying || durationMs > 0 || positionMs > 0)
         if shouldPublishNowPlayingState {
             syncNowPlayingPlaybackState(isPlaying: isPlayerPlaying)
         }
@@ -1240,6 +1272,7 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func publishNowPlayingForPlaybackSession() {
+        guard !isEmbeddedPreviewMode else { return }
         activateAudioSessionForPlayback()
         if isViewLoaded, view.window != nil {
             becomeFirstResponder()
@@ -1394,7 +1427,9 @@ final class MPVPlayerViewController: UIViewController {
                         self.clearPlaybackError()
                         self.isPlayerLoading = false
                         self.updateState()
-                        self.publishNowPlayingForPlaybackSession()
+                        if !self.isEmbeddedPreviewMode {
+                            self.publishNowPlayingForPlaybackSession()
+                        }
                         self.logCurrentAudioOutput()
                         self.primaryRenderSurface?.requestRenderBurst(reason: "file-loaded", count: 5)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
@@ -1404,7 +1439,9 @@ final class MPVPlayerViewController: UIViewController {
                 case MPV_EVENT_PLAYBACK_RESTART:
                     DispatchQueue.main.async {
                         self.updateState()
-                        self.publishNowPlayingForPlaybackSession()
+                        if !self.isEmbeddedPreviewMode {
+                            self.publishNowPlayingForPlaybackSession()
+                        }
                     }
                 case MPV_EVENT_END_FILE:
                     if let data = eventPtr.pointee.data {
@@ -1572,6 +1609,7 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func refreshImmersiveSystemUI() {
+        guard !isEmbeddedPreviewMode else { return }
         setNeedsUpdateOfHomeIndicatorAutoHidden()
         setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
         setNeedsStatusBarAppearanceUpdate()

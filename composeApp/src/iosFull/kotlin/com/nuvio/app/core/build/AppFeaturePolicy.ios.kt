@@ -7,7 +7,7 @@ actual object AppFeaturePolicy {
     actual val personalMediaAddonCopyEnabled: Boolean = false
     actual val p2pEnabled: Boolean = true
     actual val trailerPlaybackMode: TrailerPlaybackMode = TrailerPlaybackMode.IN_APP
-    actual val heroTrailerPlaybackSupported: Boolean = false
+    actual val heroTrailerPlaybackSupported: Boolean = true
     actual val inAppUpdaterEnabled: Boolean = false
     actual val imdbRatingLogoEnabled: Boolean = true
 }
