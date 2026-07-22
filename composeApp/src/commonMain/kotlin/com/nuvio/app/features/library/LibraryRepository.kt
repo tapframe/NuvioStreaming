@@ -15,6 +15,7 @@ import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
+import com.nuvio.app.features.tracking.supportsContentType
 import com.nuvio.app.features.tracking.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
 import com.nuvio.app.features.tracking.providerId
 import io.github.jan.supabase.postgrest.postgrest
@@ -370,11 +371,11 @@ object LibraryRepository {
         return localState.findById(id)
     }
 
-    fun libraryListTabs(): List<TrackingLibraryTab> =
+    fun libraryListTabs(item: LibraryItem? = null): List<TrackingLibraryTab> =
         libraryTabsWithLocal(
             TrackingProviderRegistry.connectedLibraryProviders()
                 .flatMap { provider -> provider.snapshot().tabs },
-        )
+        ).filter { tab -> item == null || tab.supportsContentType(item.type) }
 
     suspend fun getMembershipSnapshot(item: LibraryItem): Map<String, Boolean> {
         ensureLoaded()

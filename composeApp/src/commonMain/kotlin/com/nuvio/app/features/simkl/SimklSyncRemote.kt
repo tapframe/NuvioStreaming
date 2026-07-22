@@ -2,6 +2,9 @@ package com.nuvio.app.features.simkl
 
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.decodeFromJsonElement
 
 internal data class SimklAllItemsRequest(
     val type: SimklMediaType? = null,
@@ -53,7 +56,7 @@ internal class SimklApiSyncRemote(
                 path = path,
                 query = query,
             ),
-        ).body.decode()
+        ).body.decodeAllItems()
     }
 
     override suspend fun fetchPlayback(): List<SimklPlaybackSession> =
@@ -65,4 +68,13 @@ internal class SimklApiSyncRemote(
         ).body.decode()
 
     private inline fun <reified T> String.decode(): T = json.decodeFromString(this)
+
+    private fun String.decodeAllItems(): SimklAllItemsResponse {
+        val element = json.parseToJsonElement(this)
+        return when {
+            element is JsonNull -> SimklAllItemsResponse()
+            element is JsonArray && element.isEmpty() -> SimklAllItemsResponse()
+            else -> json.decodeFromJsonElement(element)
+        }
+    }
 }

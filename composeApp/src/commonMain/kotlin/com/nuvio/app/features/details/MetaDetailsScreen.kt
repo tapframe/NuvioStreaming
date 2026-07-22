@@ -116,6 +116,7 @@ import com.nuvio.app.features.trakt.TraktCommentsRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.toggleTrackingLibraryMembership
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
@@ -416,7 +417,7 @@ fun MetaDetailsScreen(
                 val openLibraryListPicker = remember(meta) {
                     {
                         val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
-                        pickerTabs = LibraryRepository.libraryListTabs()
+                        pickerTabs = LibraryRepository.libraryListTabs(libraryItem)
                         pickerMembership = pickerTabs.associate { it.key to false }
                         pickerPending = true
                         pickerError = null
@@ -424,7 +425,7 @@ fun MetaDetailsScreen(
                         detailsScope.launch {
                             runCatching {
                                 val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                val tabs = LibraryRepository.libraryListTabs()
+                                val tabs = LibraryRepository.libraryListTabs(libraryItem)
                                 pickerTabs = tabs
                                 pickerMembership = tabs.associate { tab ->
                                     tab.key to (snapshot[tab.key] == true)
@@ -1220,9 +1221,11 @@ fun MetaDetailsScreen(
                             isPending = pickerPending,
                             errorMessage = pickerError,
                             onToggle = { listKey ->
-                                pickerMembership = pickerMembership.toMutableMap().apply {
-                                    this[listKey] = !(this[listKey] == true)
-                                }
+                                pickerMembership = toggleTrackingLibraryMembership(
+                                    tabs = pickerTabs,
+                                    membership = pickerMembership,
+                                    key = listKey,
+                                )
                             },
                             onDismiss = {
                                 if (!pickerPending) {

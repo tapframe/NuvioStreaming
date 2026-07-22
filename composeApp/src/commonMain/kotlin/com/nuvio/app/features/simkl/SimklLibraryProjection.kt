@@ -1,0 +1,115 @@
+package com.nuvio.app.features.simkl
+
+import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.library.LibraryItem
+import com.nuvio.app.features.library.LibrarySection
+import com.nuvio.app.features.tracking.TrackingListStatus
+
+internal const val SIMKL_STATUS_SELECTION_GROUP = "simkl:status"
+
+internal data class SimklLibraryStatusDefinition(
+    val status: SimklListStatus,
+    val key: String,
+    val title: String,
+    val trackingStatus: TrackingListStatus,
+    val supportedContentTypes: Set<String>,
+)
+
+internal data class SimklLibraryProjection(
+    val items: List<LibraryItem>,
+    val sections: List<LibrarySection>,
+)
+
+internal val simklLibraryStatusDefinitions = listOf(
+    SimklLibraryStatusDefinition(
+        status = SimklListStatus.WATCHING,
+        key = "simkl:status:watching",
+        title = "Simkl Watching",
+        trackingStatus = TrackingListStatus.WATCHING,
+        supportedContentTypes = setOf("series"),
+    ),
+    SimklLibraryStatusDefinition(
+        status = SimklListStatus.PLAN_TO_WATCH,
+        key = "simkl:status:plantowatch",
+        title = "Simkl Plan to Watch",
+        trackingStatus = TrackingListStatus.PLAN_TO_WATCH,
+        supportedContentTypes = setOf("movie", "series"),
+    ),
+    SimklLibraryStatusDefinition(
+        status = SimklListStatus.ON_HOLD,
+        key = "simkl:status:hold",
+        title = "Simkl On Hold",
+        trackingStatus = TrackingListStatus.ON_HOLD,
+        supportedContentTypes = setOf("series"),
+    ),
+    SimklLibraryStatusDefinition(
+        status = SimklListStatus.COMPLETED,
+        key = "simkl:status:completed",
+        title = "Simkl Completed",
+        trackingStatus = TrackingListStatus.COMPLETED,
+        supportedContentTypes = setOf("movie", "series"),
+    ),
+    SimklLibraryStatusDefinition(
+        status = SimklListStatus.DROPPED,
+        key = "simkl:status:dropped",
+        title = "Simkl Dropped",
+        trackingStatus = TrackingListStatus.DROPPED,
+        supportedContentTypes = setOf("movie", "series"),
+    ),
+)
+
+internal fun SimklSyncSnapshot.toSimklLibraryProjection(): SimklLibraryProjection {
+    val sections = simklLibraryStatusDefinitions.mapNotNull { definition ->
+        val items = entries
+            .asSequence()
+            .filter { entry -> entry.status == definition.status }
+            .mapNotNull { entry -> entry.toLibraryItem(definition.key, lastSyncedAtEpochMs) }
+            .distinctBy { item -> "${item.type}:${item.id}" }
+            .sortedByDescending(LibraryItem::savedAtEpochMs)
+            .toList()
+        items.takeIf { projectedItems -> projectedItems.isNotEmpty() }?.let {
+            LibrarySection(
+                type = definition.key,
+                displayTitle = definition.title,
+                items = items,
+            )
+        }
+    }
+    return SimklLibraryProjection(
+        items = sections
+            .flatMap(LibrarySection::items)
+            .distinctBy { item -> "${item.type}:${item.id}" }
+            .sortedByDescending(LibraryItem::savedAtEpochMs),
+        sections = sections,
+    )
+}
+
+internal fun simklLibraryStatusDefinition(key: String): SimklLibraryStatusDefinition? =
+    simklLibraryStatusDefinitions.firstOrNull { definition -> definition.key == key }
+
+private fun SimklLibraryEntry.toLibraryItem(
+    listKey: String,
+    lastSyncedAtEpochMs: Long?,
+): LibraryItem? {
+    val media = media ?: return null
+    val contentId = media.canonicalContentId() ?: return null
+    val simklId = media.ids.simklIdValue()?.toLongOrNull()
+    return LibraryItem(
+        id = contentId,
+        type = if (mediaType == SimklMediaType.MOVIES) "movie" else "series",
+        name = media.title?.takeIf(String::isNotBlank) ?: contentId,
+        poster = simklPosterUrl(media.poster),
+        releaseInfo = media.year?.toString(),
+        posterShape = PosterShape.Poster,
+        listKeys = setOf(listKey),
+        imdbId = media.ids.idValue("imdb"),
+        tmdbId = media.ids.idValue("tmdb")?.toIntOrNull(),
+        trackingProviderId = "simkl",
+        trackingProviderItemId = simklId?.let { "simkl:$it" },
+        trackingSourceUrl = buildSimklSourceUrl(mediaType, media),
+        savedAtEpochMs = parseSimklUtcEpochMs(addedToWatchlistAt)
+            ?: parseSimklUtcEpochMs(lastWatchedAt)
+            ?: lastSyncedAtEpochMs
+            ?: 0L,
+    )
+}

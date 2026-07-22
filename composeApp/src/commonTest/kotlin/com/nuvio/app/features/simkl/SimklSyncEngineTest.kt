@@ -174,6 +174,30 @@ class SimklSyncEngineTest {
         assertTrue("extended=simkl_ids_only" in urls[2])
     }
 
+    @Test
+    fun `remote treats top level empty all items variants as empty`() = runBlocking {
+        listOf("null", "[]").forEach { body ->
+            val engine = SimklHttpEngine { _, url, _, _ ->
+                RawHttpResponse(200, "", url, body, emptyMap())
+            }
+            val client = SimklApiClient(
+                engine = engine,
+                accessToken = { "token" },
+                onUnauthorized = {},
+                nowEpochMs = { 0L },
+                sleep = {},
+                retryJitterMs = { 0L },
+            )
+
+            val response = SimklApiSyncRemote(client).fetchAllItems(
+                SimklAllItemsRequest(type = SimklMediaType.ANIME),
+            )
+
+            assertTrue(response.entriesFor(SimklMediaType.ANIME).isEmpty())
+            assertTrue(response.presentTypes().isEmpty())
+        }
+    }
+
     private sealed interface Step {
         data class Activities(val value: SimklActivities) : Step
         data class AllItems(val type: SimklMediaType?, val value: SimklAllItemsResponse) : Step

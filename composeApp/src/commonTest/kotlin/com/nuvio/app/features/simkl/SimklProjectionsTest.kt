@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 
 class SimklProjectionsTest {
     @Test
-    fun `library projection exposes only plan to watch with attribution`() {
+    fun `library projection exposes every populated status with attribution`() {
         val plan = entry(
             type = SimklMediaType.MOVIES,
             status = SimklListStatus.PLAN_TO_WATCH,
@@ -28,12 +28,32 @@ class SimklProjectionsTest {
             id = 53434,
             imdb = "tt0068646",
         )
+        val watching = entry(
+            type = SimklMediaType.SHOWS,
+            status = SimklListStatus.WATCHING,
+            id = 2090,
+            imdb = "tt1520211",
+        )
 
-        val items = SimklSyncSnapshot(entries = listOf(plan, completed)).toSimklLibraryItems()
+        val projection = SimklSyncSnapshot(entries = listOf(plan, completed, watching)).toSimklLibraryProjection()
+        val watchingDefinition = simklLibraryStatusDefinitions.single { definition ->
+            definition.status == SimklListStatus.WATCHING
+        }
+        val planDefinition = simklLibraryStatusDefinitions.single { definition ->
+            definition.status == SimklListStatus.PLAN_TO_WATCH
+        }
+        val completedDefinition = simklLibraryStatusDefinitions.single { definition ->
+            definition.status == SimklListStatus.COMPLETED
+        }
 
-        val item = items.single()
+        assertEquals(
+            listOf(watchingDefinition.key, planDefinition.key, completedDefinition.key),
+            projection.sections.map { section -> section.type },
+        )
+        assertEquals(3, projection.items.size)
+        val item = projection.items.single { candidate -> candidate.id == "tt0181852" }
         assertEquals("tt0181852", item.id)
-        assertEquals(setOf(SIMKL_WATCHLIST_KEY), item.listKeys)
+        assertEquals(setOf(planDefinition.key), item.listKeys)
         assertEquals("simkl", item.trackingProviderId)
         assertEquals("simkl:53536", item.trackingProviderItemId)
         assertEquals(
@@ -42,6 +62,14 @@ class SimklProjectionsTest {
         )
         assertTrue(item.poster.orEmpty().contains("simkl.in/posters/12/poster_w.webp"))
         assertEquals(1_700_000_000_000L, item.savedAtEpochMs)
+        assertEquals(
+            setOf(completedDefinition.key),
+            projection.items.single { candidate -> candidate.id == "tt0068646" }.listKeys,
+        )
+        assertEquals(
+            setOf(watchingDefinition.key),
+            projection.items.single { candidate -> candidate.id == "tt1520211" }.listKeys,
+        )
     }
 
     @Test
@@ -87,6 +115,27 @@ class SimklProjectionsTest {
         assertFalse(projection.items.any { it.episode == 2 })
         assertTrue(projection.items.any { it.id == "tt2560140" && it.season == null })
         assertTrue(projection.fullyWatchedSeriesKeys.any { "tt2560140" in it })
+    }
+
+    @Test
+    fun `summary counters do not fabricate exact episode markers`() {
+        val summary = entry(
+            type = SimklMediaType.SHOWS,
+            status = SimklListStatus.WATCHING,
+            id = 2090,
+            imdb = "tt1520211",
+            lastWatchedAt = "2023-11-14T23:13:20Z",
+        ).copy(
+            lastWatched = "S01E03",
+            nextToWatch = "S01E04",
+            watchedEpisodesCount = 3,
+            totalEpisodesCount = 6,
+        )
+
+        val projection = SimklSyncSnapshot(entries = listOf(summary)).toSimklWatchedProjection()
+
+        assertTrue(projection.items.isEmpty())
+        assertTrue(projection.fullyWatchedSeriesKeys.isEmpty())
     }
 
     @Test

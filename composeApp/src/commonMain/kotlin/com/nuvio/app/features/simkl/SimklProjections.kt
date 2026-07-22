@@ -1,7 +1,5 @@
 package com.nuvio.app.features.simkl
 
-import com.nuvio.app.features.home.PosterShape
-import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.tracking.TrackingEpisode
 import com.nuvio.app.features.tracking.TrackingExternalIds
 import com.nuvio.app.features.tracking.TrackingMediaKind
@@ -15,21 +13,10 @@ import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressSourceSimklPlayback
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 
-internal const val SIMKL_WATCHLIST_KEY = "simkl:watchlist"
-internal const val SIMKL_WATCHLIST_TITLE = "Simkl Watchlist"
-
 internal data class SimklWatchedProjection(
     val items: List<WatchedItem>,
     val fullyWatchedSeriesKeys: Set<String>,
 )
-
-internal fun SimklSyncSnapshot.toSimklLibraryItems(): List<LibraryItem> =
-    entries
-        .asSequence()
-        .filter { entry -> entry.status == SimklListStatus.PLAN_TO_WATCH }
-        .mapNotNull { entry -> entry.toLibraryItem(lastSyncedAtEpochMs) }
-        .sortedByDescending(LibraryItem::savedAtEpochMs)
-        .toList()
 
 internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjection {
     val watchedItems = mutableListOf<WatchedItem>()
@@ -225,29 +212,6 @@ internal fun parseSimklUtcEpochMs(value: String?): Long? {
     for (monthIndex in 0 until month - 1) days += monthDays[monthIndex]
     days += day - 1L
     return (((days * 24L + hour) * 60L + minute) * 60L + second) * 1_000L + millis
-}
-
-private fun SimklLibraryEntry.toLibraryItem(lastSyncedAtEpochMs: Long?): LibraryItem? {
-    val media = media ?: return null
-    val contentId = media.canonicalContentId() ?: return null
-    val simklId = media.ids.simklIdValue()?.toLongOrNull()
-    return LibraryItem(
-        id = contentId,
-        type = if (mediaType == SimklMediaType.MOVIES) "movie" else "series",
-        name = media.title?.takeIf(String::isNotBlank) ?: contentId,
-        poster = simklPosterUrl(media.poster),
-        releaseInfo = media.year?.toString(),
-        posterShape = PosterShape.Poster,
-        listKeys = setOf(SIMKL_WATCHLIST_KEY),
-        imdbId = media.ids.idValue("imdb"),
-        tmdbId = media.ids.idValue("tmdb")?.toIntOrNull(),
-        trackingProviderId = "simkl",
-        trackingProviderItemId = simklId?.let { "simkl:$it" },
-        trackingSourceUrl = buildSimklSourceUrl(mediaType, media),
-        savedAtEpochMs = parseSimklUtcEpochMs(addedToWatchlistAt)
-            ?: lastSyncedAtEpochMs
-            ?: 0L,
-    )
 }
 
 private fun SimklPlaybackSession.toWatchProgressEntry(): WatchProgressEntry? {

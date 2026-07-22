@@ -225,6 +225,7 @@ import com.nuvio.app.features.tracking.TrackingScrobbleCoordinator
 import com.nuvio.app.features.tracking.TrackingScrobbleEvent
 import com.nuvio.app.features.tracking.buildTrackingMediaReference
 import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.toggleTrackingLibraryMembership
 import com.nuvio.app.features.updater.AppUpdaterHost
 import com.nuvio.app.features.updater.AppUpdaterPlatform
 import com.nuvio.app.features.updater.rememberAppUpdaterController
@@ -3354,7 +3355,7 @@ private fun MainAppContent(
                                         } else {
                                             pickerItem = libraryItem
                                             pickerTitle = preview.name
-                                            pickerTabs = LibraryRepository.libraryListTabs()
+                                            pickerTabs = LibraryRepository.libraryListTabs(libraryItem)
                                             pickerMembership = pickerTabs.associate { it.key to false }
                                             pickerPending = true
                                             pickerError = null
@@ -3362,7 +3363,7 @@ private fun MainAppContent(
                                             coroutineScope.launch {
                                                 runCatching {
                                                     val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                                    val tabs = LibraryRepository.libraryListTabs()
+                                                    val tabs = LibraryRepository.libraryListTabs(libraryItem)
                                                     pickerTabs = tabs
                                                     pickerMembership = tabs.associate { tab ->
                                                         tab.key to (snapshot[tab.key] == true)
@@ -3499,9 +3500,11 @@ private fun MainAppContent(
                 isPending = pickerPending,
                 errorMessage = pickerError,
                 onToggle = { listKey ->
-                    pickerMembership = pickerMembership.toMutableMap().apply {
-                        this[listKey] = !(this[listKey] == true)
-                    }
+                    pickerMembership = toggleTrackingLibraryMembership(
+                        tabs = pickerTabs,
+                        membership = pickerMembership,
+                        key = listKey,
+                    )
                 },
                 onDismiss = {
                     if (!pickerPending) {

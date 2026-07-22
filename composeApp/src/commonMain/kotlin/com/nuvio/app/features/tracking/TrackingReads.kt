@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 enum class TrackingLibraryTabKind {
     WATCHLIST,
     PERSONAL,
+    STATUS,
 }
 
 data class TrackingLibraryTab(
@@ -17,7 +18,31 @@ data class TrackingLibraryTab(
     val title: String,
     val providerId: TrackingProviderId?,
     val kind: TrackingLibraryTabKind,
+    val selectionGroup: String? = null,
+    val supportedContentTypes: Set<String>? = null,
 )
+
+fun TrackingLibraryTab.supportsContentType(contentType: String): Boolean =
+    supportedContentTypes == null || supportedContentTypes.any { supported ->
+        supported.equals(contentType, ignoreCase = true)
+    }
+
+fun toggleTrackingLibraryMembership(
+    tabs: List<TrackingLibraryTab>,
+    membership: Map<String, Boolean>,
+    key: String,
+): Map<String, Boolean> {
+    val target = tabs.firstOrNull { tab -> tab.key == key } ?: return membership
+    val selecting = membership[key] != true
+    return membership.toMutableMap().apply {
+        if (selecting && target.selectionGroup != null) {
+            tabs.filter { tab ->
+                tab.providerId == target.providerId && tab.selectionGroup == target.selectionGroup
+            }.forEach { tab -> this[tab.key] = false }
+        }
+        this[key] = selecting
+    }
+}
 
 data class TrackingLibrarySnapshot(
     val items: List<LibraryItem> = emptyList(),
