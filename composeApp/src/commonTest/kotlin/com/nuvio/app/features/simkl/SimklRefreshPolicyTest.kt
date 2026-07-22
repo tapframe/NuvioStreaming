@@ -26,6 +26,7 @@ class SimklRefreshPolicyTest {
     fun `automatic refresh is throttled for fifteen minutes`() {
         val lastCheckedAt = 1_000L
 
+        assertEquals(15, SIMKL_AUTOMATIC_REFRESH_INTERVAL_MINUTES)
         assertFalse(
             shouldRunSimklRefresh(
                 intent = TrackingRefreshIntent.AUTOMATIC,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -99,6 +100,7 @@ import nuvio.composeapp.generated.resources.settings_simkl_open_login
 import nuvio.composeapp.generated.resources.settings_simkl_sign_in_description
 import nuvio.composeapp.generated.resources.settings_simkl_sign_in_failed
 import nuvio.composeapp.generated.resources.settings_simkl_sync_now
+import nuvio.composeapp.generated.resources.settings_simkl_sync_info_action
 import nuvio.composeapp.generated.resources.settings_simkl_visit
 import nuvio.composeapp.generated.resources.tracking_library_source_simkl_selected
 import nuvio.composeapp.generated.resources.tracking_source_simkl
@@ -791,6 +793,7 @@ private fun SimklConnectionCard(
         SimklSyncRepository.state
     }.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    var showSyncInfo by rememberSaveable { mutableStateOf(false) }
 
     ProviderConnectionCard(
         isTablet = isTablet,
@@ -813,6 +816,7 @@ private fun SimklConnectionCard(
         openLoginLabel = stringResource(Res.string.settings_simkl_open_login),
         disconnectLabel = stringResource(Res.string.settings_simkl_disconnect),
         syncLabel = stringResource(Res.string.settings_simkl_sync_now),
+        infoLabel = stringResource(Res.string.settings_simkl_sync_info_action),
         isSyncing = syncState.isLoading,
         missingCredentialsMessage = stringResource(Res.string.settings_simkl_missing_credentials),
         errorMessage = simklErrorMessage(uiState.error) ?: syncState.errorMessage,
@@ -829,8 +833,13 @@ private fun SimklConnectionCard(
                 SimklSyncRepository.refresh(TrackingRefreshIntent.USER_INITIATED)
             }
         },
+        onInfoRequested = { showSyncInfo = true },
         onDisconnect = SimklAuthRepository::onDisconnectRequested,
     )
+
+    if (showSyncInfo) {
+        SimklSyncInfoDialog(onDismiss = { showSyncInfo = false })
+    }
 }
 
 @Composable
@@ -848,6 +857,7 @@ private fun ProviderConnectionCard(
     openLoginLabel: String,
     disconnectLabel: String,
     syncLabel: String? = null,
+    infoLabel: String? = null,
     isSyncing: Boolean = false,
     missingCredentialsMessage: String,
     statusMessage: String? = null,
@@ -858,6 +868,7 @@ private fun ProviderConnectionCard(
     onResumeAuthorization: () -> String?,
     onCancelAuthorization: () -> Unit,
     onSyncRequested: (() -> Unit)? = null,
+    onInfoRequested: (() -> Unit)? = null,
     onDisconnect: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -905,6 +916,17 @@ private fun ProviderConnectionCard(
                         } else {
                             Text(syncLabel)
                         }
+                    }
+                }
+                if (infoLabel != null && onInfoRequested != null) {
+                    TextButton(onClick = onInfoRequested) {
+                        Icon(
+                            imageVector = Icons.Rounded.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(infoLabel)
                     }
                 }
                 Button(

@@ -5,7 +5,9 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal const val SIMKL_AUTOMATIC_REFRESH_INTERVAL_MS = 15L * 60L * 1_000L
+internal const val SIMKL_AUTOMATIC_REFRESH_INTERVAL_MINUTES = 15
+internal const val SIMKL_AUTOMATIC_REFRESH_INTERVAL_MS =
+    SIMKL_AUTOMATIC_REFRESH_INTERVAL_MINUTES * 60L * 1_000L
 
 internal fun shouldRunSimklRefresh(
     intent: TrackingRefreshIntent,

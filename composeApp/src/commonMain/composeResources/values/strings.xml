@@ -1139,6 +1139,12 @@
     <string name="settings_simkl_authorization_expired">The Simkl sign-in request expired. Start again.</string>
     <string name="settings_simkl_sign_in_failed">Could not complete Simkl sign in. Please try again.</string>
     <string name="settings_simkl_sync_now">Sync now</string>
+    <string name="settings_simkl_sync_info_action">How syncing works</string>
+    <string name="settings_simkl_sync_info_title">How Simkl syncing works</string>
+    <string name="settings_simkl_sync_info_description">Nuvio automatically checks Simkl at most once every %1$d minutes. Changes made through another app or the Simkl website may take that long to appear.</string>
+    <string name="settings_simkl_sync_info_activity">Each refresh first checks whether Simkl reports any changes and downloads only the updates. This follows Simkl’s API rules, reduces unnecessary data use, and helps keep the service stable.</string>
+    <string name="settings_simkl_sync_info_manual">Changes made in Nuvio are sent to Simkl immediately. Use Sync now whenever you want Nuvio to check for remote changes sooner.</string>
+    <string name="settings_simkl_sync_info_docs">Read the Simkl sync guide</string>
     <string name="settings_simkl_authorization_revoked">Simkl authorization expired or was revoked. Connect again.</string>
     <string name="tracking_source_simkl">Simkl</string>
     <string name="tracking_library_source_simkl_selected">Simkl watchlist selected</string>
