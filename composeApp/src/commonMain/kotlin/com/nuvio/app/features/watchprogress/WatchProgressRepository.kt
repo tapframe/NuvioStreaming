@@ -54,6 +54,7 @@ private const val WATCH_PROGRESS_DELTA_OPERATION_UPSERT = "upsert"
 private const val WATCH_PROGRESS_DELTA_OPERATION_DELETE = "delete"
 
 private data class RemoteMetadataResolutionResult(
+    val key: WatchProgressMetadataKey,
     val entries: List<WatchProgressEntry>,
     val meta: MetaDetails?,
 )
@@ -177,36 +178,6 @@ internal data class WatchProgressDeltaDecision(
     val clearsDirtyProgress: Boolean = false,
 )
 
-internal fun enrichWatchProgressEntry(
-    current: WatchProgressEntry,
-    meta: MetaDetails,
-): WatchProgressEntry {
-    val episodeVideo = if (current.seasonNumber != null && current.episodeNumber != null) {
-        meta.videos.firstOrNull { video ->
-            video.season == current.seasonNumber && video.episode == current.episodeNumber
-        }
-    } else {
-        null
-    }
-    return current.copy(
-        title = meta.name.takeIf(String::isNotBlank) ?: current.title,
-        poster = meta.poster?.takeIf(String::isNotBlank) ?: current.poster,
-        background = meta.background?.takeIf(String::isNotBlank) ?: current.background,
-        logo = meta.logo?.takeIf(String::isNotBlank) ?: current.logo,
-        episodeTitle = episodeVideo?.title?.takeIf(String::isNotBlank) ?: current.episodeTitle,
-        episodeThumbnail = episodeVideo?.thumbnail?.takeIf(String::isNotBlank) ?: current.episodeThumbnail,
-        pauseDescription = episodeVideo?.overview?.takeIf(String::isNotBlank)
-            ?: meta.description?.takeIf(String::isNotBlank)
-            ?: current.pauseDescription,
-    )
-}
-
-internal fun WatchProgressEntry.needsRemoteMetadataEnrichment(): Boolean =
-    title.isBlank() ||
-        title.equals(parentMetaId, ignoreCase = true) ||
-        poster.isNullOrBlank() ||
-        background.isNullOrBlank()
-
 object WatchProgressRepository {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val accountScopeLock = SynchronizedObject()
@@ -229,6 +200,7 @@ object WatchProgressRepository {
     private var dirtyProgressKeys: MutableSet<String> = mutableSetOf()
     private var metadataResolutionJob: Job? = null
     private val metadataResolutionRetryCoordinator = MetadataResolutionRetryCoordinator()
+    private val providerMetadataOverlay = ProviderProgressMetadataOverlay()
     private val nuvioPullMutex = Mutex()
     private var lastSuccessfulPushEpochMs = 0L
     private var deltaCursorEventId = 0L
@@ -242,6 +214,9 @@ object WatchProgressRepository {
                 provider.changes.collectLatest {
                     if (activeSource.providerId == provider.providerId) {
                         publish()
+                        if (hasLoaded && !provider.providesCompleteMetadata) {
+                            resolveRemoteMetadata()
+                        }
                     }
                 }
             }
@@ -297,6 +272,7 @@ object WatchProgressRepository {
         currentProfileId = 1
         profileGeneration += 1L
         updateActiveSource(WatchProgressSource.NUVIO_SYNC)
+        providerMetadataOverlay.clear()
         clearLocalEntries()
         lastSuccessfulPushEpochMs = 0L
         deltaCursorEventId = 0L
@@ -311,6 +287,7 @@ object WatchProgressRepository {
         profileGeneration += 1L
         hasLoaded = true
         hasLoadedNuvioRemoteProgress = false
+        providerMetadataOverlay.clear()
         clearLocalEntries()
 
         val payload = WatchProgressStorage.loadPayload(profileId).orEmpty().trim()
@@ -346,6 +323,12 @@ object WatchProgressRepository {
         currentProfileId == profileId &&
             profileGeneration == generation &&
             ProfileRepository.activeProfileId == profileId
+
+    private fun isActiveMetadataTarget(
+        profileId: Int,
+        generation: Long,
+        source: WatchProgressSource,
+    ): Boolean = isActiveOperation(profileId, generation) && activeSource == source
 
     suspend fun pullFromServer(profileId: Int) {
         refreshForSource(
@@ -388,6 +371,7 @@ object WatchProgressRepository {
 
         updateActiveSource(source)
         cancelMetadataResolution(resetProviderHistory = false)
+        providerMetadataOverlay.clear()
         activeProgressProvider()?.onActivated() ?: run { hasLoadedNuvioRemoteProgress = false }
         publish()
         if (activeProgressProvider()?.providesCompleteMetadata != true) {
@@ -931,13 +915,14 @@ object WatchProgressRepository {
     private fun resolveRemoteMetadata() {
         val targetProfileId = currentProfileId
         val targetGeneration = profileGeneration
-        val missingMetadataEntries = localEntriesSnapshot()
+        val targetSource = activeSource
+        val missingMetadataEntries = currentEntries()
             .filter(WatchProgressEntry::needsRemoteMetadataEnrichment)
         val entriesToResolve = missingMetadataEntries.continueWatchingEntries(
             limit = WATCH_PROGRESS_METADATA_RESOLUTION_LIMIT,
         )
         val needsResolution = entriesToResolve
-            .groupBy { it.parentMetaId to it.contentType }
+            .groupBy(WatchProgressEntry::metadataKey)
 
         if (needsResolution.isEmpty()) return
 
@@ -948,7 +933,7 @@ object WatchProgressRepository {
         metadataResolutionJob?.cancel()
         metadataResolutionJob = syncScope.launch(start = CoroutineStart.LAZY) {
             try {
-                if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
+                if (!isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)) return@launch
                 AddonRepository.initialize()
                 val providerReadiness = AddonRepository.uiState.value.metadataProviderReadiness()
                 if (providerReadiness.isReady) {
@@ -972,30 +957,41 @@ object WatchProgressRepository {
                 repeat(needsResolution.size) {
                     val result = resolutionResults.receive()
                     ensureActive()
-                    if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
+                    if (!isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)) return@launch
                     val meta = result.meta
                     if (meta == null) {
                         return@repeat
                     }
 
-                    var appliedEntries = 0
-                    for (entry in result.entries) {
-                        val current = localEntry(entry.resolvedProgressKey()) ?: continue
-                        val enriched = enrichWatchProgressEntry(current = current, meta = meta)
-                        if (enriched == current) continue
-                        upsertLocalEntry(enriched)
-                        appliedEntries += 1
+                    val appliedEntries = if (targetSource.providerId == null) {
+                        var appliedLocalEntries = 0
+                        for (entry in result.entries) {
+                            val current = localEntry(entry.resolvedProgressKey()) ?: continue
+                            val enriched = enrichWatchProgressEntry(current = current, meta = meta)
+                            if (enriched == current) continue
+                            upsertLocalEntry(enriched)
+                            appliedLocalEntries += 1
+                        }
+                        appliedLocalEntries
+                    } else if (providerMetadataOverlay.put(targetSource, result.key, meta)) {
+                        result.entries.size
+                    } else {
+                        0
                     }
                     if (appliedEntries == 0) return@repeat
 
                     resolvedEntries += appliedEntries
 
-                    if (isActiveOperation(targetProfileId, targetGeneration)) {
+                    if (isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)) {
                         publish()
                     }
                 }
                 resolutionResults.close()
-                if (resolvedEntries > 0 && isActiveOperation(targetProfileId, targetGeneration)) {
+                if (
+                    targetSource.providerId == null &&
+                    resolvedEntries > 0 &&
+                    isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)
+                ) {
                     persist()
                 }
             } finally {
@@ -1013,10 +1009,9 @@ object WatchProgressRepository {
     }
 
     private suspend fun fetchRemoteMetadataGroup(
-        key: Pair<String, String>,
+        key: WatchProgressMetadataKey,
         entries: List<WatchProgressEntry>,
     ): RemoteMetadataResolutionResult {
-        val (metaId, metaType) = key
         var meta: MetaDetails? = null
         for (attempt in 1..WATCH_PROGRESS_METADATA_FETCH_ATTEMPTS) {
             if (attempt > 1) {
@@ -1025,7 +1020,7 @@ object WatchProgressRepository {
                 delay(retryDelayMs)
             }
             meta = try {
-                MetaDetailsRepository.fetch(metaType, metaId)
+                MetaDetailsRepository.fetch(key.metaType, key.metaId)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -1034,6 +1029,7 @@ object WatchProgressRepository {
             if (meta != null) break
         }
         return RemoteMetadataResolutionResult(
+            key = key,
             entries = entries,
             meta = meta,
         )
@@ -1465,11 +1461,16 @@ object WatchProgressRepository {
             ?.snapshot()
             ?.entries
             .orEmpty()
-        return projectWatchProgressSourceEntries(
+        val projectedEntries = projectWatchProgressSourceEntries(
             source = activeSource,
             nuvioEntries = localEntriesSnapshot(),
             providerEntries = providerEntries,
         )
+        return if (activeSource.providerId == null) {
+            projectedEntries
+        } else {
+            providerMetadataOverlay.project(source = activeSource, entries = projectedEntries)
+        }
     }
 
     private fun localEntriesSnapshot(): List<WatchProgressEntry> =

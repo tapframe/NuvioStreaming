@@ -174,7 +174,7 @@ internal fun simklPosterUrl(path: String?): String? =
         ?.trim()
         ?.trim('/')
         ?.takeIf(String::isNotBlank)
-        ?.let { normalized -> "https://wsrv.nl/?url=https://simkl.in/posters/${normalized}_w.webp&q=90" }
+        ?.let { normalized -> "https://wsrv.nl/?url=https://simkl.in/posters/${normalized}_ca.webp&q=90" }
 
 internal fun buildSimklSourceUrl(mediaType: SimklMediaType, media: SimklMedia): String? {
     val id = media.ids.simklIdValue()?.toLongOrNull()?.takeIf { it > 0L } ?: return null

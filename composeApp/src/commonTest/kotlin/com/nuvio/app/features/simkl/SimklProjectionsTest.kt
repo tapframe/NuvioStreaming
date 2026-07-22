@@ -60,7 +60,8 @@ class SimklProjectionsTest {
             "https://simkl.com/movies/53536/terminator-3-rise-of-the-machines",
             item.trackingSourceUrl,
         )
-        assertTrue(item.poster.orEmpty().contains("simkl.in/posters/12/poster_w.webp"))
+        assertTrue(item.poster.orEmpty().contains("simkl.in/posters/12/poster_ca.webp"))
+        assertFalse(item.poster.orEmpty().contains("_w.webp"))
         assertEquals(1_700_000_000_000L, item.savedAtEpochMs)
         assertEquals(
             setOf(completedDefinition.key),
@@ -163,6 +164,7 @@ class SimklProjectionsTest {
         assertEquals(1_266_000L, entry.lastPositionMs)
         assertEquals("simkl-playback:12345", entry.progressKey)
         assertEquals(WatchProgressSourceSimklPlayback, entry.source)
+        assertTrue(entry.poster.orEmpty().contains("simkl.in/posters/12/poster_ca.webp"))
         assertFalse(entry.isCompleted)
         assertEquals(1_714_515_180_250L, entry.lastUpdatedEpochMs)
     }
