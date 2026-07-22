@@ -484,6 +484,7 @@ fun App(
 
         LaunchedEffect(Unit) {
             if (!ownsAppRuntime) return@LaunchedEffect
+            InAppLogger.info("App/Runtime", "Starting network/profile/avatar services")
             NetworkStatusRepository.ensureStarted()
             ProfileRepository.loadCachedProfiles()
             AvatarRepository.fetchAvatars()
@@ -1075,15 +1076,18 @@ private fun MainAppContent(
 
     LaunchedEffect(Unit) {
         if (!ownsAppRuntime) return@LaunchedEffect
+        InAppLogger.info("App/Runtime", "Starting main app runtime services")
         NetworkStatusRepository.ensureStarted()
         EpisodeReleaseNotificationsRepository.refreshAsync()
         kotlinx.coroutines.delay(5_000)
         initialHomeReady = true
+        InAppLogger.info("App/Runtime", "Initial home ready")
     }
 
     LaunchedEffect(Unit) {
         if (!ownsAppRuntime) return@LaunchedEffect
         AppForegroundMonitor.events().collect {
+            InAppLogger.debug("App/Foreground", "foreground event: refreshing network status")
             NetworkStatusRepository.requestForegroundRefresh()
         }
     }
@@ -1099,6 +1103,7 @@ private fun MainAppContent(
 
         val previousConditionName = lastNetworkToastCondition
         if (previousConditionName == condition.name) return@LaunchedEffect
+        InAppLogger.info("Network/Status", "condition changed $previousConditionName -> ${condition.name}")
 
         when (condition) {
             NetworkCondition.NoInternet -> {
@@ -1135,7 +1140,12 @@ private fun MainAppContent(
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
-            -> watchSourceReconnectPending = true
+            -> {
+                if (!watchSourceReconnectPending) {
+                    InAppLogger.warn("Network/Status", "watch source reconnect pending condition=${networkStatusUiState.condition.name}")
+                }
+                watchSourceReconnectPending = true
+            }
 
             NetworkCondition.Online -> {
                 if (!watchSourceReconnectPending) return@LaunchedEffect
@@ -1144,15 +1154,20 @@ private fun MainAppContent(
                     ?: ProfileRepository.activeProfileId
                 val authenticatedState = authState as? AuthState.Authenticated
                 if (authenticatedState != null && !authenticatedState.isAnonymous) {
+                    InAppLogger.info("Sync/Foreground", "network restored: requesting foreground pull profile=$profileId")
                     SyncManager.requestForegroundPull(profileId = profileId, force = true)
                     watchSourceReconnectPending = false
                 } else {
+                    InAppLogger.info("Sync/WatchProgress", "network restored: refreshing active watch source profile=$profileId")
                     val result = WatchProgressSourceCoordinator.refreshActiveSource(
                         profileId = profileId,
                         force = true,
                     )
                     if (result.succeeded) {
+                        InAppLogger.info("Sync/WatchProgress", "active watch source refreshed profile=$profileId")
                         watchSourceReconnectPending = false
+                    } else {
+                        InAppLogger.warn("Sync/WatchProgress", "active watch source refresh failed profile=$profileId")
                     }
                 }
             }
@@ -1249,8 +1264,10 @@ private fun MainAppContent(
         if (authenticatedState.isAnonymous) return@LaunchedEffect
 
         val activeProfileId = profileState.activeProfile?.profileIndex ?: return@LaunchedEffect
+        InAppLogger.info("Sync/Foreground", "initial pull profile=$activeProfileId")
         SyncManager.pullAllForProfile(activeProfileId)
         AppForegroundMonitor.events().collect {
+            InAppLogger.debug("Sync/Foreground", "foreground pull requested profile=$activeProfileId")
             SyncManager.requestForegroundPull(activeProfileId, force = true)
         }
     }
@@ -1353,6 +1370,7 @@ private fun MainAppContent(
             AppDeepLinkRepository.pendingDeepLink.collectLatest { deepLink ->
                 when (deepLink) {
                     is AppDeepLink.Meta -> {
+                        InAppLogger.info("App/DeepLink", "meta type=${deepLink.type} id=${deepLink.id}")
                         activateTab(AppScreenTab.Home)
                         val routeTitle = runCatching {
                             MetaDetailsRepository.fetch(deepLink.type, deepLink.id)?.name
@@ -1366,10 +1384,12 @@ private fun MainAppContent(
                         ) {
                             launchSingleTop = true
                         }
+                        InAppLogger.info("App/DeepLink", "meta consumed type=${deepLink.type} id=${deepLink.id} title=$routeTitle")
                         AppDeepLinkRepository.markConsumed(deepLink)
                     }
 
                     is AppDeepLink.AddonInstall -> {
+                        InAppLogger.info("App/DeepLink", "addon install url=${InAppLogger.redactUrl(deepLink.manifestUrl)}")
                         activateTab(AppScreenTab.Settings)
                         navController.navigate(AddonsSettingsRoute(addonsSettingsTitle)) {
                             launchSingleTop = true
@@ -1378,23 +1398,28 @@ private fun MainAppContent(
                         AddonRepository.initialize()
                         when (val result = AddonRepository.addAddon(deepLink.manifestUrl)) {
                             is AddAddonResult.Success -> {
+                                InAppLogger.info("App/DeepLink", "addon install success name=${result.manifest.name}")
                                 NuvioToastController.show(
                                     getString(Res.string.addons_modal_success_message, result.manifest.name),
                                 )
                             }
 
                             is AddAddonResult.Error -> {
+                                InAppLogger.warn("App/DeepLink", "addon install failed message=${result.message}")
                                 NuvioToastController.show(result.message)
                             }
                         }
+                        InAppLogger.info("App/DeepLink", "addon install consumed")
                         AppDeepLinkRepository.markConsumed(deepLink)
                     }
 
                     AppDeepLink.Downloads -> {
+                        InAppLogger.info("App/DeepLink", "downloads")
                         activateTab(AppScreenTab.Settings)
                         navController.navigate(DownloadsSettingsRoute(downloadsSettingsTitle)) {
                             launchSingleTop = true
                         }
+                        InAppLogger.info("App/DeepLink", "downloads consumed")
                         AppDeepLinkRepository.markConsumed(deepLink)
                     }
 

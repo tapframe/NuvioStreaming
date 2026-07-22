@@ -651,6 +651,12 @@ private fun ExoPlayerSurface(
             }
 
             override fun onRenderedFirstFrame() {
+                InAppLogger.info(
+                    "ExoPlayer/Android",
+                    "firstFrame attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
+                )
                 Log.i(
                     PLAYER_DIAGNOSTIC_TAG,
                     "firstFrame attempt=${playbackDiagnostics.attempt} " +
@@ -777,11 +783,21 @@ private fun ExoPlayerSurface(
         val activity = context.findActivity()
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> exoPlayer.playWhenReady = latestPlayWhenReady.value
+                Lifecycle.Event.ON_START -> {
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "lifecycle ON_START restorePlayWhenReady=${latestPlayWhenReady.value}",
+                    )
+                    exoPlayer.playWhenReady = latestPlayWhenReady.value
+                }
                 Lifecycle.Event.ON_STOP -> {
                     val isInPictureInPicture =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true
                     val isFinishing = activity?.isFinishing == true
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "lifecycle ON_STOP pip=$isInPictureInPicture finishing=$isFinishing positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
+                    )
                     if (!isInPictureInPicture || isFinishing) {
                         exoPlayer.pause()
                     }
@@ -792,6 +808,10 @@ private fun ExoPlayerSurface(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            InAppLogger.info(
+                "ExoPlayer/Android",
+                "release positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} durationMs=${exoPlayer.duration.coerceAtLeast(0L)}",
+            )
             exoPlayer.release()
         }
     }
@@ -806,28 +826,40 @@ private fun ExoPlayerSurface(
         onControllerReady(
             object : PlayerEngineController {
                 override fun play() {
+                    InAppLogger.debug("ExoPlayer/Android", "control play positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}")
                     exoPlayer.playWhenReady = true
                     exoPlayer.play()
                 }
 
                 override fun pause() {
+                    InAppLogger.debug("ExoPlayer/Android", "control pause positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}")
                     exoPlayer.pause()
                 }
 
                 override fun seekTo(positionMs: Long) {
-                    exoPlayer.seekTo(positionMs.coerceAtLeast(0L))
+                    val targetMs = positionMs.coerceAtLeast(0L)
+                    InAppLogger.info(
+                        "ExoPlayer/Android",
+                        "control seekTo fromMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} targetMs=$targetMs",
+                    )
+                    exoPlayer.seekTo(targetMs)
                 }
 
                 override fun seekBy(offsetMs: Long) {
-                    exoPlayer.seekTo((exoPlayer.currentPosition + offsetMs).coerceAtLeast(0L))
+                    val currentMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    val targetMs = (currentMs + offsetMs).coerceAtLeast(0L)
+                    InAppLogger.info("ExoPlayer/Android", "control seekBy offsetMs=$offsetMs fromMs=$currentMs targetMs=$targetMs")
+                    exoPlayer.seekTo(targetMs)
                 }
 
                 override fun retry() {
+                    InAppLogger.info("ExoPlayer/Android", "control retry positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}")
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
                 }
 
                 override fun setPlaybackSpeed(speed: Float) {
+                    InAppLogger.info("ExoPlayer/Android", "control speed=$speed")
                     exoPlayer.setPlaybackSpeed(speed)
                 }
 
@@ -849,6 +881,7 @@ private fun ExoPlayerSurface(
 
                 override fun setPlayerVolume(level: Float): PlayerAudioLevel {
                     val target = level.coerceIn(0f, 2f)
+                    InAppLogger.debug("ExoPlayer/Android", "control volume target=$target muted=${target <= 0.001f}")
                     // Keep ExoPlayer's own volume at unity and apply gain in the PCM audio processor.
                     // ExoPlayer#setVolume is effectively a normal 0..1 output volume control on many devices,
                     // so values above 1 may not create audible amplification.
@@ -860,11 +893,21 @@ private fun ExoPlayerSurface(
                     )
                 }
 
-                override fun getAudioTracks(): List<AudioTrack> =
-                    exoPlayer.extractAudioTracks(context)
+                override fun getAudioTracks(): List<AudioTrack> {
+                    val tracks = exoPlayer.extractAudioTracks(context)
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "getAudioTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                    )
+                    return tracks
+                }
 
                 override fun getSubtitleTracks(): List<SubtitleTrack> {
                     val tracks = exoPlayer.extractSubtitleTracks(context)
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "getSubtitleTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                    )
                     Log.d(TAG, "getSubtitleTracks: found ${tracks.size} tracks")
                     tracks.forEach { t ->
                         Log.d(TAG, "  track idx=${t.index} id=${t.id} label='${t.label}' lang=${t.language} selected=${t.isSelected}")
@@ -873,10 +916,12 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun selectAudioTrack(index: Int) {
+                    InAppLogger.info("ExoPlayer/Android", "select audio track index=$index")
                     exoPlayer.selectTrackByIndex(C.TRACK_TYPE_AUDIO, index)
                 }
 
                 override fun selectSubtitleTrack(index: Int) {
+                    InAppLogger.info("ExoPlayer/Android", "select subtitle track index=$index")
                     Log.d(TAG, "selectSubtitleTrack: index=$index")
                     if (index < 0) {
                         Log.d(TAG, "selectSubtitleTrack: disabling text tracks")
@@ -897,12 +942,14 @@ private fun ExoPlayerSurface(
 
                 override fun setSubtitleUri(url: String) {
                     Log.d(TAG, "setSubtitleUri: url=$url")
+                    InAppLogger.info("ExoPlayer/Android", "set external subtitle url=${InAppLogger.redactUrl(url)}")
                     subtitleSelectionJob?.cancel()
                     subtitleSelectionJob = coroutineScope.launch {
                         val currentPosition = exoPlayer.currentPosition
                         val wasPlaying = exoPlayer.isPlaying
                         val currentMediaItem = exoPlayer.currentMediaItem ?: run {
                             Log.e(TAG, "setSubtitleUri: currentMediaItem is null, aborting")
+                            InAppLogger.warn("ExoPlayer/Android", "set external subtitle aborted: currentMediaItem is null")
                             return@launch
                         }
                         preserveAudioSelectionForReload("setSubtitleUri")
@@ -910,6 +957,10 @@ private fun ExoPlayerSurface(
                             resolveSubtitleMimeType(url)
                         }
                         selectedExternalSubtitleMimeType = resolvedMime
+                        InAppLogger.info(
+                            "ExoPlayer/Android",
+                            "external subtitle resolved mime=$resolvedMime positionMs=$currentPosition wasPlaying=$wasPlaying",
+                        )
                         Log.d(TAG, "setSubtitleUri: currentPosition=$currentPosition, wasPlaying=$wasPlaying")
                         val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(Uri.parse(url))
                             .setMimeType(resolvedMime)
@@ -940,11 +991,15 @@ private fun ExoPlayerSurface(
 
                 override fun clearExternalSubtitle() {
                     Log.d(TAG, "clearExternalSubtitle called")
+                    InAppLogger.info("ExoPlayer/Android", "clear external subtitle")
                     subtitleSelectionJob?.cancel()
                     selectedExternalSubtitleMimeType = null
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
-                    val currentMediaItem = exoPlayer.currentMediaItem ?: return
+                    val currentMediaItem = exoPlayer.currentMediaItem ?: run {
+                        InAppLogger.warn("ExoPlayer/Android", "clear external subtitle aborted: currentMediaItem is null")
+                        return
+                    }
                     preserveAudioSelectionForReload("clearExternalSubtitle")
                     val newMediaItem = currentMediaItem.buildUpon()
                         .setSubtitleConfigurations(emptyList())
@@ -957,13 +1012,17 @@ private fun ExoPlayerSurface(
 
                 override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
                     Log.d(TAG, "clearExternalSubtitleAndSelect: trackIndex=$trackIndex")
+                    InAppLogger.info("ExoPlayer/Android", "clear external subtitle and select builtInIndex=$trackIndex")
                     subtitleSelectionJob?.cancel()
                     selectedExternalSubtitleMimeType = null
                     pendingSubtitleTrackIndex.clear()
                     pendingSubtitleTrackIndex.add(trackIndex)
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
-                    val currentMediaItem = exoPlayer.currentMediaItem ?: return
+                    val currentMediaItem = exoPlayer.currentMediaItem ?: run {
+                        InAppLogger.warn("ExoPlayer/Android", "clear external subtitle/select aborted: currentMediaItem is null")
+                        return
+                    }
                     preserveAudioSelectionForReload("clearExternalSubtitleAndSelect")
                     val newMediaItem = currentMediaItem.buildUpon()
                         .setSubtitleConfigurations(emptyList())
@@ -975,12 +1034,18 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
+                    InAppLogger.debug(
+                        "ExoPlayer/Android",
+                        "apply subtitle style font=${style.fontSizeSp} bold=${style.bold} outline=${style.outlineEnabled}:${style.outlineWidth} bottom=${style.bottomOffset}",
+                    )
                     currentSubtitleStyle = style
                     playerViewRef?.applySubtitleStyle(style, pipSubtitleScale)
                 }
 
                 override fun setSubtitleDelayMs(delayMs: Int) {
-                    subtitleDelayMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                    val targetMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                    InAppLogger.info("ExoPlayer/Android", "set subtitle delay ms=$targetMs")
+                    subtitleDelayMs = targetMs
                 }
             }
         )
@@ -1591,20 +1656,36 @@ private class NuvioLibmpvView(
         nowPlayingController: AndroidPlayerNowPlayingController?,
     ): PlayerEngineController =
         object : PlayerEngineController {
-            override fun play() = setPaused(false)
+            override fun play() {
+                InAppLogger.debug("MPV/Android", "control play positionMs=${snapshot().positionMs}")
+                setPaused(false)
+            }
 
-            override fun pause() = setPaused(true)
+            override fun pause() {
+                InAppLogger.debug("MPV/Android", "control pause positionMs=${snapshot().positionMs}")
+                setPaused(true)
+            }
 
-            override fun seekTo(positionMs: Long) = this@NuvioLibmpvView.seekToMs(positionMs)
+            override fun seekTo(positionMs: Long) {
+                val targetMs = positionMs.coerceAtLeast(0L)
+                InAppLogger.info("MPV/Android", "control seekTo targetMs=$targetMs")
+                this@NuvioLibmpvView.seekToMs(targetMs)
+            }
 
-            override fun seekBy(offsetMs: Long) = this@NuvioLibmpvView.seekByMs(offsetMs)
+            override fun seekBy(offsetMs: Long) {
+                InAppLogger.info("MPV/Android", "control seekBy offsetMs=$offsetMs")
+                this@NuvioLibmpvView.seekByMs(offsetMs)
+            }
 
             override fun retry() {
+                InAppLogger.info("MPV/Android", "control retry url=${InAppLogger.redactUrl(currentSourceUrl)}")
                 loadCurrentSource(playWhenReady = true)
             }
 
             override fun setPlaybackSpeed(speed: Float) {
-                mpv.setPropertyDouble("speed", speed.coerceIn(0.25f, 4f).toDouble())
+                val target = speed.coerceIn(0.25f, 4f)
+                InAppLogger.info("MPV/Android", "control speed=$target")
+                mpv.setPropertyDouble("speed", target.toDouble())
             }
 
             override fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {
@@ -1616,11 +1697,12 @@ private class NuvioLibmpvView(
             }
 
             override fun setMuted(muted: Boolean) {
+                InAppLogger.debug("MPV/Android", "control muted=$muted")
                 mpv.setPropertyBoolean("mute", muted)
             }
 
-            override fun getAudioTracks(): List<AudioTrack> =
-                extractLibmpvTracks(context, type = "audio").mapIndexed { index, track ->
+            override fun getAudioTracks(): List<AudioTrack> {
+                val tracks = extractLibmpvTracks(context, type = "audio").mapIndexed { index, track ->
                     AudioTrack(
                         index = index,
                         id = track.id.toString(),
@@ -1629,9 +1711,15 @@ private class NuvioLibmpvView(
                         isSelected = track.isSelected,
                     )
                 }
+                InAppLogger.debug(
+                    "MPV/Android",
+                    "getAudioTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                )
+                return tracks
+            }
 
-            override fun getSubtitleTracks(): List<SubtitleTrack> =
-                extractLibmpvTracks(context, type = "sub").mapIndexed { index, track ->
+            override fun getSubtitleTracks(): List<SubtitleTrack> {
+                val tracks = extractLibmpvTracks(context, type = "sub").mapIndexed { index, track ->
                     SubtitleTrack(
                         index = index,
                         id = track.id.toString(),
@@ -1641,40 +1729,57 @@ private class NuvioLibmpvView(
                         isForced = track.isForced,
                     )
                 }
+                InAppLogger.debug(
+                    "MPV/Android",
+                    "getSubtitleTracks count=${tracks.size} selected=${tracks.firstOrNull { it.isSelected }?.index ?: -1}",
+                )
+                return tracks
+            }
 
             override fun selectAudioTrack(index: Int) {
+                InAppLogger.info("MPV/Android", "select audio track index=$index")
                 if (index < 0) {
                     mpv.setPropertyString("aid", "no")
                 } else {
                     extractLibmpvTracks(context, type = "audio").getOrNull(index)?.let { track ->
+                        InAppLogger.debug("MPV/Android", "select audio track mpvId=${track.id} label=${track.label}")
                         mpv.setPropertyInt("aid", track.id)
                     }
                 }
             }
 
             override fun selectSubtitleTrack(index: Int) {
+                InAppLogger.info("MPV/Android", "select subtitle track index=$index")
                 if (index < 0) {
                     mpv.setPropertyString("sid", "no")
                 } else {
                     extractLibmpvTracks(context, type = "sub").getOrNull(index)?.let { track ->
+                        InAppLogger.debug("MPV/Android", "select subtitle track mpvId=${track.id} label=${track.label}")
                         mpv.setPropertyInt("sid", track.id)
                     }
                 }
             }
 
             override fun setSubtitleUri(url: String) {
+                InAppLogger.info("MPV/Android", "set external subtitle url=${InAppLogger.redactUrl(url)}")
                 mpv.command("sub-add", url, "select")
             }
 
             override fun clearExternalSubtitle() {
+                InAppLogger.info("MPV/Android", "clear external subtitle")
                 mpv.setPropertyString("sid", "no")
             }
 
             override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
+                InAppLogger.info("MPV/Android", "clear external subtitle and select builtInIndex=$trackIndex")
                 selectSubtitleTrack(trackIndex)
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
+                InAppLogger.debug(
+                    "MPV/Android",
+                    "apply subtitle style font=${style.fontSizeSp} bold=${style.bold} outline=${style.outlineEnabled}:${style.outlineWidth} bottom=${style.bottomOffset}",
+                )
                 mpv.setPropertyString("sub-ass-override", "no")
                 mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
                 mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
@@ -1689,9 +1794,11 @@ private class NuvioLibmpvView(
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
+                val targetMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+                InAppLogger.info("MPV/Android", "set subtitle delay ms=$targetMs")
                 mpv.setPropertyDouble(
                     "sub-delay",
-                    delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS) / 1000.0,
+                    targetMs / 1000.0,
                 )
             }
         }

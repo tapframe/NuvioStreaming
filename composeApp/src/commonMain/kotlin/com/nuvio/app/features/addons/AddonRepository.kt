@@ -92,6 +92,10 @@ object AddonRepository {
     fun onProfileChanged(profileId: Int) {
         val effectiveProfileId = resolveEffectiveProfileId(profileId)
         if (effectiveProfileId == currentProfileId && initialized) return
+        InAppLogger.info(
+            "Addons/Repository",
+            "profile changed requested=$profileId effective=$effectiveProfileId previous=$currentProfileId",
+        )
         cancelActiveRefreshes()
         currentProfileId = effectiveProfileId
         initialized = false
@@ -100,6 +104,7 @@ object AddonRepository {
     }
 
     fun clearLocalState() {
+        InAppLogger.info("Addons/Repository", "clear local in-memory state")
         cancelActiveRefreshes()
         currentProfileId = 1
         initialized = false
@@ -233,6 +238,7 @@ object AddonRepository {
 
     suspend fun addAddon(rawUrl: String): AddAddonResult {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) {
+            InAppLogger.warn("Addons/Repository", "addAddon blocked because active profile uses primary addons")
             return AddAddonResult.Error(getString(Res.string.profile_primary_addons_required))
         }
         log.i { "addAddon() — rawUrl=$rawUrl" }
@@ -240,10 +246,16 @@ object AddonRepository {
         val manifestUrl = try {
             normalizeManifestUrl(rawUrl)
         } catch (error: IllegalArgumentException) {
+            InAppLogger.warn(
+                "Addons/Repository",
+                "addAddon invalid url=${InAppLogger.redactUrl(rawUrl)} error=${error.message.orEmpty()}",
+            )
             return AddAddonResult.Error(error.message ?: getString(Res.string.addon_invalid_url))
         }
+        InAppLogger.debug("Addons/Repository", "addAddon normalized=${InAppLogger.redactUrl(manifestUrl)}")
 
         if (_uiState.value.addons.any { it.manifestUrl == manifestUrl }) {
+            InAppLogger.warn("Addons/Repository", "addAddon duplicate url=${InAppLogger.redactUrl(manifestUrl)}")
             return AddAddonResult.Error(getString(Res.string.addon_already_installed))
         }
 
@@ -279,19 +291,29 @@ object AddonRepository {
     }
 
     fun removeAddon(manifestUrl: String) {
-        if (isUsingPrimaryAddonsFromSecondaryProfile()) return
+        if (isUsingPrimaryAddonsFromSecondaryProfile()) {
+            InAppLogger.warn("Addons/Repository", "removeAddon blocked because active profile uses primary addons")
+            return
+        }
         log.i { "removeAddon() — $manifestUrl" }
+        val beforeCount = _uiState.value.addons.size
         _uiState.update { current ->
             current.copy(
                 addons = current.addons.filterNot { it.manifestUrl == manifestUrl },
             )
         }
+        val removed = _uiState.value.addons.size != beforeCount
+        InAppLogger.info("Addons/Repository", "removeAddon removed=$removed url=${InAppLogger.redactUrl(manifestUrl)}")
         persist()
         pushToServer()
     }
 
     fun moveAddon(fromIndex: Int, toIndex: Int) {
-        if (isUsingPrimaryAddonsFromSecondaryProfile()) return
+        if (isUsingPrimaryAddonsFromSecondaryProfile()) {
+            InAppLogger.warn("Addons/Repository", "moveAddon blocked because active profile uses primary addons")
+            return
+        }
+        var movedUrl: String? = null
         _uiState.update { current ->
             val addons = current.addons
             if (
@@ -299,20 +321,32 @@ object AddonRepository {
                 toIndex !in addons.indices ||
                 fromIndex == toIndex
             ) {
+                InAppLogger.debug(
+                    "Addons/Repository",
+                    "moveAddon ignored from=$fromIndex to=$toIndex count=${addons.size}",
+                )
                 return@update current
             }
 
             val reordered = addons.toMutableList()
             val movingAddon = reordered.removeAt(fromIndex)
+            movedUrl = movingAddon.manifestUrl
             reordered.add(toIndex, movingAddon)
             current.copy(addons = reordered)
+        }
+        movedUrl?.let { url ->
+            InAppLogger.info("Addons/Repository", "moveAddon from=$fromIndex to=$toIndex url=${InAppLogger.redactUrl(url)}")
         }
         persist()
         pushToServer()
     }
 
     fun setAddonEnabled(manifestUrl: String, enabled: Boolean) {
-        if (isUsingPrimaryAddonsFromSecondaryProfile()) return
+        if (isUsingPrimaryAddonsFromSecondaryProfile()) {
+            InAppLogger.warn("Addons/Repository", "setAddonEnabled blocked because active profile uses primary addons")
+            return
+        }
+        var changed = false
         var shouldRefresh = false
         _uiState.update { current ->
             current.copy(
@@ -320,12 +354,17 @@ object AddonRepository {
                     if (addon.manifestUrl != manifestUrl || addon.enabled == enabled) {
                         addon
                     } else {
+                        changed = true
                         shouldRefresh = enabled && addon.manifest == null && !addon.isRefreshing
                         addon.copy(enabled = enabled)
                     }
                 },
             )
         }
+        InAppLogger.info(
+            "Addons/Repository",
+            "setAddonEnabled enabled=$enabled changed=$changed shouldRefresh=$shouldRefresh url=${InAppLogger.redactUrl(manifestUrl)}",
+        )
         persist()
         pushToServer()
         if (shouldRefresh) {
@@ -334,14 +373,19 @@ object AddonRepository {
     }
 
     fun refreshAll() {
-        _uiState.value.addons.filter { it.enabled }.distinctBy { it.manifestUrl }.forEach { addon ->
+        val enabledAddons = _uiState.value.addons.filter { it.enabled }.distinctBy { it.manifestUrl }
+        InAppLogger.info("Addons/Repository", "refreshAll enabledCount=${enabledAddons.size}")
+        enabledAddons.forEach { addon ->
             refreshAddon(addon.manifestUrl)
         }
     }
 
     fun refreshAddon(manifestUrl: String) {
         val existingJob = activeRefreshJobs[manifestUrl]
-        if (existingJob?.isActive == true) return
+        if (existingJob?.isActive == true) {
+            InAppLogger.debug("Addons/Manifest", "refresh skipped active url=${InAppLogger.redactUrl(manifestUrl)}")
+            return
+        }
 
         markRefreshing(manifestUrl)
         var refreshJob: Job? = null

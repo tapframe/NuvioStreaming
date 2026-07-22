@@ -27,6 +27,11 @@ internal fun PlayerScreenRuntime.resolveDebridForPlayer(
     onStale: () -> Unit,
 ): Boolean {
     if (!DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)) return false
+    InAppLogger.info(
+        "Streams/Debrid",
+        "resolve requested addon=${stream.addonName} addonId=${stream.addonId} stream=${stream.streamLabel} " +
+            "s=${season ?: -1} e=${episode ?: -1}",
+    )
     scope.launch {
         val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
             stream = stream,
@@ -34,8 +39,20 @@ internal fun PlayerScreenRuntime.resolveDebridForPlayer(
             episode = episode,
         )
         when (resolved) {
-            is DirectDebridPlayableResult.Success -> onResolved(resolved.stream)
+            is DirectDebridPlayableResult.Success -> {
+                InAppLogger.info(
+                    "Streams/Debrid",
+                    "resolve success addon=${stream.addonName} stream=${stream.streamLabel} " +
+                        "url=${InAppLogger.redactUrl(resolved.stream.playableDirectUrl)}",
+                )
+                onResolved(resolved.stream)
+            }
             else -> {
+                InAppLogger.warn(
+                    "Streams/Debrid",
+                    "resolve result=${resolved::class.simpleName ?: "unknown"} addon=${stream.addonName} " +
+                        "stream=${stream.streamLabel} stale=${resolved == DirectDebridPlayableResult.Stale}",
+                )
                 resolved.toastMessage()?.let { NuvioToastController.show(it) }
                 if (resolved == DirectDebridPlayableResult.Stale) {
                     onStale()
@@ -56,6 +73,10 @@ internal fun PlayerScreenRuntime.openExternalSourceUrl(stream: StreamItem): Bool
     if (!stream.shouldOpenExternally) return false
     val url = stream.externalOpenUrl ?: return false
     val openExternalUrl = args.onOpenExternalUrl ?: return false
+    InAppLogger.info(
+        "Player/External",
+        "open external source addon=${stream.addonName} stream=${stream.streamLabel} url=${InAppLogger.redactUrl(url)}",
+    )
     openExternalUrl(url)
     showSourcesPanel = false
     showEpisodesPanel = false
@@ -117,6 +138,11 @@ internal fun StreamItem.playerSourceIdentityKey(): String? {
 
 internal fun PlayerScreenRuntime.stopActiveP2pStream() {
     if (activeTorrentInfoHash != null || p2pResolvedSourceUrl != null) {
+        InAppLogger.info(
+            "Player/P2P",
+            "stop active torrent hash=${activeTorrentInfoHash.orEmpty()} fileIdx=${activeTorrentFileIdx ?: -1} " +
+                "resolved=${InAppLogger.redactUrl(p2pResolvedSourceUrl)}",
+        )
         P2pStreamingEngine.stopStream()
     }
     activeTorrentInfoHash = null
@@ -162,6 +188,10 @@ internal fun PlayerScreenRuntime.switchToP2pSourceStream(stream: StreamItem) {
     val infoHash = stream.p2pInfoHash ?: return
     if (!P2pSettingsRepository.isVisible) return
     if (!P2pSettingsRepository.uiState.value.p2pEnabled) {
+        InAppLogger.warn(
+            "Player/P2P",
+            "source switch pending because P2P disabled hash=$infoHash fileIdx=${stream.p2pFileIdx ?: -1}",
+        )
         pendingP2pSwitch = PendingPlayerP2pSwitch(stream = stream, episode = null, isAutoPlay = false)
         return
     }
@@ -193,6 +223,11 @@ internal fun PlayerScreenRuntime.switchToP2pSourceStream(stream: StreamItem) {
     activeInitialProgressFraction = null
     showSourcesPanel = false
     controlsVisible = true
+    InAppLogger.info(
+        "Player/P2P",
+        "switch source hash=$infoHash fileIdx=${stream.p2pFileIdx ?: -1} filename=${stream.behaviorHints.filename.orEmpty()} " +
+            "trackers=${stream.p2pTrackers.size} resumeMs=$currentPositionMs addon=${stream.addonName} stream=${stream.streamLabel}",
+    )
 }
 
 internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
@@ -203,6 +238,11 @@ internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
     val infoHash = stream.p2pInfoHash ?: return
     if (!P2pSettingsRepository.isVisible) return
     if (!P2pSettingsRepository.uiState.value.p2pEnabled) {
+        InAppLogger.warn(
+            "Player/P2P",
+            "episode switch pending because P2P disabled hash=$infoHash fileIdx=${stream.p2pFileIdx ?: -1} " +
+                "videoId=${episode.id} s=${episode.season} e=${episode.episode} auto=$isAutoPlay",
+        )
         pendingP2pSwitch = PendingPlayerP2pSwitch(stream = stream, episode = episode, isAutoPlay = isAutoPlay)
         return
     }
@@ -227,12 +267,19 @@ internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
     activeTorrentFilename = stream.behaviorHints.filename
     activeTorrentTrackers = stream.p2pTrackers
     applyEpisodeStreamMetadata(stream, episode, resume)
+    InAppLogger.info(
+        "Player/P2P",
+        "switch episode hash=$infoHash fileIdx=${stream.p2pFileIdx ?: -1} filename=${stream.behaviorHints.filename.orEmpty()} " +
+            "trackers=${stream.p2pTrackers.size} videoId=${episode.id} s=${episode.season} e=${episode.episode} " +
+            "resumeMs=${resume.positionMs} auto=$isAutoPlay addon=${stream.addonName} stream=${stream.streamLabel}",
+    )
 }
 
 internal fun PlayerScreenRuntime.switchToLiveChannel(channel: LiveTvChannel) {
     LiveTvRepository.markChannelWatched(channel)
 
     if (channel.streamUrl == activeSourceUrl) {
+        InAppLogger.debug("Player/LiveTV", "selected current channel id=${channel.id} name=${channel.name}")
         activeStreamTitle = channel.name
         activeStreamSubtitle = channel.group
         activeLogo = channel.logoUrl
@@ -485,6 +532,10 @@ internal fun PlayerScreenRuntime.playNextEpisode() {
 
 internal fun PlayerScreenRuntime.openSourcesPanel() {
     val vid = activeVideoId ?: return
+    InAppLogger.info(
+        "Player/Source",
+        "open sources panel videoId=$vid type=${contentType ?: parentMetaType} s=${activeSeasonNumber ?: -1} e=${activeEpisodeNumber ?: -1}",
+    )
     PlayerStreamsRepository.loadSources(
         type = contentType ?: parentMetaType,
         videoId = vid,
@@ -498,9 +549,17 @@ internal fun PlayerScreenRuntime.openSourcesPanel() {
 }
 
 internal fun PlayerScreenRuntime.openEpisodesPanel() {
+    InAppLogger.info(
+        "Player/Episodes",
+        "open episodes panel parentType=$parentMetaType parentId=$parentMetaId cachedVideos=${playerMetaVideos.size}",
+    )
     if (playerMetaVideos.isEmpty()) {
         scope.launch {
             playerMetaVideos = MetaDetailsRepository.fetch(parentMetaType, parentMetaId)?.videos ?: emptyList()
+            InAppLogger.info(
+                "Player/Episodes",
+                "episodes loaded parentType=$parentMetaType parentId=$parentMetaId count=${playerMetaVideos.size}",
+            )
         }
     }
     showEpisodesPanel = true

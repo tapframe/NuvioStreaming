@@ -77,12 +77,14 @@ internal class FetchBridge : HostModule {
             )
         }
 
-        InAppLogger.info(
-            "PluginRuntime/Fetch",
-            "$method ${InAppLogger.redactUrl(url)} -> ${response.status} ${response.statusText} " +
-                "responseUrl=${InAppLogger.redactUrl(response.url)} bodyChars=${response.body.length} " +
-                "responseHeaders=${responseHeaderKeys(response.headers)}",
-        )
+        val responseLogMessage = "$method ${InAppLogger.redactUrl(url)} -> ${response.status} ${response.statusText} " +
+            "responseUrl=${InAppLogger.redactUrl(response.url)} bodyChars=${response.body.length} " +
+            "responseHeaders=${responseHeaderKeys(response.headers)}"
+        if (response.status in 200..299) {
+            InAppLogger.info("PluginRuntime/Fetch", responseLogMessage)
+        } else {
+            InAppLogger.warn("PluginRuntime/Fetch", responseLogMessage)
+        }
 
         val responseHeaders = response.headers.mapKeys { (key, _) -> key.lowercase() }
             .mapValues { (_, value) -> truncateString(value, MAX_FETCH_HEADER_VALUE_CHARS) }
