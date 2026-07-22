@@ -131,6 +131,8 @@ object SimklSyncRepository : TrackingProfileStore {
         }
 
         if (generation != profileGeneration || profileId != ProfileRepository.activeProfileId) return
+        SimklAuthRepository.synchronizeUserSettings(result.activities?.settings?.all)
+        if (generation != profileGeneration || profileId != ProfileRepository.activeProfileId) return
         SimklSyncStorage.savePayload(json.encodeToString(result))
         _state.value = SimklSyncUiState(
             snapshot = result,

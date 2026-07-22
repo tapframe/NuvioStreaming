@@ -33,12 +33,32 @@ data class SimklAuthUiState(
 internal data class SimklStoredAuthState(
     val username: String? = null,
     val accountId: Long? = null,
+    val hasFetchedUserSettings: Boolean = false,
+    val settingsActivityWatermark: String? = null,
     val tokenExpiresAtEpochMs: Long? = null,
     val pendingAuthorizationState: String? = null,
     val pendingAuthorizationStartedAtEpochMs: Long? = null,
 ) {
     val hasPendingAuthorization: Boolean
         get() = !pendingAuthorizationState.isNullOrBlank()
+}
+
+internal enum class SimklSettingsRefreshAction {
+    NONE,
+    RECORD_WATERMARK,
+    FETCH,
+}
+
+internal fun simklSettingsRefreshAction(
+    state: SimklStoredAuthState,
+    activityWatermark: String?,
+): SimklSettingsRefreshAction = when {
+    activityWatermark.isNullOrBlank() -> SimklSettingsRefreshAction.NONE
+    activityWatermark == state.settingsActivityWatermark -> SimklSettingsRefreshAction.NONE
+    state.settingsActivityWatermark == null && state.hasFetchedUserSettings -> {
+        SimklSettingsRefreshAction.RECORD_WATERMARK
+    }
+    else -> SimklSettingsRefreshAction.FETCH
 }
 
 internal sealed interface SimklAuthCallback {

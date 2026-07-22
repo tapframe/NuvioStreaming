@@ -103,7 +103,7 @@ internal class SimklApiClient(
                     url = buildSimklApiUrl(request.path, request.query),
                     headers = simklRequestHeaders(
                         accessToken = token,
-                        contentTypeJson = request.body.isNotEmpty(),
+                        contentTypeJson = request.method == SimklHttpMethod.POST,
                     ),
                     body = request.body,
                 )

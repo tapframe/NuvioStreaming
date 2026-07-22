@@ -187,7 +187,21 @@ object SimklAuthRepository : TrackingAuthProvider {
 
     suspend fun refreshUserSettings(): String? {
         authorizedAccessToken() ?: return null
-        return fetchAndStoreUserSettings()
+        return if (fetchAndStoreUserSettings()) storedState.username else null
+    }
+
+    internal suspend fun synchronizeUserSettings(activityWatermark: String?) {
+        authorizedAccessToken() ?: return
+        when (simklSettingsRefreshAction(storedState, activityWatermark)) {
+            SimklSettingsRefreshAction.NONE -> Unit
+            SimklSettingsRefreshAction.RECORD_WATERMARK -> {
+                storedState = storedState.copy(settingsActivityWatermark = activityWatermark)
+                persistMetadata()
+            }
+            SimklSettingsRefreshAction.FETCH -> {
+                fetchAndStoreUserSettings(activityWatermark)
+            }
+        }
     }
 
     private suspend fun completeAuthorization(callback: SimklAuthCallback.AuthorizationCode) =
@@ -261,30 +275,31 @@ object SimklAuthRepository : TrackingAuthProvider {
             SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
         }
 
-    private suspend fun fetchAndStoreUserSettings(): String? {
+    private suspend fun fetchAndStoreUserSettings(activityWatermark: String? = null): Boolean {
         val response = try {
             SimklApi.client.execute(
                 SimklApiRequest(
                     method = SimklHttpMethod.POST,
                     path = "/users/settings",
-                    body = "{}",
                 ),
             )
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
             log.w { "Failed to fetch Simkl user settings: ${error.message}" }
-            return null
+            return false
         }
         val settings = runCatching { json.decodeFromString<SimklUserSettingsResponse>(response.body) }
-            .getOrNull() ?: return null
+            .getOrNull() ?: return false
         storedState = storedState.copy(
             username = settings.user?.name,
             accountId = settings.account?.id,
+            hasFetchedUserSettings = true,
+            settingsActivityWatermark = activityWatermark ?: storedState.settingsActivityWatermark,
         )
         persistMetadata()
         publish(error = null)
-        return storedState.username
+        return true
     }
 
     private fun loadFromDisk() {

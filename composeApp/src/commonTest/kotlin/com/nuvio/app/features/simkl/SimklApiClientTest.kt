@@ -70,6 +70,23 @@ class SimklApiClientTest {
     }
 
     @Test
+    fun `bodyless post sends json content type without inventing a payload`() = runBlocking {
+        val engine = RecordingEngine(response(200))
+        val harness = TestHarness(engine)
+
+        harness.client.execute(
+            SimklApiRequest(
+                method = SimklHttpMethod.POST,
+                path = "/users/settings",
+            ),
+        )
+
+        val request = engine.requests.single()
+        assertEquals("", request.body)
+        assertEquals("application/json", request.headers["Content-Type"])
+    }
+
+    @Test
     fun `single use unauthenticated posts keep metadata and never retry`() = runBlocking {
         val engine = RecordingEngine(response(503), response(200))
         val harness = TestHarness(engine)
