@@ -71,6 +71,9 @@ class SimklProjectionsTest {
             setOf(watchingDefinition.key),
             projection.items.single { candidate -> candidate.id == "tt1520211" }.listKeys,
         )
+        assertTrue(watchingDefinition.isMembershipDestination)
+        assertTrue(planDefinition.isMembershipDestination)
+        assertFalse(completedDefinition.isMembershipDestination)
     }
 
     @Test

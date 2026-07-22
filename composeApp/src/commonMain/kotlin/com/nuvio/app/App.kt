@@ -162,6 +162,7 @@ import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
 import com.nuvio.app.features.library.LibrarySourceMode
+import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.library.toMetaPreview
@@ -3523,7 +3524,8 @@ private fun MainAppContent(
                                 item = item,
                                 desiredMembership = pickerMembership,
                             )
-                        }.onSuccess {
+                        }.onSuccess { result ->
+                            showTrackingMembershipRewriteFeedback(result)
                             showLibraryListPicker = false
                             pickerItem = null
                             pickerError = null

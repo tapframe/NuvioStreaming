@@ -20,12 +20,17 @@ data class TrackingLibraryTab(
     val kind: TrackingLibraryTabKind,
     val selectionGroup: String? = null,
     val supportedContentTypes: Set<String>? = null,
+    val isMembershipDestination: Boolean = true,
 )
 
 fun TrackingLibraryTab.supportsContentType(contentType: String): Boolean =
     supportedContentTypes == null || supportedContentTypes.any { supported ->
         supported.equals(contentType, ignoreCase = true)
     }
+
+internal fun trackingMembershipDestinations(
+    tabs: List<TrackingLibraryTab>,
+): List<TrackingLibraryTab> = tabs.filter(TrackingLibraryTab::isMembershipDestination)
 
 fun toggleTrackingLibraryMembership(
     tabs: List<TrackingLibraryTab>,
@@ -88,7 +93,7 @@ interface TrackingLibraryProvider {
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
-    )
+    ): TrackingMembershipResolution?
     suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem)
 }
 

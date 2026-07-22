@@ -7,6 +7,7 @@ import com.nuvio.app.features.tracking.TrackingLibraryProvider
 import com.nuvio.app.features.tracking.TrackingLibrarySnapshot
 import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
+import com.nuvio.app.features.tracking.TrackingMembershipResolution
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import kotlinx.coroutines.CoroutineScope
@@ -67,8 +68,8 @@ object SimklLibraryRepository {
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
-    ) {
-        if (profileId != ProfileRepository.activeProfileId) return
+    ): TrackingMembershipResolution? {
+        if (profileId != ProfileRepository.activeProfileId) return null
         ensureLoaded()
         val desiredStatuses = simklLibraryStatusDefinitions.filter { definition ->
             desiredMembership[definition.key] == true
@@ -80,7 +81,7 @@ object SimklLibraryRepository {
         }) { "${desiredStatus?.title} does not support ${item.type}" }
         val currentStatus = findItem(item.id, item.type)?.listKeys.orEmpty()
             .firstNotNullOfOrNull(::simklLibraryStatusDefinition)
-        if (desiredStatus == currentStatus) return
+        if (desiredStatus == currentStatus) return null
 
         val snapshot = SimklSyncRepository.state.value.snapshot
         val media = snapshot.mediaReference(
@@ -103,12 +104,25 @@ object SimklLibraryRepository {
                 SimklMutationRepository.removeFromList(profileId = profileId, items = listOf(media))
             }
 
-            else -> return
+            else -> return null
         }
         check(result.isComplete) {
             "Simkl could not match ${result.notFoundCount} of ${result.attemptedCount} library items"
         }
+        val resolution = desiredStatus?.let { requested ->
+            result.resolvedListStatuses
+                .singleOrNull()
+                ?.let(::simklLibraryStatusDefinition)
+                ?.let { resolved ->
+                    TrackingMembershipResolution(
+                        providerId = TrackingProviderId.SIMKL,
+                        requestedListKey = requested.key,
+                        resolvedListKey = resolved.key,
+                    )
+                }
+        }
         refresh(TrackingRefreshIntent.INVALIDATED)
+        return resolution
     }
 
     private fun publish(syncState: SimklSyncUiState) {
@@ -157,6 +171,7 @@ object SimklTrackingLibraryProvider : TrackingLibraryProvider {
                     },
                     selectionGroup = SIMKL_STATUS_SELECTION_GROUP,
                     supportedContentTypes = definition.supportedContentTypes,
+                    isMembershipDestination = definition.isMembershipDestination,
                 )
             },
             hasLoaded = state.hasLoaded,
@@ -180,13 +195,12 @@ object SimklTrackingLibraryProvider : TrackingLibraryProvider {
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
-    ) {
+    ): TrackingMembershipResolution? =
         SimklLibraryRepository.applyStatusMembership(
             profileId = profileId,
             item = item,
             desiredMembership = desiredMembership,
         )
-    }
 
     override suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem) {
         val current = SimklLibraryRepository.statusMembership(item.id, item.type)

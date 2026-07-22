@@ -13,6 +13,7 @@ internal data class SimklLibraryStatusDefinition(
     val title: String,
     val trackingStatus: TrackingListStatus,
     val supportedContentTypes: Set<String>,
+    val isMembershipDestination: Boolean = true,
 )
 
 internal data class SimklLibraryProjection(
@@ -48,6 +49,7 @@ internal val simklLibraryStatusDefinitions = listOf(
         title = "Simkl Completed",
         trackingStatus = TrackingListStatus.COMPLETED,
         supportedContentTypes = setOf("movie", "series"),
+        isMembershipDestination = false,
     ),
     SimklLibraryStatusDefinition(
         status = SimklListStatus.DROPPED,
@@ -86,6 +88,9 @@ internal fun SimklSyncSnapshot.toSimklLibraryProjection(): SimklLibraryProjectio
 
 internal fun simklLibraryStatusDefinition(key: String): SimklLibraryStatusDefinition? =
     simklLibraryStatusDefinitions.firstOrNull { definition -> definition.key == key }
+
+internal fun simklLibraryStatusDefinition(status: TrackingListStatus): SimklLibraryStatusDefinition? =
+    simklLibraryStatusDefinitions.firstOrNull { definition -> definition.trackingStatus == status }
 
 private fun SimklLibraryEntry.toLibraryItem(
     listKey: String,

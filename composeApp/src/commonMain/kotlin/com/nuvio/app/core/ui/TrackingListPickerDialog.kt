@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.trackingMembershipDestinations
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.action_save
@@ -48,6 +49,7 @@ fun TrackingListPickerDialog(
 ) {
     if (!visible) return
     val tokens = MaterialTheme.nuvio
+    val destinations = trackingMembershipDestinations(tabs)
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
@@ -80,7 +82,7 @@ fun TrackingListPickerDialog(
                     )
                 }
 
-                if (isPending && tabs.isEmpty()) {
+                if (isPending && destinations.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -108,7 +110,7 @@ fun TrackingListPickerDialog(
                             .height(NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s40),
                         verticalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
                     ) {
-                        items(items = tabs, key = { it.key }) { tab ->
+                        items(items = destinations, key = { it.key }) { tab ->
                             val selected = membership[tab.key] == true
                             Row(
                                 modifier = Modifier

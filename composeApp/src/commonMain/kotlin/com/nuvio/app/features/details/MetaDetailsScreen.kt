@@ -106,6 +106,7 @@ import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
 import com.nuvio.app.features.details.components.TrailerPlayerPopup
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
@@ -1299,7 +1300,8 @@ fun MetaDetailsScreen(
                                             item = meta.toLibraryItem(savedAtEpochMs = 0L),
                                             desiredMembership = pickerMembership,
                                         )
-                                    }.onSuccess {
+                                    }.onSuccess { result ->
+                                        showTrackingMembershipRewriteFeedback(result)
                                         showLibraryListPicker = false
                                     }.onFailure { error ->
                                         pickerError = error.message ?: getString(Res.string.tracking_lists_update_failed)

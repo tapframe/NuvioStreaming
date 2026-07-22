@@ -53,6 +53,25 @@ class TrackingReadsTest {
         assertTrue(tab("trakt:watchlist").supportsContentType("movie"))
     }
 
+    @Test
+    fun `non destination status stays in selection group without appearing in picker`() {
+        val watching = tab("simkl:watching", selectionGroup = "simkl:status")
+        val completed = tab("simkl:completed", selectionGroup = "simkl:status")
+            .copy(isMembershipDestination = false)
+        val tabs = listOf(watching, completed)
+
+        assertEquals(listOf(watching), trackingMembershipDestinations(tabs))
+
+        val updated = toggleTrackingLibraryMembership(
+            tabs = tabs,
+            membership = mapOf(watching.key to false, completed.key to true),
+            key = watching.key,
+        )
+
+        assertEquals(true, updated[watching.key])
+        assertEquals(false, updated[completed.key])
+    }
+
     private fun tab(
         key: String,
         providerId: TrackingProviderId? = TrackingProviderId.SIMKL,

@@ -6,6 +6,7 @@ import com.nuvio.app.features.tracking.TrackingLibraryProvider
 import com.nuvio.app.features.tracking.TrackingLibrarySnapshot
 import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
+import com.nuvio.app.features.tracking.TrackingMembershipResolution
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import kotlinx.coroutines.flow.Flow
@@ -69,11 +70,12 @@ object TraktTrackingLibraryProvider : TrackingLibraryProvider {
         profileId: Int,
         item: LibraryItem,
         desiredMembership: Map<String, Boolean>,
-    ) {
+    ): TrackingMembershipResolution? {
         TraktLibraryRepository.applyMembershipChanges(
             item = item,
             changes = TraktMembershipChanges(desiredMembership = desiredMembership),
         )
+        return null
     }
 
     override suspend fun toggleDefaultMembership(profileId: Int, item: LibraryItem) =

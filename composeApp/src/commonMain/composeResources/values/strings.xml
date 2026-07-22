@@ -1446,6 +1446,7 @@
     <string name="trakt_lists_load_failed">Failed to load Trakt lists</string>
     <string name="trakt_lists_update_failed">Failed to update Trakt lists</string>
     <string name="tracking_lists_update_failed">Failed to update tracking lists</string>
+    <string name="tracking_list_status_rewritten">%1$s placed this title in %2$s instead of %3$s</string>
     <string name="updates_asset_line">%1$s • %2$s</string>
     <string name="updates_check_failed">Update check failed</string>
     <string name="updates_download_failed">Download failed</string>

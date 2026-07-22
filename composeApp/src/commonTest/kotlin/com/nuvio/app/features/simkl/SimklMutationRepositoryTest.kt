@@ -105,7 +105,7 @@ class SimklMutationRepositoryTest {
         val engine = RecordingEngine(
             response(
                 status = 201,
-                body = """{"added":{"movies":1},"not_found":{"movies":[{"title":"Missing"}],"shows":[]}}""",
+                body = """{"added":{"movies":[{"to":"completed"}]},"not_found":{"movies":[{"title":"Missing"}],"shows":[]}}""",
             ),
             response(status = 409),
         )
@@ -134,6 +134,7 @@ class SimklMutationRepositoryTest {
 
         assertEquals(2, result.attemptedCount)
         assertEquals(1, result.notFoundCount)
+        assertEquals(listOf(TrackingListStatus.COMPLETED), result.resolvedListStatuses)
         assertFalse(result.isComplete)
         assertEquals(listOf("/sync/add-to-list", "/scrobble/stop"), engine.paths)
         assertEquals(2, committed)

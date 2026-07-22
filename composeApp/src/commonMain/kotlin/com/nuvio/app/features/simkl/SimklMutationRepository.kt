@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.math.round
 
@@ -363,14 +364,33 @@ private fun TrackingExternalIds.toSimklJsonObjectOrNull(): JsonObject? {
 }
 
 private fun SimklApiResponse.toMutationResult(attemptedCount: Int, json: Json): TrackingMutationResult {
-    val notFound = body
+    val payload = body
         .takeIf(String::isNotBlank)
-        ?.let { payload -> runCatching { json.parseToJsonElement(payload).jsonObject["not_found"]?.jsonObject }.getOrNull() }
+        ?.let { value -> runCatching { json.parseToJsonElement(value).jsonObject }.getOrNull() }
+    val notFound = payload
+        ?.get("not_found")
+        ?.let { value -> runCatching { value.jsonObject }.getOrNull() }
     val notFoundCount = notFound
         ?.values
         ?.sumOf { value -> (value as? JsonArray)?.size ?: 0 }
         ?: 0
-    return TrackingMutationResult(attemptedCount = attemptedCount, notFoundCount = notFoundCount)
+    val resolvedListStatuses = payload
+        ?.get("added")
+        ?.let { value -> runCatching { value.jsonObject }.getOrNull() }
+        ?.values
+        .orEmpty()
+        .flatMap { value -> (value as? JsonArray).orEmpty() }
+        .mapNotNull { value ->
+            val wireValue = runCatching {
+                value.jsonObject["to"]?.jsonPrimitive?.content
+            }.getOrNull()
+            TrackingListStatus.fromWireValue(wireValue)
+        }
+    return TrackingMutationResult(
+        attemptedCount = attemptedCount,
+        notFoundCount = notFoundCount,
+        resolvedListStatuses = resolvedListStatuses,
+    )
 }
 
 private fun Double.clampAndRoundProgress(): Double = round(coerceIn(0.0, 100.0) * 100.0) / 100.0

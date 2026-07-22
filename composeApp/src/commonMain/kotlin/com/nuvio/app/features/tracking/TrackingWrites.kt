@@ -5,7 +5,12 @@ enum class TrackingListStatus(val wireValue: String) {
     PLAN_TO_WATCH("plantowatch"),
     ON_HOLD("hold"),
     COMPLETED("completed"),
-    DROPPED("dropped"),
+    DROPPED("dropped");
+
+    companion object {
+        internal fun fromWireValue(value: String?): TrackingListStatus? =
+            entries.firstOrNull { status -> status.wireValue.equals(value, ignoreCase = true) }
+    }
 }
 
 enum class TrackingScrobbleAction(val wireValue: String) {
@@ -27,6 +32,7 @@ data class TrackingScrobbleEvent(
 data class TrackingMutationResult(
     val attemptedCount: Int,
     val notFoundCount: Int = 0,
+    val resolvedListStatuses: List<TrackingListStatus> = emptyList(),
 ) {
     val isComplete: Boolean
         get() = notFoundCount == 0

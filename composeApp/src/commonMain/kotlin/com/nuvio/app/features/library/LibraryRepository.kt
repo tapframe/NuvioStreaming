@@ -12,6 +12,8 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tracking.TrackingLibraryProvider
 import com.nuvio.app.features.tracking.TrackingLibraryTab
 import com.nuvio.app.features.tracking.TrackingLibraryTabKind
+import com.nuvio.app.features.tracking.TrackingMembershipApplyResult
+import com.nuvio.app.features.tracking.TrackingMembershipResolution
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
@@ -387,7 +389,10 @@ object LibraryRepository {
         return libraryMembershipWithLocal(inLocal = inLocal, providerMembership = memberships)
     }
 
-    suspend fun applyMembershipChanges(item: LibraryItem, desiredMembership: Map<String, Boolean>) {
+    suspend fun applyMembershipChanges(
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+    ): TrackingMembershipApplyResult {
         ensureLoaded()
         val localDesired = desiredMembership[LOCAL_LIBRARY_LIST_KEY] == true
         val currentlyInLocal = localState.contains(item.id, item.type)
@@ -406,6 +411,7 @@ object LibraryRepository {
         }
 
         var firstFailure: Throwable? = null
+        val resolutions = mutableListOf<TrackingMembershipResolution>()
         TrackingProviderRegistry.connectedLibraryProviders().forEach { provider ->
             val providerListKeys = provider.snapshot().tabs.mapTo(mutableSetOf(), TrackingLibraryTab::key)
             val providerMembership = desiredMembership.filterKeys(providerListKeys::contains)
@@ -415,7 +421,7 @@ object LibraryRepository {
                         profileId = profileId,
                         item = item,
                         desiredMembership = providerMembership,
-                    )
+                    )?.let(resolutions::add)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
@@ -426,6 +432,7 @@ object LibraryRepository {
         }
         publish()
         firstFailure?.let { throw it }
+        return TrackingMembershipApplyResult(resolutions = resolutions)
     }
 
     suspend fun removeFromList(item: LibraryItem, listKey: String) {
