@@ -69,6 +69,54 @@ class SimklApiClientTest {
     }
 
     @Test
+    fun `single use unauthenticated posts keep metadata and never retry`() = runBlocking {
+        val engine = RecordingEngine(response(503), response(200))
+        val harness = TestHarness(engine)
+
+        assertFailsWith<SimklApiException> {
+            harness.client.execute(
+                SimklApiRequest(
+                    method = SimklHttpMethod.POST,
+                    path = "/oauth/token",
+                    body = "{}",
+                    requiresAuthentication = false,
+                    retryPolicy = SimklRetryPolicy.NEVER,
+                ),
+            )
+        }
+
+        val request = engine.requests.single()
+        assertTrue("client_id=" in request.url)
+        assertTrue("app-name=" in request.url)
+        assertTrue("app-version=" in request.url)
+        assertTrue(request.headers.getValue("User-Agent").contains('/'))
+        assertFalse("Authorization" in request.headers)
+        assertTrue(harness.sleeps.isEmpty())
+        assertFalse(harness.wasUnauthorized)
+    }
+
+    @Test
+    fun `unauthenticated 401 does not invalidate an existing session`() = runBlocking {
+        val engine = RecordingEngine(response(401))
+        val harness = TestHarness(engine)
+
+        assertFailsWith<SimklApiException> {
+            harness.client.execute(
+                SimklApiRequest(
+                    method = SimklHttpMethod.POST,
+                    path = "/oauth/token",
+                    body = "{}",
+                    requiresAuthentication = false,
+                    retryPolicy = SimklRetryPolicy.NEVER,
+                ),
+            )
+        }
+
+        assertFalse(harness.wasUnauthorized)
+        assertEquals(1, engine.requests.size)
+    }
+
+    @Test
     fun `authenticated requests are serialized at documented method rates`() = runBlocking {
         val engine = RecordingEngine(response(200), response(200), response(200), response(200))
         val harness = TestHarness(engine)

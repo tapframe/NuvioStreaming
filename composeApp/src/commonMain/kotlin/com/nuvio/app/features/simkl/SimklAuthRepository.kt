@@ -1,7 +1,6 @@
 package com.nuvio.app.features.simkl
 
 import co.touchlab.kermit.Logger
-import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.tracking.TrackingAuthProvider
 import com.nuvio.app.features.tracking.TrackingCapability
 import com.nuvio.app.features.tracking.TrackingProviderDescriptor
@@ -220,23 +219,19 @@ object SimklAuthRepository : TrackingAuthProvider {
                 redirectUri = SimklConfig.REDIRECT_URI,
             )
             val response = try {
-                httpRequestRaw(
-                    method = "POST",
-                    url = "$SIMKL_API_BASE_URL/oauth/token",
-                    headers = simklRequestHeaders(contentTypeJson = true),
-                    body = json.encodeToString(request),
+                SimklApi.client.execute(
+                    SimklApiRequest(
+                        method = SimklHttpMethod.POST,
+                        path = "/oauth/token",
+                        body = json.encodeToString(request),
+                        requiresAuthentication = false,
+                        retryPolicy = SimklRetryPolicy.NEVER,
+                    ),
                 )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
                 log.w { "Simkl token exchange failed: ${error.message}" }
-                clearPendingAuthorization()
-                persistMetadata()
-                publish(isLoading = false, error = SimklAuthError.TOKEN_EXCHANGE_FAILED)
-                return@withLock
-            }
-
-            if (response.status !in 200..299) {
                 clearPendingAuthorization()
                 persistMetadata()
                 publish(isLoading = false, error = SimklAuthError.TOKEN_EXCHANGE_FAILED)

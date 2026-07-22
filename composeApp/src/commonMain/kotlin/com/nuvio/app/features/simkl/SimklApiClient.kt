@@ -20,12 +20,18 @@ internal enum class SimklHttpMethod {
     DELETE,
 }
 
+internal enum class SimklRetryPolicy {
+    TRANSIENT_FAILURES,
+    NEVER,
+}
+
 internal data class SimklApiRequest(
     val method: SimklHttpMethod,
     val path: String,
     val query: Map<String, String> = emptyMap(),
     val body: String = "",
     val requiresAuthentication: Boolean = true,
+    val retryPolicy: SimklRetryPolicy = SimklRetryPolicy.TRANSIENT_FAILURES,
     val scrobbleStopConflictIsSuccess: Boolean = false,
 )
 
@@ -78,7 +84,11 @@ internal class SimklApiClient(
         }
 
         var lastTransportFailure: Throwable? = null
-        for (attempt in 0..MAX_RETRIES) {
+        val maxRetries = when (request.retryPolicy) {
+            SimklRetryPolicy.TRANSIENT_FAILURES -> MAX_RETRIES
+            SimklRetryPolicy.NEVER -> 0
+        }
+        for (attempt in 0..maxRetries) {
             awaitRateLimit(request.method)
             val response = try {
                 engine.execute(
@@ -94,7 +104,7 @@ internal class SimklApiClient(
                 throw error
             } catch (error: Throwable) {
                 lastTransportFailure = error
-                if (attempt == MAX_RETRIES) {
+                if (attempt == maxRetries) {
                     throw SimklApiException(
                         status = null,
                         errorCode = "transport_failure",
@@ -112,12 +122,12 @@ internal class SimklApiClient(
                     return@withLock response.toApiResponse(isSoftSuccess = true)
                 }
                 SimklResponseAction.REAUTHENTICATE -> {
-                    onUnauthorized()
+                    if (request.requiresAuthentication) onUnauthorized()
                     throw response.toApiException(json)
                 }
                 SimklResponseAction.FAIL -> throw response.toApiException(json)
                 SimklResponseAction.RETRY -> {
-                    if (attempt == MAX_RETRIES) throw response.toApiException(json)
+                    if (attempt == maxRetries) throw response.toApiException(json)
                     sleep(
                         retryDelayMs(
                             attempt = attempt,
