@@ -68,34 +68,6 @@ private data class MetadataProviderReadiness(
         get() = providers.isNotEmpty()
 }
 
-internal fun mergeTrackerProgressEntries(
-    remoteEntries: Collection<WatchProgressEntry>,
-    localEntries: Collection<WatchProgressEntry>,
-): List<WatchProgressEntry> {
-    val newestByMedia = linkedMapOf<String, WatchProgressEntry>()
-    remoteEntries.forEach { entry ->
-        newestByMedia[entry.trackerMediaIdentity()] = entry
-    }
-    localEntries.forEach { entry ->
-        val key = entry.trackerMediaIdentity()
-        val existing = newestByMedia[key]
-        if (existing == null || entry.lastUpdatedEpochMs > existing.lastUpdatedEpochMs) {
-            newestByMedia[key] = entry
-        }
-    }
-    return newestByMedia.values.toList()
-}
-
-private fun WatchProgressEntry.trackerMediaIdentity(): String = buildString {
-    append(parentMetaType.trim().lowercase())
-    append(':')
-    append(parentMetaId.trim().lowercase())
-    append(':')
-    append(seasonNumber ?: -1)
-    append(':')
-    append(episodeNumber ?: -1)
-}
-
 internal class MetadataResolutionRetryCoordinator {
     private val lock = SynchronizedObject()
     private var generation = 0L
@@ -1489,10 +1461,14 @@ object WatchProgressRepository {
         }
 
     private fun currentEntries(): List<WatchProgressEntry> {
-        val provider = activeProgressProvider() ?: return localEntriesSnapshot()
-        return mergeTrackerProgressEntries(
-            remoteEntries = provider.snapshot().entries,
-            localEntries = localEntriesSnapshot().filter(provider::shouldRetainLocalEntry),
+        val providerEntries = activeProgressProvider()
+            ?.snapshot()
+            ?.entries
+            .orEmpty()
+        return projectWatchProgressSourceEntries(
+            source = activeSource,
+            nuvioEntries = localEntriesSnapshot(),
+            providerEntries = providerEntries,
         )
     }
 

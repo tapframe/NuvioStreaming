@@ -10,36 +10,6 @@ import kotlin.test.assertTrue
 class WatchProgressIdentityTest {
 
     @Test
-    fun `tracker progress merge keeps one entry per media and favors fresher local playback`() {
-        val remote = entry(
-            progressKey = "simkl-playback:42",
-            lastUpdatedEpochMs = 100L,
-            lastPositionMs = 400L,
-        )
-        val staleLocal = entry(lastUpdatedEpochMs = 90L, lastPositionMs = 300L)
-        val otherLocal = entry(
-            parentMetaId = "other",
-            videoId = "other:1:2",
-            lastUpdatedEpochMs = 80L,
-        )
-
-        val firstMerge = mergeTrackerProgressEntries(
-            remoteEntries = listOf(remote),
-            localEntries = listOf(staleLocal, otherLocal),
-        )
-
-        assertEquals(2, firstMerge.size)
-        assertEquals("simkl-playback:42", firstMerge.single { it.parentMetaId == "show" }.progressKey)
-
-        val freshLocal = staleLocal.copy(lastUpdatedEpochMs = 110L, lastPositionMs = 500L)
-        val secondMerge = mergeTrackerProgressEntries(
-            remoteEntries = listOf(remote),
-            localEntries = listOf(freshLocal),
-        )
-        assertEquals(500L, secondMerge.single().lastPositionMs)
-    }
-
-    @Test
     fun `provider change during metadata batch schedules one follow up`() {
         val coordinator = MetadataResolutionRetryCoordinator()
 

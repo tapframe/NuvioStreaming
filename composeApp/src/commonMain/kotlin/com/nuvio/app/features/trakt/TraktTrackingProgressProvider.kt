@@ -131,9 +131,6 @@ object TraktTrackingProgressProvider : TrackingProgressProvider {
     override fun normalizeParentContentId(parentContentId: String, videoId: String?): String =
         resolveEffectiveContentId(parentContentId, videoId)
 
-    override fun shouldRetainLocalEntry(entry: WatchProgressEntry): Boolean =
-        !isTraktCompatibleId(entry.parentMetaId)
-
     override suspend fun refreshEpisodeProgress(contentId: String, forceRefresh: Boolean) =
         TraktProgressRepository.refreshEpisodeProgress(contentId, forceRefresh)
 

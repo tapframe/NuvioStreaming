@@ -139,7 +139,6 @@ interface TrackingProgressProvider {
     fun applyOptimisticRemoval(entries: Collection<WatchProgressEntry>) = Unit
     fun applyOptimisticProgress(entry: WatchProgressEntry) = Unit
     fun normalizeParentContentId(parentContentId: String, videoId: String?): String = parentContentId
-    fun shouldRetainLocalEntry(entry: WatchProgressEntry): Boolean = true
     suspend fun refreshEpisodeProgress(contentId: String, forceRefresh: Boolean) = Unit
     fun isHiddenFromProgress(contentId: String): Boolean = false
 }
