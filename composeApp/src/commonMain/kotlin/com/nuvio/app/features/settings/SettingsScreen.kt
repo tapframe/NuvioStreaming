@@ -780,6 +780,7 @@ private fun MobileSettingsScreen(
                     onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                     onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
                     onDebridClick = { onPageChange(SettingsPage.Debrid) },
+                    onTelegramClick = { onPageChange(SettingsPage.Telegram) },
                 )
                 SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                     isTablet = false,
@@ -793,6 +794,13 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     settings = debridSettings,
                 )
+                SettingsPage.Telegram -> item {
+                    TelegramSettingsPage(
+                        isTablet = false,
+                        onBack = { onPageChange(SettingsPage.Integrations) },
+                    )
+                }
+
                 SettingsPage.TraktAuthentication -> traktSettingsContent(
                     isTablet = false,
                     uiState = traktAuthUiState,
@@ -1194,6 +1202,7 @@ private fun TabletSettingsScreen(
                         onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                         onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
                         onDebridClick = { onPageChange(SettingsPage.Debrid) },
+                        onTelegramClick = { onPageChange(SettingsPage.Telegram) },
                     )
                     SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                         isTablet = true,
@@ -1207,6 +1216,13 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         settings = debridSettings,
                     )
+                    SettingsPage.Telegram -> item {
+                        TelegramSettingsPage(
+                            isTablet = true,
+                            onBack = { onPageChange(SettingsPage.Integrations) },
+                        )
+                    }
+
                     SettingsPage.TraktAuthentication -> traktSettingsContent(
                         isTablet = true,
                         uiState = traktAuthUiState,

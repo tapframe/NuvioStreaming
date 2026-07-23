@@ -62,3 +62,9 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# TDLib — preserve all JNI callback classes
+# The native layer calls back into Java by exact name; obfuscation breaks it.
+-keep class org.drinkless.tdlib.** { *; }
+-dontwarn org.drinkless.tdlib.**
+

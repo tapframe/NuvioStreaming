@@ -437,7 +437,10 @@
     <string name="settings_appearance_section_streams">STREAMS</string>
     <string name="compose_settings_page_supporters_contributors">Supporters &amp; Contributors</string>
     <string name="compose_settings_page_tmdb_enrichment">TMDB Enrichment</string>
+    <string name="compose_settings_page_telegram">Telegram Integration</string>
+    <string name="settings_integrations_telegram_description">Search and stream movies &amp; shows directly from your Telegram chats</string>
     <string name="compose_settings_page_trakt">Trakt</string>
+
     <string name="compose_settings_root_about_section">ABOUT</string>
     <string name="compose_settings_root_account_description">Account and sync status</string>
     <string name="compose_settings_root_account_section">ACCOUNT</string>

@@ -418,7 +418,7 @@ kotlin {
                 implementation(libs.androidx.media3.extractor)
                 implementation(libs.mpv.android.lib)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-                implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+                implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "lib-*.aar"))))
                 if (androidDistribution == "full") {
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
                     implementation(libs.ksoup)
@@ -436,6 +436,9 @@ kotlin {
                 exclude(group = "org.jetbrains.skiko", module = "skiko")
             }
             implementation("dev.chrisbanes.haze:haze:1.7.2")
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

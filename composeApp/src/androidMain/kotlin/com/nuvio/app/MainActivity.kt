@@ -121,7 +121,9 @@ class MainActivity : AppCompatActivity() {
         DownloadsLiveStatusPlatform.initialize(applicationContext)
         AndroidAppUpdaterPlatform.initialize(applicationContext)
         PlatformLocalAccountDataCleaner.initialize(applicationContext)
+        com.nuvio.app.features.telegram.TelegramRepository.initialize(applicationContext)
         EpisodeReleaseNotificationPlatform.initialize(applicationContext)
+
         EpisodeReleaseNotificationPlatform.bindActivity(this)
         handleIncomingAppIntent(intent)
 

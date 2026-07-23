@@ -1,5 +1,6 @@
 [versions]
-agp = "9.2.0"
+agp = "9.1.0"
+
 android-compileSdk = "37"
 android-compileSdkMinor = "0"
 android-minSdk = "24"
@@ -89,6 +90,9 @@ ksoup = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 sentry-android = { module = "io.sentry:sentry-android", version.ref = "sentry" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
