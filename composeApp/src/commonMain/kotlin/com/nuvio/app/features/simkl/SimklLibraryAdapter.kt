@@ -166,6 +166,7 @@ object SimklLibraryRepository {
 object SimklTrackingLibraryProvider : TrackingLibraryProvider {
     override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
     override val changes: Flow<Unit> = SimklLibraryRepository.uiState.map { Unit }
+    override val connectionRefreshIntent: TrackingRefreshIntent = simklConnectionRefreshIntent
 
     override fun ensureLoaded() = SimklLibraryRepository.ensureLoaded()
 

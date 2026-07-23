@@ -102,8 +102,8 @@ object LibraryRepository {
                 activeLibraryProvider()?.let { provider ->
                     refreshLibraryProvider(
                         provider = provider,
-                        reason = "authentication change",
-                        intent = TrackingRefreshIntent.INVALIDATED,
+                        reason = "connection state change",
+                        intent = provider.connectionRefreshIntent,
                     )
                 }
                 publish()

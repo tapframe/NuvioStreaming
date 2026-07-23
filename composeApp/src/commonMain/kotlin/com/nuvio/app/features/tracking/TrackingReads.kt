@@ -79,6 +79,7 @@ enum class TrackingRefreshIntent {
 interface TrackingLibraryProvider {
     val providerId: TrackingProviderId
     val changes: Flow<Unit>
+    val connectionRefreshIntent: TrackingRefreshIntent
 
     fun ensureLoaded()
     fun prepare() = Unit

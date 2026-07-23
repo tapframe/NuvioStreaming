@@ -11,14 +11,14 @@ import kotlin.test.assertTrue
 
 class SimklRefreshPolicyTest {
     @Test
-    fun `progress refresh keeps provider policy unless the source changes`() {
+    fun `startup refresh paths share automatic freshness`() {
         assertEquals(
             TrackingRefreshIntent.AUTOMATIC,
-            simklProgressRefreshIntent(sourceChanged = false),
+            simklConnectionRefreshIntent,
         )
         assertEquals(
-            TrackingRefreshIntent.INVALIDATED,
-            simklProgressRefreshIntent(sourceChanged = true),
+            TrackingRefreshIntent.AUTOMATIC,
+            simklProgressRefreshIntent,
         )
     }
 
@@ -117,6 +117,58 @@ class SimklRefreshPolicyTest {
         first.await()
         second.await()
         assertEquals(1, executions)
+    }
+
+    @Test
+    fun `sequential startup refresh paths execute only once`() = runBlocking {
+        val gate = SimklRefreshGate()
+        var lastCheckedAtEpochMs: Long? = null
+        var executions = 0
+
+        listOf(simklConnectionRefreshIntent, simklProgressRefreshIntent).forEach { intent ->
+            gate.runIfNeeded(
+                profileGeneration = 7L,
+                shouldRun = {
+                    shouldRunSimklRefresh(
+                        intent = intent,
+                        lastCheckedAtEpochMs = lastCheckedAtEpochMs,
+                        nowEpochMs = 1_000L,
+                        hasError = false,
+                    )
+                },
+            ) {
+                executions += 1
+                lastCheckedAtEpochMs = 1_000L
+            }
+        }
+
+        assertEquals(1, executions)
+    }
+
+    @Test
+    fun `mutation invalidation still refreshes after startup check`() = runBlocking {
+        val gate = SimklRefreshGate()
+        var lastCheckedAtEpochMs: Long? = null
+        var executions = 0
+
+        listOf(simklConnectionRefreshIntent, TrackingRefreshIntent.INVALIDATED).forEach { intent ->
+            gate.runIfNeeded(
+                profileGeneration = 7L,
+                shouldRun = {
+                    shouldRunSimklRefresh(
+                        intent = intent,
+                        lastCheckedAtEpochMs = lastCheckedAtEpochMs,
+                        nowEpochMs = 1_000L,
+                        hasError = false,
+                    )
+                },
+            ) {
+                executions += 1
+                lastCheckedAtEpochMs = 1_000L
+            }
+        }
+
+        assertEquals(2, executions)
     }
 
     @Test

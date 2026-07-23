@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 object TraktTrackingLibraryProvider : TrackingLibraryProvider {
     override val providerId: TrackingProviderId = TrackingProviderId.TRAKT
     override val changes: Flow<Unit> = TraktLibraryRepository.uiState.map { Unit }
+    override val connectionRefreshIntent: TrackingRefreshIntent = TrackingRefreshIntent.INVALIDATED
 
     override fun ensureLoaded() = TraktLibraryRepository.ensureLoaded()
 

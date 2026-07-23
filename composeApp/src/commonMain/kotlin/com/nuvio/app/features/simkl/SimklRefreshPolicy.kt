@@ -8,6 +8,8 @@ import kotlinx.coroutines.sync.withLock
 internal const val SIMKL_AUTOMATIC_REFRESH_INTERVAL_MINUTES = 15
 internal const val SIMKL_AUTOMATIC_REFRESH_INTERVAL_MS =
     SIMKL_AUTOMATIC_REFRESH_INTERVAL_MINUTES * 60L * 1_000L
+internal val simklConnectionRefreshIntent = TrackingRefreshIntent.AUTOMATIC
+internal val simklProgressRefreshIntent = TrackingRefreshIntent.AUTOMATIC
 
 internal fun shouldRunSimklRefresh(
     intent: TrackingRefreshIntent,
