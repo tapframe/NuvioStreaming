@@ -80,6 +80,7 @@ import nuvio.composeapp.generated.resources.settings_simkl_connected_as
 import nuvio.composeapp.generated.resources.settings_simkl_connected_description
 import nuvio.composeapp.generated.resources.settings_simkl_default_user
 import nuvio.composeapp.generated.resources.settings_simkl_disconnect
+import nuvio.composeapp.generated.resources.settings_simkl_disconnect_description
 import nuvio.composeapp.generated.resources.settings_simkl_finish_sign_in
 import nuvio.composeapp.generated.resources.settings_simkl_invalid_callback
 import nuvio.composeapp.generated.resources.settings_simkl_missing_credentials
@@ -97,6 +98,7 @@ import nuvio.composeapp.generated.resources.settings_trakt_connect
 import nuvio.composeapp.generated.resources.settings_trakt_connected_as
 import nuvio.composeapp.generated.resources.settings_trakt_default_user
 import nuvio.composeapp.generated.resources.settings_trakt_disconnect
+import nuvio.composeapp.generated.resources.settings_trakt_disconnect_description
 import nuvio.composeapp.generated.resources.settings_trakt_failed_open_browser
 import nuvio.composeapp.generated.resources.settings_trakt_finish_sign_in
 import nuvio.composeapp.generated.resources.settings_trakt_missing_credentials
@@ -642,7 +644,18 @@ private fun TrackingDisconnectDialog(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = stringResource(Res.string.settings_tracking_disconnect_description, brand.displayName),
+                    text = when (brand) {
+                        TrackingBrand.TRAKT ->
+                            stringResource(Res.string.settings_trakt_disconnect_description)
+                        TrackingBrand.SIMKL ->
+                            stringResource(Res.string.settings_simkl_disconnect_description)
+                        TrackingBrand.NUVIO,
+                        TrackingBrand.TMDB,
+                        -> stringResource(
+                            Res.string.settings_tracking_disconnect_description,
+                            brand.displayName,
+                        )
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = tokens.colors.textMuted,
                 )
