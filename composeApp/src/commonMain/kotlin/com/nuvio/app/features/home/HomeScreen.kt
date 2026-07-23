@@ -140,7 +140,7 @@ fun HomeScreen(
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by WatchProgressRepository.uiState.collectAsStateWithLifecycle()
-    val effectiveWatchProgressSource by WatchProgressRepository.activeSourceState.collectAsStateWithLifecycle()
+    val effectiveWatchProgressSource = watchProgressUiState.source
     val cloudLibraryUiState by CloudLibraryRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     val trackingSettingsUiState by remember {
@@ -925,6 +925,7 @@ fun HomeScreen(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
                         upcomingItems = upcomingItems,
+                        dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
                         layout = continueWatchingLayout,
                         continueWatchingListState = continueWatchingListState,
@@ -946,6 +947,7 @@ fun HomeScreen(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
                         upcomingItems = upcomingItems,
+                        dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
                         layout = continueWatchingLayout,
                         continueWatchingListState = continueWatchingListState,
@@ -990,6 +992,7 @@ fun HomeScreen(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
                         upcomingItems = upcomingItems,
+                        dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
                         layout = continueWatchingLayout,
                         continueWatchingListState = continueWatchingListState,
@@ -1046,6 +1049,7 @@ private fun LazyListScope.homeContinueWatchingSections(
     preferences: ContinueWatchingPreferencesUiState,
     continueWatchingItems: List<ContinueWatchingItem>,
     upcomingItems: List<ContinueWatchingItem>,
+    dataSourceKey: WatchProgressSource,
     sectionPadding: Dp,
     layout: ContinueWatchingLayout,
     continueWatchingListState: LazyListState,
@@ -1059,6 +1063,7 @@ private fun LazyListScope.homeContinueWatchingSections(
         item(key = HOME_CONTINUE_WATCHING_SECTION_KEY) {
             HomeContinueWatchingSection(
                 items = continueWatchingItems,
+                dataSourceKey = dataSourceKey,
                 style = preferences.style,
                 useEpisodeThumbnails = preferences.useEpisodeThumbnails,
                 blurNextUp = preferences.blurNextUp,
@@ -1076,6 +1081,7 @@ private fun LazyListScope.homeContinueWatchingSections(
         item(key = HOME_UPCOMING_SECTION_KEY) {
             HomeContinueWatchingSection(
                 items = upcomingItems,
+                dataSourceKey = dataSourceKey,
                 style = preferences.style,
                 useEpisodeThumbnails = preferences.useEpisodeThumbnails,
                 blurNextUp = preferences.blurNextUp,

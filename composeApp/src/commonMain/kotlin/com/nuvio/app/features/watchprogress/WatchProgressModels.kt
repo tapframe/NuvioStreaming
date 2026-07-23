@@ -4,6 +4,7 @@ import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryProviderPosterUrl
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.tracking.TrackingAttributedItem
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.Serializable
 
@@ -131,6 +132,7 @@ data class WatchProgressEntry(
 }
 
 data class WatchProgressUiState(
+    val source: WatchProgressSource = WatchProgressSource.NUVIO_SYNC,
     val entries: List<WatchProgressEntry> = emptyList(),
     val hasLoadedRemoteProgress: Boolean = false,
 ) {

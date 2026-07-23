@@ -71,6 +71,7 @@ import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.ScopedDisintegrationTracker
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
@@ -222,7 +223,11 @@ fun LibraryScreen(
         uiState.isLoaded &&
         sortedSections.isNotEmpty()
     ) {
-        disintegration.sync(sortedSections, LIBRARY_SECTION_PREVIEW_LIMIT)
+        disintegration.sync(
+            sourceMode = uiState.sourceMode,
+            sections = sortedSections,
+            previewLimit = LIBRARY_SECTION_PREVIEW_LIMIT,
+        )
     } else {
         disintegration.reset()
         emptyList()
@@ -1196,41 +1201,34 @@ private fun libraryGlobalKey(sectionType: String, item: LibraryItem): String =
     "$sectionType|${item.type}|${item.id}"
 
 private class LibraryDisintegrationHolder {
-    private val exiting = LinkedHashMap<String, LibraryExitingEntry>()
-    private var previous = LinkedHashMap<String, LibraryExitingEntry>()
-    private var invalidations by mutableStateOf(0)
+    private val tracker = ScopedDisintegrationTracker<LibrarySourceMode, String, LibraryExitingEntry> { entry ->
+        libraryGlobalKey(entry.sectionType, entry.item)
+    }
 
     fun onExited(globalKey: String) {
-        if (exiting.remove(globalKey) != null) invalidations++
+        tracker.onDisintegrated(globalKey)
     }
 
     fun reset() {
-        exiting.clear()
-        previous = LinkedHashMap()
+        tracker.reset()
     }
 
-    fun sync(sections: List<LibrarySection>, previewLimit: Int): List<LibraryDisplaySection> {
-        @Suppress("UNUSED_EXPRESSION")
-        invalidations
-
-        val current = LinkedHashMap<String, LibraryExitingEntry>()
+    fun sync(
+        sourceMode: LibrarySourceMode,
+        sections: List<LibrarySection>,
+        previewLimit: Int,
+    ): List<LibraryDisplaySection> {
+        val current = ArrayList<LibraryExitingEntry>()
         sections.forEach { section ->
             section.items.take(previewLimit).forEachIndexed { index, item ->
-                val key = libraryGlobalKey(section.type, item)
-                current[key] = LibraryExitingEntry(item, section.type, section.displayTitle, index)
+                current += LibraryExitingEntry(item, section.type, section.displayTitle, index)
             }
         }
-        for ((key, info) in previous) {
-            if (key !in current && key !in exiting) {
-                exiting[key] = info
-            }
-        }
-        for (key in current.keys) {
-            exiting.remove(key)
-        }
-        previous = current
-
-        val exitingBySection = exiting.values.groupBy { it.sectionType }
+        val exitingBySection = tracker.sync(sourceMode, current)
+            .asSequence()
+            .filter { entry -> entry.exiting }
+            .map { entry -> entry.item }
+            .groupBy { entry -> entry.sectionType }
         val seenTypes = HashSet<String>(sections.size)
         val result = ArrayList<LibraryDisplaySection>(sections.size + 1)
 

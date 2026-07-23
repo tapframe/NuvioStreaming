@@ -1345,6 +1345,7 @@ object WatchProgressRepository {
             ?.hasLoadedRemoteProgress
             ?: hasLoadedNuvioRemoteProgress
         _uiState.value = WatchProgressUiState(
+            source = activeSource,
             entries = sortedEntries,
             hasLoadedRemoteProgress = hasLoadedRemoteProgress,
         )
