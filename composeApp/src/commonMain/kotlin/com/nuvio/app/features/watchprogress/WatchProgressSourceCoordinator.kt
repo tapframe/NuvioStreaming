@@ -309,6 +309,22 @@ object WatchProgressSourceCoordinator {
         }
     }
 
+    suspend fun refreshProviderAndActiveSource(
+        profileId: Int,
+        providerId: TrackingProviderId,
+        refreshProvider: suspend () -> Boolean,
+    ): Boolean = coordinateTrackingProviderRefresh(
+        providerId = providerId,
+        refreshProvider = refreshProvider,
+        activeProviderId = {
+            ensureSourceStateLoaded()
+            currentContext(profileId).effectiveSource.providerId
+        },
+        refreshActiveReadModels = {
+            refreshActiveSource(profileId = profileId, force = false).succeeded
+        },
+    )
+
     private fun ensureSourceStateLoadedForGeneration(expectedGeneration: Long) {
         synchronized(startLock) {
             ensureCoordinatorGeneration(expectedGeneration)

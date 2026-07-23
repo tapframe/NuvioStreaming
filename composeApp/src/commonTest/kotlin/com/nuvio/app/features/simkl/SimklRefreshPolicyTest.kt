@@ -153,6 +153,44 @@ class SimklRefreshPolicyTest {
     }
 
     @Test
+    fun `manual sync followed by read model refresh executes once`() = runBlocking {
+        val gate = SimklRefreshGate()
+        var lastCheckedAtEpochMs: Long? = null
+        var executions = 0
+
+        val outcomes = listOf(
+            TrackingRefreshIntent.USER_INITIATED,
+            TrackingRefreshIntent.AUTOMATIC,
+            TrackingRefreshIntent.AUTOMATIC,
+        ).map { intent ->
+            gate.runIfNeeded(
+                profileGeneration = 7L,
+                shouldRun = {
+                    shouldRunSimklRefresh(
+                        intent = intent,
+                        lastCheckedAtEpochMs = lastCheckedAtEpochMs,
+                        nowEpochMs = 1_000L,
+                        hasError = false,
+                    )
+                },
+            ) {
+                executions += 1
+                lastCheckedAtEpochMs = 1_000L
+            }
+        }
+
+        assertEquals(
+            listOf(
+                SimklRefreshGateOutcome.EXECUTED,
+                SimklRefreshGateOutcome.FRESHNESS_SKIPPED,
+                SimklRefreshGateOutcome.FRESHNESS_SKIPPED,
+            ),
+            outcomes,
+        )
+        assertEquals(1, executions)
+    }
+
+    @Test
     fun `mutation invalidation still refreshes after startup check`() = runBlocking {
         val gate = SimklRefreshGate()
         var lastCheckedAtEpochMs: Long? = null

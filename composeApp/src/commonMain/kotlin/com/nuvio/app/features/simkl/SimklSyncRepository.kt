@@ -73,23 +73,23 @@ object SimklSyncRepository : TrackingProfileStore {
         scope.launch { refresh(intent, origin) }
     }
 
-    suspend fun refresh(intent: TrackingRefreshIntent) {
+    suspend fun refresh(intent: TrackingRefreshIntent): Boolean =
         refresh(intent, SimklRefreshOrigin.MANUAL_SYNC)
-    }
 
     internal suspend fun refresh(
         intent: TrackingRefreshIntent,
         origin: SimklRefreshOrigin,
-    ) {
+    ): Boolean {
         ensureLoaded()
         val requestId = refreshRequestSequence.incrementAndGet()
         val requestedGeneration = profileGeneration
+        val requestedProfileId = ProfileRepository.activeProfileId
         val before = _state.value
         SimklWatchDiagnostics.logRefreshRequest(
             requestId = requestId,
             origin = origin,
             intent = intent,
-            profileId = ProfileRepository.activeProfileId,
+            profileId = requestedProfileId,
             profileGeneration = requestedGeneration,
             authenticated = SimklAuthRepository.isAuthenticated.value,
             snapshot = before.snapshot,
@@ -132,6 +132,12 @@ object SimklSyncRepository : TrackingProfileStore {
             before = before,
             after = _state.value,
         )
+        val completed = _state.value
+        return requestedGeneration == profileGeneration &&
+            requestedProfileId == ProfileRepository.activeProfileId &&
+            SimklAuthRepository.isAuthenticated.value &&
+            completed.hasLoaded &&
+            completed.errorMessage == null
     }
 
     private suspend fun refreshSnapshot(generation: Long) {

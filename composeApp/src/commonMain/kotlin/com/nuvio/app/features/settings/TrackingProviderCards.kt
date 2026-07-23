@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.simkl.SimklAuthError
 import com.nuvio.app.features.simkl.SimklAuthRepository
 import com.nuvio.app.features.simkl.SimklAuthUiState
@@ -64,12 +65,14 @@ import com.nuvio.app.features.simkl.SimklBrandAsset
 import com.nuvio.app.features.simkl.SimklConnectionMode
 import com.nuvio.app.features.simkl.SimklSyncRepository
 import com.nuvio.app.features.simkl.simklBrandPainter
+import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktBrandAsset
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.traktBrandPainter
+import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
@@ -156,6 +159,17 @@ internal fun TrackingProviderCards(
     }.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var showSyncInfo by rememberSaveable { mutableStateOf(false) }
+    val onSimklSyncRequested: () -> Unit = {
+        scope.launch {
+            WatchProgressSourceCoordinator.refreshProviderAndActiveSource(
+                profileId = ProfileRepository.activeProfileId,
+                providerId = TrackingProviderId.SIMKL,
+                refreshProvider = {
+                    SimklSyncRepository.refresh(TrackingRefreshIntent.USER_INITIATED)
+                },
+            )
+        }
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val useTwoColumns = maxWidth >= 600.dp
@@ -176,11 +190,7 @@ internal fun TrackingProviderCards(
                     uiState = simklUiState,
                     isSyncing = syncState.isLoading,
                     syncErrorMessage = syncState.errorMessage,
-                    onSyncRequested = {
-                        scope.launch {
-                            SimklSyncRepository.refresh(TrackingRefreshIntent.USER_INITIATED)
-                        }
-                    },
+                    onSyncRequested = onSimklSyncRequested,
                     onInfoRequested = { showSyncInfo = true },
                     modifier = Modifier
                         .weight(1f)
@@ -200,11 +210,7 @@ internal fun TrackingProviderCards(
                     uiState = simklUiState,
                     isSyncing = syncState.isLoading,
                     syncErrorMessage = syncState.errorMessage,
-                    onSyncRequested = {
-                        scope.launch {
-                            SimklSyncRepository.refresh(TrackingRefreshIntent.USER_INITIATED)
-                        }
-                    },
+                    onSyncRequested = onSimklSyncRequested,
                     onInfoRequested = { showSyncInfo = true },
                     modifier = Modifier.fillMaxWidth(),
                 )
