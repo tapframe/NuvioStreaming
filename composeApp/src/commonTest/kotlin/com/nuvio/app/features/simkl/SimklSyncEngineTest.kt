@@ -79,6 +79,60 @@ class SimklSyncEngineTest {
     }
 
     @Test
+    fun `watched delta discards retained playback without fetching playback`() = runBlocking {
+        val retainedPlayback = episodePlayback("1", "2024-04-30T22:13:00Z")
+        val current = SimklSyncSnapshot(
+            isInitialized = true,
+            watermark = "v1",
+            activities = activities(all = "v1", playback = "p1"),
+            entries = listOf(entry(SimklMediaType.SHOWS, "1")),
+            playback = listOf(retainedPlayback),
+        )
+        val remote = ScriptedRemote(
+            Step.Activities(activities(all = "v2", playback = "p1")),
+            Step.AllItems(
+                null,
+                responseOf(watchedShowEntry("1", "2024-04-30T22:14:00Z")),
+            ),
+        )
+
+        val result = SimklSyncEngine(remote) { 900L }.synchronize(current)
+
+        assertTrue(result.playback.isEmpty())
+        assertTrue(result.toSimklProgressEntries().isEmpty())
+        assertTrue(
+            result.toSimklWatchedProjection().items.any { watched ->
+                watched.season == 1 && watched.episode == 5
+            },
+        )
+        assertEquals(
+            listOf<SimklAllItemsRequest>(SimklAllItemsRequest.Changes("v1")),
+            remote.allItemsRequests,
+        )
+        assertTrue(remote.isExhausted)
+    }
+
+    @Test
+    fun `initial sync discards playback superseded by watched history`() = runBlocking {
+        val remote = ScriptedRemote(
+            Step.AllItems(
+                SimklMediaType.SHOWS,
+                responseOf(watchedShowEntry("1", "2024-04-30T22:14:00Z")),
+            ),
+            Step.AllItems(SimklMediaType.MOVIES, SimklAllItemsResponse(movies = emptyList())),
+            Step.AllItems(SimklMediaType.ANIME, SimklAllItemsResponse(anime = emptyList())),
+            Step.Playback(listOf(episodePlayback("1", "2024-04-30T22:13:00Z"))),
+            Step.Activities(activities(all = "v1", playback = "p1")),
+        )
+
+        val result = SimklSyncEngine(remote) { 900L }.synchronize(SimklSyncSnapshot())
+
+        assertTrue(result.playback.isEmpty())
+        assertEquals(1, result.toSimklWatchedProjection().items.size)
+        assertTrue(remote.isExhausted)
+    }
+
+    @Test
     fun `delta merge reconciles removals and replaces changed playback atomically`() = runBlocking {
         val previousActivities = activities(all = "v1", removed = "r1", playback = "p1")
         val current = SimklSyncSnapshot(
@@ -273,6 +327,26 @@ class SimklSyncEngineTest {
             progress = 42.0,
             movie = media(id),
         )
+
+        fun episodePlayback(id: String, pausedAt: String) = SimklPlaybackSession(
+            id = id.toLong(),
+            progress = 62.5,
+            pausedAt = pausedAt,
+            type = "episode",
+            episode = SimklPlaybackEpisode(season = 1, number = 5),
+            show = media(id),
+        )
+
+        fun watchedShowEntry(id: String, watchedAt: String) =
+            entry(SimklMediaType.SHOWS, id).copy(
+                lastWatchedAt = watchedAt,
+                seasons = listOf(
+                    SimklSeason(
+                        number = 1,
+                        episodes = listOf(SimklEpisode(number = 5, watchedAt = watchedAt)),
+                    ),
+                ),
+            )
 
         fun activities(
             all: String,

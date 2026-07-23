@@ -226,7 +226,7 @@ internal fun parseSimklUtcEpochMs(value: String?): Long? {
     return (((days * 24L + hour) * 60L + minute) * 60L + second) * 1_000L + millis
 }
 
-private fun SimklPlaybackSession.toWatchProgressEntry(): WatchProgressEntry? {
+internal fun SimklPlaybackSession.toWatchProgressEntry(): WatchProgressEntry? {
     val media = media ?: return null
     val parentId = media.canonicalContentId() ?: return null
     val isMovie = mediaType == SimklMediaType.MOVIES

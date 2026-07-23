@@ -38,7 +38,7 @@ internal class SimklSyncEngine(
             playback = playback,
             lastSyncedAtEpochMs = now,
             lastCheckedAtEpochMs = now,
-        )
+        ).reconcileWatchedPlayback()
     }
 
     private suspend fun initialSync(): SimklSyncSnapshot {
@@ -61,7 +61,7 @@ internal class SimklSyncEngine(
             playback = playback,
             lastSyncedAtEpochMs = now,
             lastCheckedAtEpochMs = now,
-        )
+        ).reconcileWatchedPlayback()
     }
 }
 
