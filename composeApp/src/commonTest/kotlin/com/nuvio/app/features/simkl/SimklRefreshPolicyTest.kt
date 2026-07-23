@@ -114,8 +114,8 @@ class SimklRefreshPolicyTest {
         secondStarted.await()
         releaseFirst.complete(Unit)
 
-        first.await()
-        second.await()
+        assertEquals(SimklRefreshGateOutcome.EXECUTED, first.await())
+        assertEquals(SimklRefreshGateOutcome.COALESCED, second.await())
         assertEquals(1, executions)
     }
 
@@ -125,7 +125,7 @@ class SimklRefreshPolicyTest {
         var lastCheckedAtEpochMs: Long? = null
         var executions = 0
 
-        listOf(simklConnectionRefreshIntent, simklProgressRefreshIntent).forEach { intent ->
+        val outcomes = listOf(simklConnectionRefreshIntent, simklProgressRefreshIntent).map { intent ->
             gate.runIfNeeded(
                 profileGeneration = 7L,
                 shouldRun = {
@@ -142,6 +142,13 @@ class SimklRefreshPolicyTest {
             }
         }
 
+        assertEquals(
+            listOf(
+                SimklRefreshGateOutcome.EXECUTED,
+                SimklRefreshGateOutcome.FRESHNESS_SKIPPED,
+            ),
+            outcomes,
+        )
         assertEquals(1, executions)
     }
 
@@ -151,7 +158,10 @@ class SimklRefreshPolicyTest {
         var lastCheckedAtEpochMs: Long? = null
         var executions = 0
 
-        listOf(simklConnectionRefreshIntent, TrackingRefreshIntent.INVALIDATED).forEach { intent ->
+        val outcomes = listOf(
+            simklConnectionRefreshIntent,
+            TrackingRefreshIntent.INVALIDATED,
+        ).map { intent ->
             gate.runIfNeeded(
                 profileGeneration = 7L,
                 shouldRun = {
@@ -168,6 +178,13 @@ class SimklRefreshPolicyTest {
             }
         }
 
+        assertEquals(
+            listOf(
+                SimklRefreshGateOutcome.EXECUTED,
+                SimklRefreshGateOutcome.EXECUTED,
+            ),
+            outcomes,
+        )
         assertEquals(2, executions)
     }
 
@@ -196,8 +213,8 @@ class SimklRefreshPolicyTest {
         secondStarted.await()
         releaseFirst.complete(Unit)
 
-        first.await()
-        second.await()
+        assertEquals(SimklRefreshGateOutcome.EXECUTED, first.await())
+        assertEquals(SimklRefreshGateOutcome.EXECUTED, second.await())
         assertEquals(listOf(1L, 2L), executedGenerations)
     }
 }

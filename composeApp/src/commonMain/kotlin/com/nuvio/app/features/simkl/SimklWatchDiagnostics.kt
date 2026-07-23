@@ -3,6 +3,18 @@ package com.nuvio.app.features.simkl
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 
+internal enum class SimklRefreshOrigin {
+    AUTHORIZATION,
+    LIBRARY,
+    MANUAL_SYNC,
+    MUTATION,
+    PLAYBACK_REMOVAL,
+    PROGRESS,
+    UNKNOWN,
+    WATCHED_ITEMS,
+    WATCHED_SERIES,
+}
+
 internal object SimklWatchDiagnostics {
     private val log = Logger.withTag("SimklDiag")
 
@@ -37,20 +49,26 @@ internal object SimklWatchDiagnostics {
     }
 
     fun logRefreshRequest(
+        requestId: Long,
+        origin: SimklRefreshOrigin,
         intent: TrackingRefreshIntent,
+        profileId: Int,
         profileGeneration: Long,
         authenticated: Boolean,
         snapshot: SimklSyncSnapshot,
         errorMessage: String?,
     ) {
-        log.d {
-            "refresh request intent=$intent generation=$profileGeneration authenticated=$authenticated " +
+        log.i {
+            "refresh request id=$requestId origin=$origin intent=$intent profile=$profileId " +
+                "generation=$profileGeneration authenticated=$authenticated " +
                 "initialized=${snapshot.isInitialized} hasLastChecked=${snapshot.lastCheckedAtEpochMs != null} " +
                 "hasWatermark=${snapshot.watermark != null} hasError=${errorMessage != null}"
         }
     }
 
     fun logRefreshDecision(
+        requestId: Long,
+        origin: SimklRefreshOrigin,
         intent: TrackingRefreshIntent,
         nowEpochMs: Long,
         lastCheckedAtEpochMs: Long?,
@@ -58,20 +76,25 @@ internal object SimklWatchDiagnostics {
         hasError: Boolean,
         eligible: Boolean,
     ) {
-        log.d {
-            "refresh decision intent=$intent eligible=$eligible authenticated=$authenticated " +
+        log.i {
+            "refresh decision id=$requestId origin=$origin intent=$intent eligible=$eligible " +
+                "authenticated=$authenticated " +
                 "hasError=$hasError " +
                 "elapsedMs=${lastCheckedAtEpochMs?.let { nowEpochMs - it }}"
         }
     }
 
     fun logRefreshCompletion(
+        requestId: Long,
+        origin: SimklRefreshOrigin,
         intent: TrackingRefreshIntent,
+        outcome: SimklRefreshGateOutcome,
         before: SimklSyncUiState,
         after: SimklSyncUiState,
     ) {
-        log.d {
-            "refresh completion intent=$intent checkedChanged=" +
+        log.i {
+            "refresh completion id=$requestId origin=$origin intent=$intent outcome=$outcome " +
+                "checkedChanged=" +
                 "${before.snapshot.lastCheckedAtEpochMs != after.snapshot.lastCheckedAtEpochMs} " +
                 "watermarkChanged=${before.snapshot.watermark != after.snapshot.watermark} " +
                 "entriesBefore=${before.snapshot.entries.size} entriesAfter=${after.snapshot.entries.size} " +

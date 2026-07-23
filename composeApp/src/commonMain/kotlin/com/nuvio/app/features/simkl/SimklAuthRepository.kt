@@ -272,7 +272,10 @@ object SimklAuthRepository : TrackingAuthProvider {
             persistMetadata()
             publish(isLoading = false, error = null)
             fetchAndStoreUserSettings()
-            SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
+            SimklSyncRepository.refreshAsync(
+                intent = TrackingRefreshIntent.INVALIDATED,
+                origin = SimklRefreshOrigin.AUTHORIZATION,
+            )
         }
 
     private suspend fun fetchAndStoreUserSettings(activityWatermark: String? = null): Boolean {

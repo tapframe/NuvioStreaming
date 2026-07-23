@@ -126,7 +126,10 @@ object SimklMutationRepository : TrackingListWriter, TrackingHistoryWriter, Trac
         SimklMutationService(
             client = SimklApi.client,
             onMutationCommitted = {
-                SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
+                SimklSyncRepository.refreshAsync(
+                    intent = TrackingRefreshIntent.INVALIDATED,
+                    origin = SimklRefreshOrigin.MUTATION,
+                )
             },
         )
     }

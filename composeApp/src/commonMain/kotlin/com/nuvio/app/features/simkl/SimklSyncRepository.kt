@@ -6,6 +6,7 @@ import com.nuvio.app.features.tracking.TrackingProfileStore
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,7 @@ object SimklSyncRepository : TrackingProfileStore {
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val refreshGate = SimklRefreshGate()
+    private val refreshRequestSequence = atomic(0L)
     private val engine = SimklSyncEngine(
         remote = SimklApiSyncRemote(),
         nowEpochMs = SimklPlatformClock::nowEpochMs,
@@ -61,21 +63,39 @@ object SimklSyncRepository : TrackingProfileStore {
     }
 
     fun refreshAsync(intent: TrackingRefreshIntent) {
-        scope.launch { refresh(intent) }
+        refreshAsync(intent, SimklRefreshOrigin.UNKNOWN)
+    }
+
+    internal fun refreshAsync(
+        intent: TrackingRefreshIntent,
+        origin: SimklRefreshOrigin,
+    ) {
+        scope.launch { refresh(intent, origin) }
     }
 
     suspend fun refresh(intent: TrackingRefreshIntent) {
+        refresh(intent, SimklRefreshOrigin.MANUAL_SYNC)
+    }
+
+    internal suspend fun refresh(
+        intent: TrackingRefreshIntent,
+        origin: SimklRefreshOrigin,
+    ) {
         ensureLoaded()
+        val requestId = refreshRequestSequence.incrementAndGet()
         val requestedGeneration = profileGeneration
         val before = _state.value
         SimklWatchDiagnostics.logRefreshRequest(
+            requestId = requestId,
+            origin = origin,
             intent = intent,
+            profileId = ProfileRepository.activeProfileId,
             profileGeneration = requestedGeneration,
             authenticated = SimklAuthRepository.isAuthenticated.value,
             snapshot = before.snapshot,
             errorMessage = before.errorMessage,
         )
-        refreshGate.runIfNeeded(
+        val outcome = refreshGate.runIfNeeded(
             profileGeneration = requestedGeneration,
             shouldRun = {
                 val current = _state.value
@@ -90,6 +110,8 @@ object SimklSyncRepository : TrackingProfileStore {
                         hasError = current.errorMessage != null,
                     )
                 SimklWatchDiagnostics.logRefreshDecision(
+                    requestId = requestId,
+                    origin = origin,
                     intent = intent,
                     nowEpochMs = nowEpochMs,
                     lastCheckedAtEpochMs = current.snapshot.lastCheckedAtEpochMs,
@@ -103,7 +125,10 @@ object SimklSyncRepository : TrackingProfileStore {
             refreshSnapshot(requestedGeneration)
         }
         SimklWatchDiagnostics.logRefreshCompletion(
+            requestId = requestId,
+            origin = origin,
             intent = intent,
+            outcome = outcome,
             before = before,
             after = _state.value,
         )

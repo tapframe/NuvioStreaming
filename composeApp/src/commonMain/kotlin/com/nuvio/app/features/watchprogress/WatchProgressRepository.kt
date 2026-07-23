@@ -422,6 +422,11 @@ object WatchProgressRepository {
             log.d { "Skipping ${provider.providerId.storageId} progress refresh because it is unavailable" }
             return false
         }
+        log.i {
+            "Tracking progress refresh request profile=$profileId provider=${provider.providerId.storageId} " +
+                "source=$activeSource sourceChanged=$sourceChanged force=$force " +
+                "generation=$operationGeneration"
+        }
         return try {
             provider.refresh(force = force, sourceChanged = sourceChanged)
             if (

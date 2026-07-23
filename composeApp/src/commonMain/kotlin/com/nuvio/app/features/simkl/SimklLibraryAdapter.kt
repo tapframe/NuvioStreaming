@@ -49,7 +49,10 @@ object SimklLibraryRepository {
     }
 
     suspend fun refresh(intent: TrackingRefreshIntent) {
-        SimklSyncRepository.refresh(intent)
+        SimklSyncRepository.refresh(
+            intent = intent,
+            origin = SimklRefreshOrigin.LIBRARY,
+        )
         publish(SimklSyncRepository.state.value)
     }
 

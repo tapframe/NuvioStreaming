@@ -25,6 +25,12 @@ internal fun shouldRunSimklRefresh(
     return elapsedMs < 0L || elapsedMs >= automaticIntervalMs
 }
 
+internal enum class SimklRefreshGateOutcome {
+    COALESCED,
+    EXECUTED,
+    FRESHNESS_SKIPPED,
+}
+
 /**
  * Serializes provider refreshes and coalesces callers that overlap for the same profile generation.
  *
@@ -40,19 +46,20 @@ internal class SimklRefreshGate {
         profileGeneration: Long,
         shouldRun: () -> Boolean,
         block: suspend () -> Unit,
-    ) {
+    ): SimklRefreshGateOutcome {
         val observedSequence = completionSequence.value
-        mutex.withLock {
+        return mutex.withLock {
             if (
                 completionSequence.value != observedSequence &&
                 lastCompletedProfileGeneration == profileGeneration
             ) {
-                return
+                return@withLock SimklRefreshGateOutcome.COALESCED
             }
-            if (!shouldRun()) return
+            if (!shouldRun()) return@withLock SimklRefreshGateOutcome.FRESHNESS_SKIPPED
 
             try {
                 block()
+                SimklRefreshGateOutcome.EXECUTED
             } finally {
                 lastCompletedProfileGeneration = profileGeneration
                 completionSequence.incrementAndGet()

@@ -655,6 +655,10 @@ object LibraryRepository {
         reason: String,
         intent: TrackingRefreshIntent,
     ) {
+        log.i {
+            "Tracking library refresh request provider=${provider.providerId.storageId} " +
+                "reason=$reason intent=$intent"
+        }
         try {
             provider.refresh(intent)
         } catch (error: CancellationException) {

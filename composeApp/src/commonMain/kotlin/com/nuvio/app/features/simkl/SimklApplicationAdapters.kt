@@ -26,7 +26,10 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
     override val providerId: TrackingProviderId = TrackingProviderId.SIMKL
     override suspend fun pull(profileId: Int, pageSize: Int): List<WatchedItem> {
         if (profileId != ProfileRepository.activeProfileId) return emptyList()
-        SimklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
+        SimklSyncRepository.refresh(
+            intent = TrackingRefreshIntent.AUTOMATIC,
+            origin = SimklRefreshOrigin.WATCHED_ITEMS,
+        )
         val snapshot = SimklSyncRepository.state.value.snapshot
         val projection = snapshot.toSimklWatchedProjection()
         SimklWatchDiagnostics.logProjection(
@@ -39,7 +42,10 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
 
     override suspend fun pullFullyWatchedSeriesKeys(profileId: Int): Set<String>? {
         if (profileId != ProfileRepository.activeProfileId) return null
-        SimklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
+        SimklSyncRepository.refresh(
+            intent = TrackingRefreshIntent.AUTOMATIC,
+            origin = SimklRefreshOrigin.WATCHED_SERIES,
+        )
         val snapshot = SimklSyncRepository.state.value.snapshot
         val projection = snapshot.toSimklWatchedProjection()
         SimklWatchDiagnostics.logProjection(
@@ -120,7 +126,10 @@ object SimklProgressRepository {
     }
 
     suspend fun refresh(intent: TrackingRefreshIntent) {
-        SimklSyncRepository.refresh(intent)
+        SimklSyncRepository.refresh(
+            intent = intent,
+            origin = SimklRefreshOrigin.PROGRESS,
+        )
         publish(SimklSyncRepository.state.value)
     }
 
@@ -156,7 +165,10 @@ object SimklProgressRepository {
         }
         SimklSyncRepository.commitPlaybackRemoval(removed)
         if (removed.isNotEmpty()) {
-            SimklSyncRepository.refreshAsync(TrackingRefreshIntent.INVALIDATED)
+            SimklSyncRepository.refreshAsync(
+                intent = TrackingRefreshIntent.INVALIDATED,
+                origin = SimklRefreshOrigin.PLAYBACK_REMOVAL,
+            )
         }
     }
 
