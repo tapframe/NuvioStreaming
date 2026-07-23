@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -126,7 +125,6 @@ import com.nuvio.app.features.tracking.TrackingMembershipApplyResult
 import com.nuvio.app.features.tracking.toggleTrackingLibraryMembership
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.TrackingProviderId
-import com.nuvio.app.features.tracking.resolveTrackingAttribution
 import com.nuvio.app.features.trailer.TrailerPlaybackResolver
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import com.nuvio.app.features.watched.WatchedRepository
@@ -466,24 +464,6 @@ fun MetaDetailsScreen(
                     meta.type,
                 ) {
                     LibraryRepository.isSaved(meta.id, meta.type)
-                }
-                val simklSourceUrl = remember(
-                    libraryUiState.items,
-                    watchProgressUiState.entries,
-                    watchedUiState.items,
-                    meta.id,
-                ) {
-                    resolveTrackingAttribution(
-                        contentId = meta.id,
-                        providerId = TrackingProviderId.SIMKL,
-                        items = sequence {
-                            yieldAll(libraryUiState.items)
-                            yieldAll(watchProgressUiState.entries)
-                            yieldAll(watchedUiState.items)
-                        },
-                    )
-                        ?.sourceUrl
-                        ?.takeIf { url -> url.startsWith("https://simkl.com/") }
                 }
                 val isWatched = remember(watchedUiState.watchedKeys, fullyWatchedSeriesKeys, metaPreview) {
                     WatchingState.isPosterWatched(
@@ -1062,7 +1042,6 @@ fun MetaDetailsScreen(
                                 playButtonLabel = playButtonLabel,
                                 isSaved = isSaved,
                                 isWatched = isWatched,
-                                simklSourceUrl = simklSourceUrl,
                                 onPrimaryPlayClick = onPrimaryPlayClick,
                                 onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                 onSaveClick = toggleSaved,
@@ -1735,7 +1714,6 @@ private fun LazyListScope.configuredMetaSectionItems(
     playButtonLabel: String,
     isSaved: Boolean,
     isWatched: Boolean,
-    simklSourceUrl: String?,
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
@@ -1812,7 +1790,6 @@ private fun LazyListScope.configuredMetaSectionItems(
                     playButtonLabel = playButtonLabel,
                     isSaved = isSaved,
                     isWatched = isWatched,
-                    simklSourceUrl = simklSourceUrl,
                     onPrimaryPlayClick = onPrimaryPlayClick,
                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                     onSaveClick = onSaveClick,
@@ -1962,7 +1939,6 @@ private fun ConfiguredMetaSections(
     playButtonLabel: String,
     isSaved: Boolean,
     isWatched: Boolean,
-    simklSourceUrl: String?,
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
@@ -2002,7 +1978,6 @@ private fun ConfiguredMetaSections(
     animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
     val enabledItems = settings.items.filter { it.enabled }
-    val uriHandler = LocalUriHandler.current
 
     // Helper to check if a section actually has content to show
     val sectionHasContent: (MetaScreenSectionKey) -> Boolean = { key ->
@@ -2056,15 +2031,6 @@ private fun ConfiguredMetaSections(
                             onClick = onSaveClick,
                             onLongClick = onSaveLongClick,
                         ))
-                        simklSourceUrl?.let { sourceUrl ->
-                            add(
-                                DetailSecondaryAction(
-                                    label = stringResource(Res.string.details_view_on_simkl),
-                                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                                    onClick = { runCatching { uriHandler.openUri(sourceUrl) } },
-                                ),
-                            )
-                        }
                     },
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,

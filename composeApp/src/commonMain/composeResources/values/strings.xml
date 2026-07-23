@@ -1169,7 +1169,6 @@
     <string name="tracking_library_source_simkl_selected">Simkl watchlist selected</string>
     <string name="tracking_watch_progress_simkl_selected">Watch progress source set to Simkl</string>
     <string name="tracking_watch_progress_dialog_subtitle">Choose the service Nuvio reads for resume and Continue Watching. Scrobbling remains active for every connected service.</string>
-    <string name="details_view_on_simkl">View on Simkl</string>
     <string name="trakt_library_source_title">Library Source</string>
     <string name="trakt_library_source_subtitle">Choose which source Nuvio reads for your Library</string>
     <string name="trakt_library_source_dialog_title">Library Source</string>
