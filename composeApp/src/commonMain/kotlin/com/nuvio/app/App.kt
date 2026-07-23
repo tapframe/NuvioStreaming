@@ -412,9 +412,14 @@ private enum class AppGateScreen {
 
 private object NativeAppGateRequests {
     val profileSelection = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val profileEdit = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     fun requestProfileSelection() {
         profileSelection.tryEmit(Unit)
+    }
+
+    fun requestProfileEdit() {
+        profileEdit.tryEmit(Unit)
     }
 }
 
@@ -471,6 +476,10 @@ fun App(
                 onSwitchProfile = {
                     onActivate?.invoke(AppScreenTab.Home)
                     NativeAppGateRequests.requestProfileSelection()
+                },
+                onEditProfile = {
+                    onActivate?.invoke(AppScreenTab.Home)
+                    NativeAppGateRequests.requestProfileEdit()
                 },
             )
             return@NuvioTheme
@@ -533,6 +542,15 @@ fun App(
             NativeAppGateRequests.profileSelection.collect {
                 autoSkipProfileSelection = false
                 gateScreen = AppGateScreen.ProfileSelection.name
+            }
+        }
+
+        LaunchedEffect(useNativeNavigation, ownsAppRuntime) {
+            if (!useNativeNavigation || !ownsAppRuntime) return@LaunchedEffect
+            NativeAppGateRequests.profileEdit.collect {
+                editingProfile = ProfileRepository.state.value.activeProfile
+                isNewProfile = false
+                gateScreen = AppGateScreen.ProfileEdit.name
             }
         }
 
@@ -745,6 +763,11 @@ fun App(
                             autoSkipProfileSelection = false
                             gateScreen = AppGateScreen.ProfileSelection.name
                         },
+                        onEditProfile = {
+                            editingProfile = profileState.activeProfile
+                            isNewProfile = false
+                            gateScreen = AppGateScreen.ProfileEdit.name
+                        },
                     )
                 }
             }
@@ -769,6 +792,7 @@ private fun MainAppContent(
     nativeProfileSwitcherController: NativeProfileSwitcherController? = null,
     onRootContentReady: ((Boolean) -> Unit)? = null,
     onSwitchProfile: () -> Unit = {},
+    onEditProfile: () -> Unit = {},
 ) {
         val navBackStack = rememberNavBackStack(navigationSavedStateConfiguration, initialRoute)
         val routeDisposalDecorator = remember {
@@ -2081,6 +2105,7 @@ private fun MainAppContent(
                                         onContinueWatchingClick = onContinueWatchingClick,
                                         onContinueWatchingLongPress = onContinueWatchingLongPress,
                                         onSwitchProfile = onSwitchProfile,
+                                        onEditProfile = onEditProfile,
                                         onSettingsPageClick = if (useNativeNavigation && !isTabletLayout) {
                                             { pageName, title ->
                                                 navController.navigate(SettingsPageRoute(pageName, title))
@@ -3181,6 +3206,8 @@ private fun MainAppContent(
                         },
                         onExternalBack = onBack,
                         showInternalHeader = !useNativeNavigation,
+                        onSwitchProfile = onSwitchProfile,
+                        onEditProfile = onEditProfile,
                         onDownloadsClick = {
                             navController.navigate(DownloadsSettingsRoute(downloadsSettingsTitle))
                         },
@@ -3736,6 +3763,7 @@ private fun AppTabHost(
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     onSwitchProfile: (() -> Unit)? = null,
+    onEditProfile: (() -> Unit)? = null,
     onSettingsPageClick: ((pageName: String, title: String) -> Unit)? = null,
     onHomescreenSettingsClick: () -> Unit = {},
     onMetaScreenSettingsClick: () -> Unit = {},
@@ -3812,6 +3840,7 @@ private fun AppTabHost(
                         rootActionsEnabled = rootActionsEnabled,
                         onNavigatePage = onSettingsPageClick,
                         onSwitchProfile = onSwitchProfile,
+                        onEditProfile = onEditProfile,
                         onHomescreenClick = onHomescreenSettingsClick,
                         onMetaScreenClick = onMetaScreenSettingsClick,
                         onContinueWatchingClick = onContinueWatchingSettingsClick,

@@ -28,6 +28,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_notifications
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
 import nuvio.composeapp.generated.resources.compose_settings_page_plugins
 import nuvio.composeapp.generated.resources.compose_settings_page_poster_customization
+import nuvio.composeapp.generated.resources.compose_settings_page_profile
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import nuvio.composeapp.generated.resources.compose_settings_page_streams
 import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
@@ -58,6 +59,11 @@ internal enum class SettingsPage(
     ),
     Account(
         titleRes = Res.string.compose_settings_page_account,
+        category = SettingsCategory.Account,
+        parentPage = Root,
+    ),
+    Profile(
+        titleRes = Res.string.compose_settings_page_profile,
         category = SettingsCategory.Account,
         parentPage = Root,
     ),
