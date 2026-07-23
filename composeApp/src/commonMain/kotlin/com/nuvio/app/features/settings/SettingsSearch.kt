@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -204,7 +205,7 @@ internal fun settingsSearchEntries(
         title = trackingPage,
         description = stringResource(Res.string.compose_settings_root_tracking_description),
         category = accountCategory,
-        icon = Icons.Rounded.Link,
+        icon = Icons.Default.Sync,
     )
     addPage(
         page = SettingsPage.Appearance,

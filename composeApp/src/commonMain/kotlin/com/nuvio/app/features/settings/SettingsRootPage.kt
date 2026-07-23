@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -109,7 +110,7 @@ internal fun LazyListScope.settingsRootContent(
                     SettingsNavigationRow(
                         title = stringResource(Res.string.compose_settings_page_tracking),
                         description = stringResource(Res.string.compose_settings_root_tracking_description),
-                        icon = Icons.Rounded.Link,
+                        icon = Icons.Default.Sync,
                         isTablet = isTablet,
                         onClick = onTrackingClick,
                     )
