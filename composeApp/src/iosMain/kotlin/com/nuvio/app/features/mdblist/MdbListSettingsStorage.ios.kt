@@ -20,6 +20,7 @@ actual object MdbListSettingsStorage {
     private const val useTraktKey = "mdblist_use_trakt"
     private const val useLetterboxdKey = "mdblist_use_letterboxd"
     private const val useAudienceKey = "mdblist_use_audience"
+    private const val useMalKey = "mdblist_use_mal"
     private val syncKeys = listOf(
         enabledKey,
         apiKey,
@@ -30,6 +31,7 @@ actual object MdbListSettingsStorage {
         useTraktKey,
         useLetterboxdKey,
         useAudienceKey,
+        useMalKey,
     )
 
     actual fun loadEnabled(): Boolean? = loadBoolean(enabledKey)
@@ -87,6 +89,12 @@ actual object MdbListSettingsStorage {
         saveBoolean(useAudienceKey, enabled)
     }
 
+    actual fun loadUseMal(): Boolean? = loadBoolean(useMalKey)
+
+    actual fun saveUseMal(enabled: Boolean) {
+        saveBoolean(useMalKey, enabled)
+    }
+
     private fun loadBoolean(key: String): Boolean? {
         val defaults = NSUserDefaults.standardUserDefaults
         val scopedKey = ProfileScopedKey.of(key)
@@ -111,6 +119,7 @@ actual object MdbListSettingsStorage {
         loadUseTrakt()?.let { put(useTraktKey, encodeSyncBoolean(it)) }
         loadUseLetterboxd()?.let { put(useLetterboxdKey, encodeSyncBoolean(it)) }
         loadUseAudience()?.let { put(useAudienceKey, encodeSyncBoolean(it)) }
+        loadUseMal()?.let { put(useMalKey, encodeSyncBoolean(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -127,5 +136,6 @@ actual object MdbListSettingsStorage {
         payload.decodeSyncBoolean(useTraktKey)?.let(::saveUseTrakt)
         payload.decodeSyncBoolean(useLetterboxdKey)?.let(::saveUseLetterboxd)
         payload.decodeSyncBoolean(useAudienceKey)?.let(::saveUseAudience)
+        payload.decodeSyncBoolean(useMalKey)?.let(::saveUseMal)
     }
 }

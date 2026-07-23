@@ -270,7 +270,7 @@ object WatchedRepository {
             )
 
     suspend fun pullFromServer(profileId: Int) {
-        TraktAuthRepository.ensureLoaded()
+        TraktAuthRepository.ensureLoaded(profileId)
         TraktSettingsRepository.ensureLoaded()
         refreshForSource(
             profileId = profileId,
@@ -283,7 +283,7 @@ object WatchedRepository {
     }
 
     suspend fun forceSnapshotRefreshFromServer(profileId: Int) {
-        TraktAuthRepository.ensureLoaded()
+        TraktAuthRepository.ensureLoaded(profileId)
         TraktSettingsRepository.ensureLoaded()
         refreshForSource(
             profileId = profileId,
@@ -300,7 +300,7 @@ object WatchedRepository {
         source: WatchProgressSource,
         forceSnapshot: Boolean = true,
     ): Boolean {
-        TraktAuthRepository.ensureLoaded()
+        TraktAuthRepository.ensureLoaded(profileId)
         TraktSettingsRepository.ensureLoaded()
         if (ProfileRepository.activeProfileId != profileId) {
             log.d { "Skipping watched refresh for inactive profile $profileId" }
