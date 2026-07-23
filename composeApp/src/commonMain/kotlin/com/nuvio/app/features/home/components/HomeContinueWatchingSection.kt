@@ -55,6 +55,7 @@ import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
@@ -307,6 +308,7 @@ private fun HomeContinueWatchingSectionContent(
         rowContentPadding = PaddingValues(horizontal = sectionPadding),
         itemSpacing = layout.itemGap,
         showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
+        viewAllPillSize = NuvioViewAllPillSize.Compact,
         key = { entry -> entry.videoId },
         animatePlacement = true,
         state = listState,
@@ -1039,9 +1041,9 @@ private fun ContinueWatchingPosterCard(
                 ),
         ) {
             val shouldBlurArtwork = blurNextUp &&
-                useEpisodeThumbnails &&
-                item.isNextUp &&
-                imageUrl == firstNonBlank(item.episodeThumbnail)
+                    useEpisodeThumbnails &&
+                    item.isNextUp &&
+                    imageUrl == firstNonBlank(item.episodeThumbnail)
             if (imageUrl != null) {
                 AsyncImage(
                     model = cloudLibraryDisplayArtworkUrl(imageUrl),
