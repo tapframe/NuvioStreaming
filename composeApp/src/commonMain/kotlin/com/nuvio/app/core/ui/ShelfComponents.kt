@@ -281,7 +281,7 @@ private fun NuvioShelfSectionHeader(
         if (showAccent) {
             Box(
                 modifier = Modifier
-                    .padding(top = NuvioTokens.Space.s6)
+                    .padding(top = NuvioTokens.Space.s2)
                     .width(NuvioTokens.Space.s64 - NuvioTokens.Space.s4)
                     .height(NuvioTokens.Space.s4)
                     .background(
