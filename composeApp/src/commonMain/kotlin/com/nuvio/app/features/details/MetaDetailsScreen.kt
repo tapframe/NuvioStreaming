@@ -261,11 +261,17 @@ fun MetaDetailsScreen(
             return@LaunchedEffect
         }
 
-        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
+        val imdbId = metaForRatings.imdbId?.takeIf { it.startsWith("tt", ignoreCase = true) }
+            ?: extractImdbId(metaForRatings.id)
+            ?: extractImdbId(id)
         val tmdbId = extractTmdbId(metaForRatings.id)
             ?: extractTmdbId(id)
-            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
-            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
+            ?: TmdbService.ensureTmdbId(
+                metaForRatings.id,
+                metaForRatings.type,
+                metaForRatings.imdbId,
+            )?.toIntOrNull()
+            ?: TmdbService.ensureTmdbId(id, type, metaForRatings.imdbId)?.toIntOrNull()
 
         if (imdbId == null && tmdbId == null) {
             episodeImdbRatings = emptyMap()
@@ -1565,6 +1571,7 @@ private fun MetaDetails.toMetaPreview(): MetaPreview =
         releaseInfo = releaseInfo,
         imdbRating = imdbRating,
         genres = genres,
+        imdbId = imdbId,
     )
 
 private fun LazyListScope.configuredMetaSectionItems(

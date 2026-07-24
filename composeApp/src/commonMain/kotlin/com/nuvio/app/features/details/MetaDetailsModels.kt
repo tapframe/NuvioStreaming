@@ -38,6 +38,7 @@ data class MetaDetails(
     val trailers: List<MetaTrailer> = emptyList(),
     val links: List<MetaLink> = emptyList(),
     val videos: List<MetaVideo> = emptyList(),
+    val imdbId: String? = null,
 )
 
 enum class MoreLikeThisSource {

@@ -15,22 +15,26 @@ object TmdbService {
     private val tmdbToImdbCache = linkedMapOf<String, String>()
     private val cacheMutex = Mutex()
 
-    suspend fun ensureTmdbId(videoId: String, mediaType: String): String? {
+    suspend fun ensureTmdbId(
+        videoId: String,
+        mediaType: String,
+        fallbackImdbId: String? = null,
+    ): String? {
         val apiKey = currentApiKey() ?: return null
+        val normalizedType = normalizeMediaType(mediaType)
 
-        val normalized = videoId
-            .removePrefix("tmdb:")
-            .removePrefix("movie:")
-            .removePrefix("series:")
-            .substringBefore(':')
-            .substringBefore('/')
-            .trim()
+        tmdbLookupCandidates(videoId, fallbackImdbId).forEach { candidate ->
+            if (candidate.all(Char::isDigit)) return candidate
+            if (candidate.startsWith("tt", ignoreCase = true)) {
+                imdbToTmdb(
+                    imdbId = candidate,
+                    mediaType = normalizedType,
+                    apiKey = apiKey,
+                )?.let { return it }
+            }
+        }
 
-        if (normalized.isBlank()) return null
-        if (normalized.all(Char::isDigit)) return normalized
-        if (!normalized.startsWith("tt", ignoreCase = true)) return null
-
-        return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
+        return null
     }
 
     suspend fun tmdbToImdb(tmdbId: Int, mediaType: String): String? {
@@ -109,6 +113,24 @@ object TmdbService {
             else -> mediaType.trim().lowercase()
         }
 }
+
+internal fun tmdbLookupCandidates(
+    videoId: String,
+    fallbackImdbId: String?,
+): List<String> =
+    listOfNotNull(videoId, fallbackImdbId)
+        .mapNotNull { rawId ->
+            rawId
+                .trim()
+                .removePrefix("tmdb:")
+                .removePrefix("movie:")
+                .removePrefix("series:")
+                .substringBefore(':')
+                .substringBefore('/')
+                .trim()
+                .takeIf(String::isNotBlank)
+        }
+        .distinct()
 
 internal fun buildTmdbUrl(
     endpoint: String,

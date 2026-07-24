@@ -9,12 +9,17 @@ class HomeCatalogParserTest {
     fun `parse catalog response de-duplicates repeated metas but preserves raw count`() {
         val result = HomeCatalogParser.parseCatalogResponse(
             """
-            {
-              "metas": [
-                { "id": "mal:62516", "type": "series", "name": "A" },
-                { "id": "mal:62516", "type": "series", "name": "A duplicate" },
-                { "id": "mal:1", "type": "movie", "name": "B" }
-              ]
+                {
+                  "metas": [
+                    {
+                      "id": "mal:62516",
+                      "type": "series",
+                      "name": "A",
+                      "imdb_id": "tt30217403"
+                    },
+                    { "id": "mal:62516", "type": "series", "name": "A duplicate" },
+                    { "id": "mal:1", "type": "movie", "name": "B" }
+                  ]
             }
             """.trimIndent(),
         )
@@ -25,6 +30,7 @@ class HomeCatalogParserTest {
             result.items.map { it.stableKey() },
         )
         assertEquals("A", result.items.first().name)
+        assertEquals("tt30217403", result.items.first().imdbId)
     }
 
     @Test

@@ -22,7 +22,8 @@ class MetaDetailsParserTest {
             {
               "id": "mal:62516",
               "type": "series",
-              "name": "The Fragrant Flower Blooms with Dignity"
+              "name": "The Fragrant Flower Blooms with Dignity",
+              "imdb_id": "tt30217403"
             }
             """.trimIndent(),
         )
@@ -30,6 +31,7 @@ class MetaDetailsParserTest {
         assertEquals("mal:62516", result.id)
         assertEquals("series", result.type)
         assertEquals("The Fragrant Flower Blooms with Dignity", result.name)
+        assertEquals("tt30217403", result.imdbId)
     }
 
     @Test

@@ -55,6 +55,7 @@ internal object MetaDetailsParser {
             trailers = meta.trailers(),
             links = links,
             videos = meta.videos(),
+            imdbId = meta.string("imdb_id") ?: meta.string("imdbId"),
         )
     }
 

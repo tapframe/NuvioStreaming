@@ -49,7 +49,9 @@ object MdbListMetadataService {
         if (!settings.enabled) return false
         if (settings.apiKey.trim().isBlank()) return false
         if (settings.enabledProvidersInPriorityOrder().isEmpty()) return false
-        return extractImdbId(meta.id) != null || extractImdbId(fallbackItemId) != null
+        return validImdbId(meta.imdbId) != null ||
+            extractImdbId(meta.id) != null ||
+            extractImdbId(fallbackItemId) != null
     }
 
     suspend fun enrichMeta(
@@ -62,7 +64,8 @@ object MdbListMetadataService {
         }
         val apiKey = settings.apiKey.trim()
 
-        val imdbId = extractImdbId(meta.id)
+        val imdbId = validImdbId(meta.imdbId)
+            ?: extractImdbId(meta.id)
             ?: extractImdbId(fallbackItemId)
             ?: return meta.copy(externalRatings = emptyList())
         val mediaType = toMdbListMediaType(meta.type)
@@ -107,6 +110,11 @@ object MdbListMetadataService {
         ratingsCache[cacheKey] = ratings
         ratings
     }
+
+    private fun validImdbId(value: String?): String? =
+        value
+            ?.trim()
+            ?.takeIf { imdbRegex.matches(it) }
 
     private suspend fun fetchProviderRating(
         imdbId: String,

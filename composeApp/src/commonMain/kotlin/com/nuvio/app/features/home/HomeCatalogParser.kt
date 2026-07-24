@@ -57,6 +57,7 @@ internal object HomeCatalogParser {
                     genres = meta.array("genres").mapNotNull { genre ->
                         genre.jsonPrimitive.contentOrNull?.takeIf { it.isNotBlank() }
                     },
+                    imdbId = meta.string("imdb_id") ?: meta.string("imdbId"),
                 )
                 if (seenKeys.add(item.stableKey())) {
                     add(item)
