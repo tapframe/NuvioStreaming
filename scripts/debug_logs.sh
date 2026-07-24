@@ -12,6 +12,7 @@
 #    -s, --serial <id>     ADB device serial (optional, for multi-device)
 #    -p, --package <name>  Android package/applicationId (default: debug build)
 #    -t, --tag <regex>     Additional logcat tag filter regex (default: all app)
+#        --p2p             Focus on Nuvio Engine startup/playback diagnostics
 #    -c, --clear           Clear logcat buffer before streaming
 #    -h, --help            Show help
 # ─────────────────────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ PACKAGE="${NUVIO_LOG_PACKAGE:-com.nuviodebug.com}"
 SERIAL=""
 CLEAR_BUFFER=false
 TAG_FILTER=""
+P2P_MODE=false
 STREAM_PID=""
 USER_QUIT=false
 
@@ -33,6 +35,7 @@ LOG_FILE="${LOG_DIR}/debug_$(date +%Y%m%d_%H%M%S).log"
 
 # ── Noise suppression ───────────────────────────────────────────────────────
 NOISE_TAGS='EGL_emulation|OpenGLRenderer|eglCodecCommon|goldfish|gralloc|hwcomposer|SurfaceFlinger|chatty|ConfigStore|libEGL|MediaCodec|AudioTrack|AudioFlinger|BufferQueueProducer|GraphicBufferSource|OMXClient'
+P2P_TAGS='NuvioP2PDiag|NuvioPlayerDiag|P2pStreamingEngine|NuvioPlayer'
 
 # ── ANSI colour codes ───────────────────────────────────────────────────────
 RST='\033[0m'
@@ -62,6 +65,7 @@ Options:
   -s, --serial <id>     ADB device serial (optional)
   -p, --package <name>  Android package/applicationId (default: com.nuviodebug.com)
   -t, --tag <regex>     Additional grep regex to filter log tags
+      --p2p             Focus on engine phases, route telemetry, and player startup
   -c, --clear           Clear logcat buffer before streaming
   -h, --help            Show this help
 
@@ -73,6 +77,8 @@ Examples:
   ./scripts/debug_logs.sh
   ./scripts/debug_logs.sh --serial emulator-5554
   ./scripts/debug_logs.sh --package com.nuvio.app
+  ./scripts/debug_logs.sh --clear --p2p
+  ./scripts/debug_logs.sh --serial emulator-5554 --clear --p2p
   ./scripts/debug_logs.sh --tag 'MetaDetailsRepo|SeriesContent'
   ./scripts/debug_logs.sh --clear --tag 'Sync|Auth'
 EOF
@@ -84,11 +90,20 @@ while [[ $# -gt 0 ]]; do
     -s|--serial)  SERIAL="${2:-}"; shift 2 ;;
     -p|--package) PACKAGE="${2:-}"; shift 2 ;;
     -t|--tag)     TAG_FILTER="${2:-}"; shift 2 ;;
+    --p2p)        P2P_MODE=true; shift ;;
     -c|--clear)   CLEAR_BUFFER=true; shift ;;
     -h|--help)    usage; exit 0 ;;
     *)            echo "Unknown option: $1" >&2; usage; exit 1 ;;
   esac
 done
+
+if $P2P_MODE; then
+  if [[ -n "$TAG_FILTER" ]]; then
+    TAG_FILTER="${P2P_TAGS}|${TAG_FILTER}"
+  else
+    TAG_FILTER="$P2P_TAGS"
+  fi
+fi
 
 # ── ADB setup ────────────────────────────────────────────────────────────────
 ADB=(adb)
@@ -104,6 +119,9 @@ fi
 
 DEVICE_MODEL=$("${ADB[@]}" shell getprop ro.product.model 2>/dev/null | tr -d '\r' || echo "unknown")
 ANDROID_VER=$("${ADB[@]}" shell getprop ro.build.version.release 2>/dev/null | tr -d '\r' || echo "?")
+ANDROID_SDK=$("${ADB[@]}" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || echo "?")
+DEVICE_ABI=$("${ADB[@]}" shell getprop ro.product.cpu.abi 2>/dev/null | tr -d '\r' || echo "unknown")
+DEVICE_SERIAL=$("${ADB[@]}" get-serialno 2>/dev/null | tr -d '\r' || echo "unknown")
 
 if $CLEAR_BUFFER; then
   "${ADB[@]}" logcat -c
@@ -128,6 +146,22 @@ APP_UID="$(uid_from_pm || true)"
 if [[ -z "$APP_UID" ]]; then
   APP_UID="$(uid_from_dumpsys || true)"
 fi
+
+APP_VERSION=$("${ADB[@]}" shell dumpsys package "$PACKAGE" 2>/dev/null \
+  | tr -d '\r' \
+  | sed -nE 's/.*versionName=([^[:space:]]+).*/\1/p' \
+  | head -n1)
+APP_VERSION="${APP_VERSION:-unknown}"
+
+write_session_metadata() {
+  {
+    echo "# Nuvio Android diagnostic capture"
+    echo "# started=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "# serial=${DEVICE_SERIAL} model=${DEVICE_MODEL} android=${ANDROID_VER} sdk=${ANDROID_SDK} abi=${DEVICE_ABI}"
+    echo "# package=${PACKAGE} version=${APP_VERSION} uid=${APP_UID:-unknown}"
+    echo "# p2pMode=${P2P_MODE} filter=${TAG_FILTER:-all-app-logs}"
+  } >> "$LOG_FILE"
+}
 
 # ── Colour-coding function ──────────────────────────────────────────────────
 colorize_line() {
@@ -219,7 +253,9 @@ print_banner() {
   echo -e "${CLR_HEADER}${BOLD}  ╚══════════════════════════════════════════════════════╝${RST}"
   echo -e ""
   echo -e "  ${CLR_META}Device:${RST}  ${CLR_ACCENT}${DEVICE_MODEL}${RST} ${CLR_META}(Android ${ANDROID_VER})${RST}"
+  echo -e "  ${CLR_META}ABI / SDK:${RST} ${CLR_ACCENT}${DEVICE_ABI} / ${ANDROID_SDK}${RST}"
   echo -e "  ${CLR_META}Package:${RST} ${CLR_ACCENT}${PACKAGE}${RST}"
+  echo -e "  ${CLR_META}App version:${RST} ${CLR_ACCENT}${APP_VERSION}${RST}"
   echo -e "  ${CLR_META}Log file:${RST} ${CLR_ACCENT}${LOG_FILE}${RST}"
   if [[ -n "$TAG_FILTER" ]]; then
     echo -e "  ${CLR_META}Tag filter:${RST} ${CLR_ACCENT}${TAG_FILTER}${RST}"
@@ -256,6 +292,7 @@ run_with_hotkeys() {
         c|C)
           "${ADB[@]}" logcat -c >/dev/null 2>&1 || true
           : > "$LOG_FILE"
+          write_session_metadata
           clear_terminal
           ;;
         q|Q)
@@ -280,6 +317,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ── Main ─────────────────────────────────────────────────────────────────────
+write_session_metadata
 print_banner
 
 if [[ -n "$APP_UID" ]]; then

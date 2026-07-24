@@ -426,12 +426,14 @@
     <string name="compose_settings_page_licenses_attributions">Licenties en attributie</string>
     <string name="compose_settings_page_mdblist_ratings">MDBList-beoordelingen</string>
     <string name="compose_settings_page_meta_screen">Detailpagina</string>
+    <string name="settings_appearance_section_detail_page">DETAILPAGINA</string>
     <string name="compose_settings_page_notifications">Meldingen</string>
     <string name="compose_settings_page_playback">Afspelen</string>
     <string name="compose_settings_page_plugins">Plug-ins</string>
     <string name="compose_settings_page_poster_customization">Posterkaartstijl</string>
     <string name="compose_settings_page_root">Instellingen</string>
     <string name="compose_settings_page_streams">Streams</string>
+    <string name="settings_appearance_section_streams">STREAMS</string>
     <string name="compose_settings_page_supporters_contributors">Ondersteuners en bijdragers</string>
     <string name="compose_settings_page_tmdb_enrichment">TMDB-verrijking</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -591,8 +593,8 @@
     <string name="settings_homescreen_section_catalogs">CATALOGI</string>
     <string name="settings_homescreen_section_catalogs_collections">CATALOGI EN COLLECTIES</string>
     <string name="settings_homescreen_section_collections">COLLECTIES</string>
-    <string name="settings_homescreen_section_hero">Startschermindeling</string>
-    <string name="settings_homescreen_section_hero_sources">Hero-catalogi</string>
+    <string name="settings_homescreen_section_hero">STARTSCHERMINDELING</string>
+    <string name="settings_homescreen_section_hero_sources">HERO-CATALOGI</string>
     <string name="settings_homescreen_selected_count">%1$d van %2$d geselecteerd</string>
     <string name="settings_homescreen_show_hero">Herosectie tonen</string>
     <string name="settings_homescreen_show_hero_description">Toon herocarrousel bovenaan de startpagina.</string>
@@ -606,7 +608,7 @@
     <string name="settings_hide_secret">Waarde verbergen</string>
     <string name="settings_playback_subtitle">Speler, ondertitels en automatisch afspelen</string>
     <string name="settings_poster_card_radius">Hoekradius</string>
-    <string name="settings_poster_card_style">Posterkaartstijl</string>
+    <string name="settings_poster_card_style">POSTERKAARTSTIJL</string>
     <string name="settings_poster_card_width">Breedte</string>
     <string name="settings_poster_custom">Aangepast</string>
     <string name="settings_poster_description">Pas kaartbreedte en hoekradius aan.</string>
@@ -641,7 +643,7 @@
     <string name="settings_continue_watching_sort_mode_default_desc">Sorteer alle items op recentheid</string>
     <string name="settings_continue_watching_sort_mode_streaming">Streamingstijl</string>
     <string name="settings_continue_watching_sort_mode_streaming_desc">Uitgebrachte items eerst, aankomende items achteraan</string>
-    <string name="settings_continue_watching_section_card_style">Posterkaartstijl</string>
+    <string name="settings_continue_watching_section_card_style">POSTERKAARTSTIJL</string>
     <string name="settings_continue_watching_section_on_launch">BIJ OPSTARTEN</string>
     <string name="settings_continue_watching_section_up_next_behavior">GEDRAG VOLGENDE AFLEVERING</string>
     <string name="settings_continue_watching_section_visibility">ZICHTBAARHEID</string>
@@ -665,11 +667,11 @@
     <string name="settings_content_discovery_homescreen_description">Pas startschermindeling, zichtbaarheid van inhoud en postergedrag aan</string>
     <string name="settings_content_discovery_meta_screen_description">Instellingen voor de detail- en afleveringsschermen.</string>
     <string name="settings_content_discovery_collections_description">Maak aangepaste catalogusgroepen met mappen die op Home worden getoond.</string>
-    <string name="settings_integrations_section_title">Integraties</string>
+    <string name="settings_integrations_section_title">INTEGRATIES</string>
     <string name="settings_integrations_tmdb_description">Bediening voor metadataverrijking</string>
     <string name="settings_integrations_mdblist_description">Externe beoordelingsproviders</string>
     <string name="settings_integrations_debrid_description">Verbind accounts voor links en bibliotheektoegang</string>
-    <string name="settings_debrid_section_title">Verbonden diensten</string>
+    <string name="settings_debrid_section_title">VERBONDEN DIENSTEN</string>
     <string name="settings_debrid_experimental_notice">Deze integraties zijn experimenteel en kunnen later behouden, gewijzigd of verwijderd worden.</string>
     <string name="settings_debrid_cloud_library">Cloudbibliotheek</string>
     <string name="settings_debrid_cloud_library_description">Blader door en speel bestanden die al in je verbonden accounts staan.</string>
@@ -678,7 +680,7 @@
     <string name="settings_debrid_resolve_with">Oplossen met</string>
     <string name="settings_debrid_resolve_with_description">Kies welk verbonden account afspeelbare links afhandelt.</string>
     <string name="settings_debrid_add_key_first">Verbind eerst een account.</string>
-    <string name="settings_debrid_section_providers">Accounts</string>
+    <string name="settings_debrid_section_providers">ACCOUNTS</string>
     <string name="settings_debrid_provider_description">Verbind je %1$s-account.</string>
     <string name="settings_debrid_provider_device_description">Koppel je %1$s-account in de browser.</string>
     <string name="settings_debrid_dialog_title">%1$s API-sleutel</string>
@@ -698,26 +700,26 @@
     <string name="settings_debrid_device_auth_failed">Kan inloggen niet starten.</string>
     <string name="settings_debrid_device_auth_missing_configuration">Deze inlogmethode is niet geconfigureerd in deze build.</string>
     <string name="settings_debrid_device_auth_expired">Deze code is verlopen. Probeer het opnieuw.</string>
-    <string name="settings_debrid_section_instant_playback">Voorbereiding van links</string>
+    <string name="settings_debrid_section_instant_playback">VOORBEREIDING VAN LINKS</string>
     <string name="settings_debrid_prepare_instant_playback">Links voorbereiden</string>
     <string name="settings_debrid_prepare_instant_playback_description">Los afspeelbare links op voordat het afspelen begint.</string>
     <string name="settings_debrid_prepare_stream_count">Voor te bereiden links</string>
         <string name="settings_debrid_prepare_stream_count_warning">Gebruik indien mogelijk een lager aantal. Verbonden diensten kunnen het aantal links dat binnen een bepaalde periode kan worden opgelost, beperken. Het openen van een film of aflevering kan meetellen voor die limieten, zelfs als je niet op Afspelen drukt, omdat de links van tevoren worden voorbereid.</string>
     <string name="settings_debrid_prepare_count_one">1 link</string>
     <string name="settings_debrid_prepare_count_many">%1$d links</string>
-    <string name="settings_debrid_section_formatting">Opmaak</string>
+    <string name="settings_debrid_section_formatting">OPMAAK</string>
     <string name="settings_debrid_name_template">Naamsjabloon</string>
     <string name="settings_debrid_name_template_description">Bepaalt hoe resultaatnamen worden weergegeven. Laat leeg om de originele resultaatnaam te gebruiken.</string>
     <string name="settings_debrid_description_template">Beschrijvingssjabloon</string>
     <string name="settings_debrid_description_template_description">Bepaalt de metadata die onder elk resultaat wordt getoond. Laat leeg om de originele resultaatdetails te gebruiken.</string>
     <string name="settings_debrid_formatter_reset_title">Opmaak resetten</string>
     <string name="settings_debrid_formatter_reset_subtitle">Herstel de standaard resultaatopmaak.</string>
-    <string name="settings_stream_badges_section">Fusion-stijl</string>
+    <string name="settings_stream_badges_section">FUSION-STIJL</string>
     <string name="settings_stream_size_badges_title">Bestandsgrootte-badges</string>
     <string name="settings_stream_size_badges_description">Toon badges met bestandsgrootte in streamresultaten en spelerbronpanelen.</string>
     <string name="settings_stream_addon_logo_title">Addon-logo</string>
     <string name="settings_stream_addon_logo_description">Toon addon-logo en -naam naast streambronnen.</string>
-    <string name="settings_stream_display_section">Weergave</string>
+    <string name="settings_stream_display_section">WEERGAVE</string>
     <string name="settings_stream_badge_position_title">Badgepositie</string>
     <string name="settings_stream_badge_position_description">Kies of Fusion- en groottebadges boven of onder streamkaarten verschijnen.</string>
     <string name="settings_stream_badge_position_dialog_title">Badgepositie</string>
@@ -752,9 +754,9 @@
     <string name="settings_mdb_api_key_title">API-sleutel</string>
     <string name="settings_mdb_enable_ratings">MDBList-beoordelingen inschakelen</string>
     <string name="settings_mdb_enable_ratings_description">Haal beoordelingen op van externe providers op het detailscherm van metadata</string>
-    <string name="settings_mdb_section_api_key">API-sleutel</string>
-    <string name="settings_mdb_section_rating_providers">Externe beoordelingsproviders</string>
-    <string name="settings_mdb_section_title">MDBList-beoordelingen</string>
+    <string name="settings_mdb_section_api_key">API-SLEUTEL</string>
+    <string name="settings_mdb_section_rating_providers">EXTERNE BEOORDELINGSPROVIDERS</string>
+    <string name="settings_mdb_section_title">MDBList-BEOORDELINGEN</string>
     <string name="settings_meta_actions">Acties</string>
     <string name="settings_meta_actions_description">Bedieningselementen voor afspelen en opslaan.</string>
     <string name="settings_meta_cast">Cast</string>
@@ -1050,7 +1052,7 @@
     <string name="settings_tmdb_section_credentials">INLOGGEGEVENS</string>
     <string name="settings_tmdb_section_localization">LOKALISATIE</string>
     <string name="settings_tmdb_section_modules">MODULES</string>
-    <string name="settings_tmdb_section_title">TMDB-verrijking</string>
+    <string name="settings_tmdb_section_title">TMDB-VERRIJKING</string>
     <string name="settings_trakt_approval_redirect">Na goedkeuring word je automatisch teruggeleid.</string>
     <string name="settings_trakt_authentication">AUTHENTICATIE</string>
     <string name="settings_trakt_comments">Reacties</string>
@@ -1659,7 +1661,7 @@
     <string name="player_ios_preset_custom_desc">Gebruik je geavanceerde waarden hieronder.</string>
     <string name="player_ios_hardware_decoder_off">Uit</string>
     <!-- Playback settings iOS video output -->
-    <string name="settings_playback_ios_video_output">iOS-video-uitvoer</string>
+    <string name="settings_playback_ios_video_output">iOS-VIDEO-UITVOER</string>
     <string name="settings_playback_ios_hardware_decoder">Hardwaredecoder</string>
     <string name="settings_playback_ios_extended_dynamic_range">Uitgebreid dynamisch bereik</string>
     <string name="settings_playback_ios_extended_dynamic_range_desc">Standaard Metal-uitvoermodus voor nieuwe afspeelsessies.</string>
@@ -1668,13 +1670,13 @@
     <string name="settings_playback_ios_target_primaries">Doelprimairen</string>
     <string name="settings_playback_ios_target_transfer">Doeloverdracht</string>
     <!-- Playback settings iOS audio output -->
-    <string name="settings_playback_ios_audio_output_section">iOS-audio-uitvoer</string>
+    <string name="settings_playback_ios_audio_output_section">iOS-AUDIO-UITVOER</string>
     <string name="settings_playback_ios_audio_output">Audio-uitvoer</string>
     <string name="settings_playback_ios_audio_output_auto_desc">Gebruik AudioUnit terwijl AVFoundation-uitvoer tijdelijk is uitgeschakeld.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Experimentele ondersteuning voor Spatial Audio en meerkanaals uitvoer.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Gebruik de verouderde AudioUnit-uitvoer.</string>
     <!-- Debrid Result Management section -->
-    <string name="settings_debrid_section_result_management">Resultaatbeheer</string>
+    <string name="settings_debrid_section_result_management">RESULTAATBEHEER</string>
     <string name="settings_debrid_max_results">Max. resultaten</string>
     <string name="settings_debrid_max_results_desc">Beperk het aantal weergegeven resultaten.</string>
     <string name="settings_debrid_sort_results">Resultaten sorteren</string>
@@ -1942,6 +1944,7 @@
     <string name="p2p_consent_cancel">Annuleren</string>
     <string name="p2p_error_unknown">Onbekende torrentfout</string>
     <string name="settings_p2p_title">P2P-streaming</string>
+    <string name="settings_playback_section_p2p">P2P-STREAMING</string>
     <string name="settings_p2p_subtitle">Peer-to-peer (torrent) streams toestaan</string>
     <string name="settings_p2p_hide_stats_title">Torrentstatistieken verbergen</string>
     <string name="settings_p2p_hide_stats_subtitle">Verberg buffer, seeds, peers en downloadsnelheid tijdens laden en afspelen</string>

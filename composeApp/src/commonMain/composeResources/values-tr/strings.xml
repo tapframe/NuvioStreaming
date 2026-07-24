@@ -394,6 +394,7 @@
     <string name="compose_settings_page_licenses_attributions">Lisanslar &amp; Teşekkürler</string>
     <string name="compose_settings_page_mdblist_ratings">MDBList puanları</string>
     <string name="compose_settings_page_meta_screen">Detay ekranı</string>
+    <string name="settings_appearance_section_detail_page">DETAY EKRANI</string>
     <string name="compose_settings_page_notifications">Bildirimler</string>
     <string name="compose_settings_page_playback">Oynatma</string>
     <string name="compose_settings_page_plugins">Pluginler</string>
@@ -605,7 +606,7 @@
     <string name="settings_integrations_tmdb_description">Detay sayfalarını TMDB görselleri, ekip bilgileri, bölüm meta verileri ve daha fazlasıyla zenginleştir.</string>
     <string name="settings_integrations_mdblist_description">Detay sayfalarına IMDb, Rotten Tomatoes, Metacritic ve diğer dış puanları ekle.</string>
     <string name="settings_integrations_debrid_description">Bağlantı ve kitaplık erişimi için hesapları bağla</string>
-    <string name="settings_debrid_section_title">Bağlı Servisler</string>
+    <string name="settings_debrid_section_title">BAĞLI SERVİSLER</string>
     <string name="settings_debrid_experimental_notice">Bu entegrasyonlar deneyseldir; gelecekte tutulabilir, değiştirilebilir veya tamamen kaldırılabilir.</string>
     <string name="settings_debrid_cloud_library">Bulut kitaplığı</string>
     <string name="settings_debrid_cloud_library_description">Bağlı hesaplarında zaten bulunan dosyaları gözden geçir ve oynat.</string>
@@ -614,7 +615,7 @@
     <string name="settings_debrid_resolve_with">Şununla çöz</string>
     <string name="settings_debrid_resolve_with_description">Oynatılabilir bağlantıları hangi bağlı hesabın işleyeceğini seç.</string>
     <string name="settings_debrid_add_key_first">Önce bir hesap bağla.</string>
-    <string name="settings_debrid_section_providers">Hesaplar</string>
+    <string name="settings_debrid_section_providers">HESAPLAR</string>
     <string name="settings_debrid_provider_description">%1$s hesabını bağla.</string>
     <string name="settings_debrid_provider_device_description">%1$s hesabını tarayıcıda eşleştir.</string>
     <string name="settings_debrid_dialog_title">%1$s API Anahtarı</string>
@@ -634,14 +635,14 @@
     <string name="settings_debrid_device_auth_failed">Giriş başlatılamadı.</string>
     <string name="settings_debrid_device_auth_missing_configuration">Bu giriş yöntemi bu sürümde yapılandırılmamış.</string>
     <string name="settings_debrid_device_auth_expired">Kodun süresi doldu. Tekrar dene.</string>
-    <string name="settings_debrid_section_instant_playback">Bağlantı Hazırlığı</string>
+    <string name="settings_debrid_section_instant_playback">BAĞLANTI HAZIRLIĞI</string>
     <string name="settings_debrid_prepare_instant_playback">Bağlantıları hazırla</string>
     <string name="settings_debrid_prepare_instant_playback_description">Oynatma başlamadan önce oynatılabilir bağlantıları çöz.</string>
     <string name="settings_debrid_prepare_stream_count">Hazırlanacak bağlantı sayısı</string>
     <string name="settings_debrid_prepare_stream_count_warning">Mümkünse daha düşük bir sayı seç. Bağlı servisler, belirli bir sürede çözülebilecek bağlantı sayısını sınırlayabilir. Bir filmi veya bölümü açmak, İzle butonuna basmasan bile limitlerini etkileyebilir, çünkü bağlantılar önceden hazırlanır.</string>
     <string name="settings_debrid_prepare_count_one">1 bağlantı</string>
     <string name="settings_debrid_prepare_count_many">%1$d bağlantı</string>
-    <string name="settings_debrid_section_formatting">Biçimlendirme</string>
+    <string name="settings_debrid_section_formatting">BİÇİMLENDİRME</string>
     <string name="settings_debrid_name_template">Ad şablonu</string>
     <string name="settings_debrid_name_template_description">Sonuç adlarının nasıl görüneceğini belirler.</string>
     <string name="settings_debrid_description_template">Açıklama şablonu</string>

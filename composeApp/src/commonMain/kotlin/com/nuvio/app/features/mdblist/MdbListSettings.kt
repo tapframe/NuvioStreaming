@@ -10,6 +10,7 @@ data class MdbListSettings(
     val useTrakt: Boolean = true,
     val useLetterboxd: Boolean = true,
     val useAudience: Boolean = true,
+    val useMal: Boolean = true,
 ) {
     val hasApiKey: Boolean
         get() = apiKey.isNotBlank()
@@ -23,6 +24,7 @@ data class MdbListSettings(
             MdbListMetadataService.PROVIDER_TRAKT -> useTrakt
             MdbListMetadataService.PROVIDER_LETTERBOXD -> useLetterboxd
             MdbListMetadataService.PROVIDER_AUDIENCE -> useAudience
+            MdbListMetadataService.PROVIDER_MAL -> useMal
             else -> false
         }
 

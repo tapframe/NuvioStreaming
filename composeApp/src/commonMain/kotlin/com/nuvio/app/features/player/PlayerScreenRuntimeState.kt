@@ -64,8 +64,8 @@ internal class PlayerScreenRuntime(
     lateinit var hapticFeedback: HapticFeedback
 
     var playerSettingsUiState: PlayerSettingsUiState = PlayerSettingsUiState()
-    var p2pSettingsUiState: P2pSettingsUiState = P2pSettingsUiState()
-    var p2pStreamingState: P2pStreamingState = P2pStreamingState.Idle
+    var p2pSettingsUiState by mutableStateOf(P2pSettingsUiState())
+    var p2pStreamingState by mutableStateOf<P2pStreamingState>(P2pStreamingState.Idle)
     var metaScreenSettingsUiState: MetaScreenSettingsUiState = MetaScreenSettingsUiState()
     var watchedUiState: WatchedUiState = WatchedUiState()
     var watchProgressUiState: WatchProgressUiState = WatchProgressUiState()

@@ -426,12 +426,14 @@
     <string name="compose_settings_page_licenses_attributions">Licencias y atribución</string>
     <string name="compose_settings_page_mdblist_ratings">Calificaciones de MDBList</string>
     <string name="compose_settings_page_meta_screen">Pantalla meta</string>
+    <string name="settings_appearance_section_detail_page">PANTALLA META</string>
     <string name="compose_settings_page_notifications">Notificaciones</string>
     <string name="compose_settings_page_playback">Reproducción</string>
     <string name="compose_settings_page_plugins">Plugins</string>
     <string name="compose_settings_page_poster_customization">Personalización de póster</string>
     <string name="compose_settings_page_root">Configuración</string>
     <string name="compose_settings_page_streams">Corrientes</string>
+    <string name="settings_appearance_section_streams">CORRIENTES</string>
     <string name="compose_settings_page_supporters_contributors">Patrocinadores y colaboradores</string>
     <string name="compose_settings_page_tmdb_enrichment">Enriquecimiento TMDB</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -651,7 +653,7 @@
     <string name="settings_integrations_tmdb_description">Mejora las páginas de detalles con arte, créditos, metadatos de episodios y más desde TMDB.</string>
     <string name="settings_integrations_mdblist_description">Añade calificaciones externas de IMDb, Rotten Tomatoes, Metacritic y otras a las páginas de detalles.</string>
     <string name="settings_integrations_debrid_description">Conecte cuentas para enlaces y acceso a la biblioteca</string>
-    <string name="settings_debrid_section_title">Servicios conectados</string>
+    <string name="settings_debrid_section_title">SERVICIOS CONECTADOS</string>
     <string name="settings_debrid_experimental_notice">Estas integraciones son experimentales y pueden conservarse, modificarse o eliminarse más adelante.</string>
     <string name="settings_debrid_cloud_library">biblioteca en la nube</string>
     <string name="settings_debrid_cloud_library_description">Explore y reproduzca archivos que ya estén en sus cuentas conectadas.</string>
@@ -660,7 +662,7 @@
     <string name="settings_debrid_resolve_with">Resolver con</string>
     <string name="settings_debrid_resolve_with_description">Elija qué cuenta conectada maneja los enlaces reproducibles.</string>
     <string name="settings_debrid_add_key_first">Primero conecte una cuenta.</string>
-    <string name="settings_debrid_section_providers">Cuentas</string>
+    <string name="settings_debrid_section_providers">CUENTAS</string>
     <string name="settings_debrid_provider_description">Conecta tu cuenta de %1$s.</string>
     <string name="settings_debrid_provider_device_description">Vincula tu cuenta de %1$s en el navegador.</string>
     <string name="settings_debrid_dialog_title">%1$s clave API</string>
@@ -680,26 +682,26 @@
     <string name="settings_debrid_device_auth_failed">No se pudo iniciar el inicio de sesión.</string>
     <string name="settings_debrid_device_auth_missing_configuration">Este método de inicio de sesión no está configurado en esta compilación.</string>
     <string name="settings_debrid_device_auth_expired">Este código expiró. Intentar otra vez.</string>
-    <string name="settings_debrid_section_instant_playback">Preparación de enlaces</string>
+    <string name="settings_debrid_section_instant_playback">PREPARACIÓN DE ENLACES</string>
     <string name="settings_debrid_prepare_instant_playback">Preparar enlaces</string>
     <string name="settings_debrid_prepare_instant_playback_description">Resuelva los enlaces reproducibles antes de que comience la reproducción.</string>
     <string name="settings_debrid_prepare_stream_count">Enlaces para preparar</string>
     <string name="settings_debrid_prepare_stream_count_warning">Utilice un recuento más bajo cuando sea posible. Los servicios conectados pueden limitar la cantidad de enlaces que se pueden resolver en un período de tiempo. Abrir una película o un episodio puede contar para esos límites incluso si no presiona Ver, porque los enlaces están preparados con anticipación.</string>
     <string name="settings_debrid_prepare_count_one">1 enlace</string>
     <string name="settings_debrid_prepare_count_many">%1$d enlaces</string>
-    <string name="settings_debrid_section_formatting">Formato</string>
+    <string name="settings_debrid_section_formatting">FORMATO</string>
     <string name="settings_debrid_name_template">Plantilla de nombre</string>
     <string name="settings_debrid_name_template_description">Controla cómo aparecen los nombres de los resultados. Déjelo en blanco para utilizar el nombre del resultado original.</string>
     <string name="settings_debrid_description_template">Plantilla de descripción</string>
     <string name="settings_debrid_description_template_description">Controla los metadatos que se muestran debajo de cada resultado. Déjelo en blanco para utilizar los detalles del resultado original.</string>
     <string name="settings_debrid_formatter_reset_title">Restablecer formato</string>
     <string name="settings_debrid_formatter_reset_subtitle">Restaurar el formato de resultados predeterminado.</string>
-    <string name="settings_stream_badges_section">Estilo de fusión</string>
+    <string name="settings_stream_badges_section">ESTILO DE FUSIÓN</string>
     <string name="settings_stream_size_badges_title">Insignias de tamaño</string>
     <string name="settings_stream_size_badges_description">Muestre insignias de tamaño de archivo en los resultados de la transmisión y en los paneles de fuentes del reproductor.</string>
     <string name="settings_stream_addon_logo_title">Logotipo del complemento</string>
     <string name="settings_stream_addon_logo_description">Muestra el logotipo y el nombre del complemento junto a las fuentes de transmisión.</string>
-    <string name="settings_stream_display_section">Mostrar</string>
+    <string name="settings_stream_display_section">MOSTRAR</string>
     <string name="settings_stream_badge_position_title">Posición de la insignia</string>
     <string name="settings_stream_badge_position_description">Elija si las insignias de tamaño y Fusion aparecen encima o debajo de las tarjetas de transmisión.</string>
     <string name="settings_stream_badge_position_dialog_title">Posición de la insignia</string>
@@ -1633,7 +1635,7 @@
     <string name="player_ios_preset_custom_desc">Utilice sus valores avanzados a continuación.</string>
     <string name="player_ios_hardware_decoder_off">Apagado</string>
     <!-- Playback settings iOS video output -->
-    <string name="settings_playback_ios_video_output">salida de vídeo iOS</string>
+    <string name="settings_playback_ios_video_output">SALIDA DE VÍDEO iOS</string>
     <string name="settings_playback_ios_hardware_decoder">Decodificador de hardware</string>
     <string name="settings_playback_ios_extended_dynamic_range">Rango dinámico extendido</string>
     <string name="settings_playback_ios_extended_dynamic_range_desc">Modo de salida Metal predeterminado para nuevas sesiones de reproducción.</string>
@@ -1642,13 +1644,13 @@
     <string name="settings_playback_ios_target_primaries">Primarias objetivo</string>
     <string name="settings_playback_ios_target_transfer">Transferencia de destino</string>
     <!-- Playback settings iOS audio output -->
-    <string name="settings_playback_ios_audio_output_section">salida de audio de iOS</string>
+    <string name="settings_playback_ios_audio_output_section">SALIDA DE AUDIO DE iOS</string>
     <string name="settings_playback_ios_audio_output">Salida de audio</string>
     <string name="settings_playback_ios_audio_output_auto_desc">Utilice AudioUnit mientras la salida de AVFoundation esté temporalmente desactivada.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Soporte experimental para audio espacial y salida multicanal.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Utilice la salida AudioUnit heredada.</string>
     <!-- Debrid Result Management section -->
-    <string name="settings_debrid_section_result_management">Gestión de resultados</string>
+    <string name="settings_debrid_section_result_management">GESTIÓN DE RESULTADOS</string>
     <string name="settings_debrid_max_results">Resultados máximos</string>
     <string name="settings_debrid_max_results_desc">Limite la cantidad de resultados que aparecen.</string>
     <string name="settings_debrid_sort_results">Ordenar resultados</string>
@@ -1916,6 +1918,7 @@
     <string name="p2p_consent_cancel">Cancelar</string>
     <string name="p2p_error_unknown">Error de torrent desconocido</string>
     <string name="settings_p2p_title">Transmisión P2P</string>
+    <string name="settings_playback_section_p2p">TRANSMISIÓN P2P</string>
     <string name="settings_p2p_subtitle">Permitir transmisiones de igual a igual (torrent)</string>
     <string name="settings_p2p_hide_stats_title">Ocultar estadísticas de torrents</string>
     <string name="settings_p2p_hide_stats_subtitle">Ocultar buffer, semillas, pares y velocidad de descarga durante la carga y reproducción</string>

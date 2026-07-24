@@ -34,6 +34,7 @@ import nuvio.composeapp.generated.resources.settings_mdb_section_title
 import nuvio.composeapp.generated.resources.source_audience_score
 import nuvio.composeapp.generated.resources.source_imdb
 import nuvio.composeapp.generated.resources.source_letterboxd
+import nuvio.composeapp.generated.resources.source_mal
 import nuvio.composeapp.generated.resources.source_metacritic
 import nuvio.composeapp.generated.resources.source_rotten_tomatoes
 import nuvio.composeapp.generated.resources.source_tmdb
@@ -117,6 +118,7 @@ private fun ProviderRows(
         MdbListMetadataService.PROVIDER_TRAKT to Res.string.source_trakt,
         MdbListMetadataService.PROVIDER_LETTERBOXD to Res.string.source_letterboxd,
         MdbListMetadataService.PROVIDER_AUDIENCE to Res.string.source_audience_score,
+        MdbListMetadataService.PROVIDER_MAL to Res.string.source_mal,
     )
 
     providers.forEachIndexed { index, (providerId, providerLabelRes) ->

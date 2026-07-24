@@ -24,6 +24,7 @@ enum class ContinueWatchingSectionStyle {
 enum class ContinueWatchingSortMode {
     DEFAULT,
     STREAMING_STYLE,
+    SPLIT_UPCOMING,
 }
 
 @Serializable

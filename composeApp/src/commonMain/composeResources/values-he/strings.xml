@@ -251,6 +251,7 @@
     <string name="compose_settings_page_integrations">אינטגרציות</string>
     <string name="compose_settings_page_licenses_attributions">רישיונות וקרדיטים</string>
     <string name="compose_settings_page_meta_screen">עמוד פרטים</string>
+    <string name="settings_appearance_section_detail_page">עמוד פרטים</string>
     <string name="compose_settings_page_notifications">התראות</string>
     <string name="compose_settings_page_playback">הפעלה</string>
     <string name="compose_settings_page_plugins">פלאגינים</string>
@@ -350,7 +351,7 @@
     <string name="settings_poster_width_large">גדול</string>
     <string name="settings_poster_width_standard">רגיל</string>
     <string name="settings_show_secret">הצג ערך</string>
-    <string name="settings_stream_badges_section">סגנון Fusion</string>
+    <string name="settings_stream_badges_section">סגנון FUSION</string>
     <string name="settings_stream_size_badges_title">תגי גודל</string>
     <string name="settings_stream_size_badges_description">הצג תגי גודל קובץ בתוצאות Stream ובפאנלי מקור בנגן.</string>
     <string name="settings_stream_addon_logo_title">הצגת לוגו התוסף</string>
@@ -373,8 +374,8 @@
     <string name="settings_playback_section_next_episode">הפרק הבא</string>
     <string name="settings_playback_section_player">נגן</string>
     <string name="settings_playback_section_skip_segments">דילוג על קטעים</string>
-    <string name="settings_playback_section_stream_auto_play">הפעלה אוטומטית של Stream</string>
-    <string name="settings_playback_section_stream_selection">בחירת Stream</string>
+    <string name="settings_playback_section_stream_auto_play">הפעלה אוטומטית של STREAM</string>
+    <string name="settings_playback_section_stream_selection">בחירת STREAM</string>
     <string name="settings_playback_section_subtitle_audio">כתוביות ואודיו</string>
     <string name="settings_playback_section_subtitle_rendering">עיבוד כתוביות</string>
     <string name="settings_playback_show_loading_overlay">שכבת טעינה</string>
@@ -708,6 +709,7 @@
     <string name="p2p_consent_enable">P2P הפעל</string>
     <string name="p2p_consent_cancel">ביטול</string>
     <string name="settings_p2p_title">סטרימינג P2P</string>
+    <string name="settings_playback_section_p2p">סטרימינג P2P</string>
     <string name="settings_p2p_subtitle">אפשר מקורות Stream עמית-לעמית (חינמי אך טעינה איטית).</string>
     <string name="player_torrent_peer_info">%1$d מקורות · %2$d עמיתים</string>
     <string name="player_torrent_stats">%1$d עמיתים · %2$d מקורות · %3$d%%</string>

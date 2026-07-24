@@ -21,6 +21,8 @@ internal expect object MdbListSettingsStorage {
     fun saveUseLetterboxd(enabled: Boolean)
     fun loadUseAudience(): Boolean?
     fun saveUseAudience(enabled: Boolean)
+    fun loadUseMal(): Boolean?
+    fun saveUseMal(enabled: Boolean)
     fun exportToSyncPayload(): JsonObject
     fun replaceFromSyncPayload(payload: JsonObject)
 }

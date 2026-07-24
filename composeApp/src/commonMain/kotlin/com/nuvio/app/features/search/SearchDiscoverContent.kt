@@ -1,48 +1,32 @@
 package com.nuvio.app.features.search
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.network.NetworkCondition
-import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
-import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
-import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
-import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.features.home.MetaPreview
-import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.home.components.PosterGridRow
+import com.nuvio.app.features.home.components.PosterGridSkeletonRow
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
-import com.nuvio.app.features.watching.application.WatchingState
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -92,7 +76,7 @@ internal fun LazyListScope.discoverContent(
     when {
         state.isLoading && state.items.isEmpty() -> {
             items(2) {
-                DiscoverSkeletonRow(
+                PosterGridSkeletonRow(
                     columns = columns,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
@@ -113,7 +97,7 @@ internal fun LazyListScope.discoverContent(
 
         else -> {
             items(state.items.chunked(columns)) { rowItems ->
-                DiscoverGridRow(
+                PosterGridRow(
                     items = rowItems,
                     columns = columns,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -194,129 +178,6 @@ private fun DiscoverFilterRow(
 }
 
 @Composable
-private fun DiscoverGridRow(
-    items: List<MetaPreview>,
-    columns: Int,
-    modifier: Modifier = Modifier,
-    watchedKeys: Set<String> = emptySet(),
-    fullyWatchedSeriesKeys: Set<String> = emptySet(),
-    onPosterClick: ((MetaPreview) -> Unit)? = null,
-    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
-) {
-    val posterCardStyle = rememberPosterCardStyleUiState()
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        items.forEach { item ->
-            DiscoverPosterTile(
-                item = item,
-                cornerRadiusDp = posterCardStyle.cornerRadiusDp,
-                hideLabels = posterCardStyle.hideLabelsEnabled,
-                modifier = Modifier.weight(1f),
-                isWatched = WatchingState.isPosterWatched(
-                    watchedKeys = watchedKeys,
-                    item = item,
-                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                ),
-                onClick = onPosterClick?.let { { it(item) } },
-                onLongClick = onPosterLongClick?.let { { it(item) } },
-            )
-        }
-        repeat(columns - items.size) {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DiscoverPosterTile(
-    item: MetaPreview,
-    cornerRadiusDp: Int,
-    hideLabels: Boolean,
-    modifier: Modifier = Modifier,
-    isWatched: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    onLongClick: (() -> Unit)? = null,
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(item.posterShape.discoverAspectRatio())
-                .clip(RoundedCornerShape(cornerRadiusDp.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .posterCardClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                    zoomImageUrl = item.poster,
-                    zoomCornerRadius = cornerRadiusDp.dp,
-                ),
-        ) {
-            if (item.poster != null) {
-                AsyncImage(
-                    model = item.poster,
-                    contentDescription = item.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-            NuvioPosterWatchedOverlay(isWatched = isWatched)
-        }
-        if (!hideLabels) {
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val detail = item.releaseInfo?.let { formatReleaseDateForDisplay(it) }
-            if (detail != null) {
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun DiscoverSkeletonRow(
-    columns: Int,
-    modifier: Modifier = Modifier,
-) {
-    val posterCardStyle = rememberPosterCardStyleUiState()
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        repeat(columns) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(0.68f)
-                    .clip(RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp))
-                    .background(MaterialTheme.colorScheme.surface),
-            )
-        }
-    }
-}
-
-@Composable
 private fun CatalogLoadingFooter(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
@@ -389,11 +250,4 @@ private fun String.displayTypeLabel(): String =
         "channel" -> stringResource(Res.string.media_channels)
         "tv" -> stringResource(Res.string.media_tv)
         else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-    }
-
-private fun PosterShape.discoverAspectRatio(): Float =
-    when (this) {
-        PosterShape.Poster -> 0.68f
-        PosterShape.Square -> 1f
-        PosterShape.Landscape -> 1.2f
     }
