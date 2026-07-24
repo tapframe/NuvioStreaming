@@ -138,16 +138,16 @@ final class RootComposeViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        configureBackGestures(isVisible: true)
         refreshContainingTabBarVisibility()
         refreshImmersiveSystemUI()
+        setInteractiveContentPopGestureEnabled(false)
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        configureBackGestures(isVisible: true)
         refreshContainingTabBarVisibility()
         refreshImmersiveSystemUI()
+        setInteractiveContentPopGestureEnabled(false)
         if let tabBarController {
             onTabBarControllerAvailable?(tabBarController)
         }
@@ -159,7 +159,7 @@ final class RootComposeViewController: UIViewController {
     }
 
     override func viewWillDisappear(_ animated: Bool) {
-        configureBackGestures(isVisible: false)
+        setInteractiveContentPopGestureEnabled(true)
         super.viewWillDisappear(animated)
     }
 
@@ -208,12 +208,11 @@ final class RootComposeViewController: UIViewController {
         refreshImmersiveSystemUI()
     }
 
-    private func configureBackGestures(isVisible: Bool) {
+    private func setInteractiveContentPopGestureEnabled(_ enabled: Bool) {
+        guard disablesInteractiveContentPopGesture else { return }
         if #available(iOS 26.0, *) {
-            navigationController?.interactiveContentPopGestureRecognizer?.isEnabled = false
+            navigationController?.interactiveContentPopGestureRecognizer?.isEnabled = enabled
         }
-        navigationController?.interactivePopGestureRecognizer?.isEnabled =
-            isVisible ? !disablesInteractiveContentPopGesture : true
     }
 
     private func immersiveController(in controller: UIViewController?) -> UIViewController? {
@@ -895,7 +894,7 @@ struct DetailComposeView: UIViewControllerRepresentable {
         )
         return NuvioComposeHost.wrap(
             controller,
-            disablesInteractiveContentPopGesture: route is PlayerRoute
+            disablesInteractiveContentPopGesture: true
         )
     }
 
@@ -996,31 +995,21 @@ private struct DetailDestinationView: View {
         wrapper.route is FolderDetailRoute
     }
 
-    private var hidesNativeNavigationBar: Bool {
-        wrapper.route.hidesNavigationBar
-    }
-
     private var showsReadabilityFade: Bool {
-        !hidesNativeNavigationBar && !usesComposeNavigationHeader
+        !wrapper.route.hidesNavigationBar && !usesComposeNavigationHeader
     }
 
     private var content: some View {
         ZStack(alignment: .top) {
-            if respectsNativeNavigationSafeArea {
-                DetailComposeView(
-                    route: wrapper.route,
-                    coordinator: coordinator,
-                    appCoordinator: appCoordinator
-                )
-                .ignoresSafeArea(.all, edges: [.horizontal, .bottom])
-            } else {
-                DetailComposeView(
-                    route: wrapper.route,
-                    coordinator: coordinator,
-                    appCoordinator: appCoordinator
-                )
-                .ignoresSafeArea(.all)
-            }
+            DetailComposeView(
+                route: wrapper.route,
+                coordinator: coordinator,
+                appCoordinator: appCoordinator
+            )
+            .ignoresSafeArea(
+                .all,
+                edges: respectsNativeNavigationSafeArea ? [.horizontal, .bottom] : .all
+            )
 
             if showsReadabilityFade {
                 NativeToolbarReadabilityFade()
@@ -1038,7 +1027,7 @@ private struct DetailDestinationView: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar(
-            hidesNativeNavigationBar ? Visibility.hidden : Visibility.visible,
+            wrapper.route.hidesNavigationBar ? Visibility.hidden : Visibility.visible,
             for: .navigationBar
         )
     }
