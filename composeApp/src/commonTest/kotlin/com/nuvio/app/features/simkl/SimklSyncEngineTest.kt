@@ -79,6 +79,138 @@ class SimklSyncEngineTest {
     }
 
     @Test
+    fun `playback only activity refreshes playback without all items`() = runBlocking {
+        val current = SimklSyncSnapshot(
+            isInitialized = true,
+            watermark = "v1",
+            activities = activities(all = "v1", playback = "p1", library = "l1"),
+            entries = listOf(entry(SimklMediaType.SHOWS, "1")),
+            playback = listOf(playback("1")),
+        )
+        val remote = ScriptedRemote(
+            Step.Activities(activities(all = "v2", playback = "p2", library = "l1")),
+            Step.Playback(listOf(playback("2"))),
+        )
+
+        val result = SimklSyncEngine(remote) { 900L }.synchronize(current)
+
+        assertEquals(current.entries, result.entries)
+        assertEquals("2", result.playback.single().media?.ids?.idValue("simkl"))
+        assertEquals("v2", result.watermark)
+        assertTrue(remote.allItemsRequests.isEmpty())
+        assertTrue(remote.isExhausted)
+    }
+
+    @Test
+    fun `settings only activity updates watermark without projection calls`() = runBlocking {
+        val current = SimklSyncSnapshot(
+            isInitialized = true,
+            watermark = "v1",
+            activities = activities(all = "v1", library = "l1", settings = "s1"),
+            entries = listOf(entry(SimklMediaType.SHOWS, "1")),
+            playback = listOf(playback("1")),
+        )
+        val remote = ScriptedRemote(
+            Step.Activities(activities(all = "v2", library = "l1", settings = "s2")),
+        )
+
+        val result = SimklSyncEngine(remote) { 900L }.synchronize(current)
+
+        assertEquals(current.entries, result.entries)
+        assertEquals(current.playback, result.playback)
+        assertEquals("s2", result.activities?.settings?.all)
+        assertEquals("v2", result.watermark)
+        assertTrue(remote.allItemsRequests.isEmpty())
+        assertTrue(remote.isExhausted)
+    }
+
+    @Test
+    fun `removal only activity reconciles ids without delta`() = runBlocking {
+        val retained = entry(SimklMediaType.SHOWS, "1")
+        val current = SimklSyncSnapshot(
+            isInitialized = true,
+            watermark = "v1",
+            activities = activities(all = "v1", removed = "r1", library = "l1"),
+            entries = listOf(
+                retained,
+                entry(SimklMediaType.MOVIES, "2", SimklListStatus.PLAN_TO_WATCH),
+            ),
+        )
+        val authoritative = SimklAllItemsResponse(
+            shows = listOf(retained),
+            movies = emptyList(),
+            anime = emptyList(),
+        )
+        val remote = ScriptedRemote(
+            Step.Activities(activities(all = "v2", removed = "r2", library = "l1")),
+            Step.AllItems(null, authoritative),
+        )
+
+        val result = SimklSyncEngine(remote) { 900L }.synchronize(current)
+
+        assertEquals(listOf("1"), result.entries.mapNotNull { it.media?.ids?.idValue("simkl") })
+        assertEquals(
+            listOf<SimklAllItemsRequest>(SimklAllItemsRequest.CurrentIds),
+            remote.allItemsRequests,
+        )
+        assertTrue(remote.isExhausted)
+    }
+
+    @Test
+    fun `each library activity timestamp requests an all items delta`() = runBlocking {
+        val previousDomain = SimklActivityDomain(
+            all = "d1",
+            ratedAt = "rated1",
+            playback = "playback",
+            plantowatch = "plantowatch1",
+            watching = "watching1",
+            completed = "completed1",
+            hold = "hold1",
+            dropped = "dropped1",
+            removedFromList = "removed",
+        )
+        val changes = listOf(
+            "rated_at" to previousDomain.copy(ratedAt = "rated2"),
+            "plantowatch" to previousDomain.copy(plantowatch = "plantowatch2"),
+            "watching" to previousDomain.copy(watching = "watching2"),
+            "completed" to previousDomain.copy(completed = "completed2"),
+            "hold" to previousDomain.copy(hold = "hold2"),
+            "dropped" to previousDomain.copy(dropped = "dropped2"),
+        )
+
+        changes.forEach { (name, changedDomain) ->
+            val previousActivities = SimklActivities(
+                all = "v1",
+                tvShows = previousDomain,
+                movies = previousDomain,
+                anime = previousDomain,
+            )
+            val changedActivities = previousActivities.copy(
+                all = "v2",
+                tvShows = changedDomain.copy(all = "d2"),
+            )
+            val current = SimklSyncSnapshot(
+                isInitialized = true,
+                watermark = "v1",
+                activities = previousActivities,
+            )
+            val remote = ScriptedRemote(
+                Step.Activities(changedActivities),
+                Step.AllItems(null, SimklAllItemsResponse()),
+            )
+
+            SimklSyncEngine(remote) { 900L }.synchronize(current)
+
+            assertEquals(
+                listOf<SimklAllItemsRequest>(SimklAllItemsRequest.Changes("v1")),
+                remote.allItemsRequests,
+                name,
+            )
+            assertTrue(remote.isExhausted, name)
+        }
+    }
+
+    @Test
     fun `watched delta discards retained playback without fetching playback`() = runBlocking {
         val retainedPlayback = episodePlayback("1", "2024-04-30T22:13:00Z")
         val current = SimklSyncSnapshot(
@@ -352,13 +484,27 @@ class SimklSyncEngineTest {
             all: String,
             removed: String = "removed",
             playback: String = "playback",
+            library: String = all,
+            settings: String = "settings",
         ): SimklActivities {
             val domain = SimklActivityDomain(
                 all = all,
-                removedFromList = removed,
+                ratedAt = library,
                 playback = playback,
+                plantowatch = library,
+                watching = library,
+                completed = library,
+                hold = library,
+                dropped = library,
+                removedFromList = removed,
             )
-            return SimklActivities(all = all, tvShows = domain, movies = domain, anime = domain)
+            return SimklActivities(
+                all = all,
+                settings = SimklActivitySettings(all = settings),
+                tvShows = domain,
+                movies = domain,
+                anime = domain,
+            )
         }
 
         const val ALL_ITEMS_FIXTURE = """

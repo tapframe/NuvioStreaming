@@ -16,8 +16,11 @@ internal class SimklSyncEngine(
         }
         if (current.watermark == null) return initialSync()
 
-        val delta = remote.fetchAllItems(SimklAllItemsRequest.Changes(current.watermark))
-        var entries = mergeDelta(current.entries, delta)
+        var entries = current.entries
+        if (hasAllItemsActivityChanged(current.activities, activities)) {
+            val delta = remote.fetchAllItems(SimklAllItemsRequest.Changes(current.watermark))
+            entries = mergeDelta(entries, delta)
+        }
 
         if (hasRemovalActivityChanged(current.activities, activities)) {
             val authoritativeIds = remote.fetchAllItems(SimklAllItemsRequest.CurrentIds)
@@ -89,19 +92,43 @@ internal fun reconcileRemovedEntries(
         .sortedWith(simklEntryComparator)
 }
 
+private fun hasAllItemsActivityChanged(
+    previous: SimklActivities?,
+    current: SimklActivities,
+): Boolean {
+    if (previous == null) return true
+    return SimklMediaType.entries.any { type ->
+        current.domain(type).hasAllItemsActivityChangedFrom(previous.domain(type))
+    }
+}
+
+private fun SimklActivityDomain.hasAllItemsActivityChangedFrom(
+    previous: SimklActivityDomain,
+): Boolean =
+    ratedAt != previous.ratedAt ||
+        plantowatch != previous.plantowatch ||
+        watching != previous.watching ||
+        completed != previous.completed ||
+        hold != previous.hold ||
+        dropped != previous.dropped
+
 private fun hasRemovalActivityChanged(
     previous: SimklActivities?,
     current: SimklActivities,
-): Boolean = SimklMediaType.entries.any { type ->
-    previous?.domain(type)?.removedFromList != current.domain(type).removedFromList
-}
+): Boolean =
+    previous == null ||
+        SimklMediaType.entries.any { type ->
+            previous.domain(type).removedFromList != current.domain(type).removedFromList
+        }
 
 private fun hasPlaybackActivityChanged(
     previous: SimklActivities?,
     current: SimklActivities,
-): Boolean = SimklMediaType.entries.any { type ->
-    previous?.domain(type)?.playback != current.domain(type).playback
-}
+): Boolean =
+    previous == null ||
+        SimklMediaType.entries.any { type ->
+            previous.domain(type).playback != current.domain(type).playback
+        }
 
 private val simklEntryComparator = compareBy<SimklLibraryEntry>(
     { entry -> entry.mediaType.ordinal },
