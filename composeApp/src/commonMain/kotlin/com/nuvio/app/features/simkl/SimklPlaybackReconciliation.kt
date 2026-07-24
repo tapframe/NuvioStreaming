@@ -15,17 +15,20 @@ internal fun SimklSyncSnapshot.reconcileWatchedPlayback(): SimklSyncSnapshot {
     return if (retainedPlayback.size == playback.size) this else copy(playback = retainedPlayback)
 }
 
-internal fun SimklSyncSnapshot.isDroppedContent(contentId: String): Boolean =
+internal fun SimklSyncSnapshot.isHiddenFromContinueWatching(contentId: String): Boolean =
     entries.any { entry ->
-        entry.status == SimklListStatus.DROPPED &&
+        entry.status.hidesContinueWatching() &&
             entry.matchesContent(contentId = contentId, trackingProviderItemId = null)
     }
 
-internal fun SimklSyncSnapshot.droppedContentIds(): Set<String> =
+internal fun SimklSyncSnapshot.hiddenFromContinueWatchingContentIds(): Set<String> =
     entries.asSequence()
-        .filter { entry -> entry.status == SimklListStatus.DROPPED }
+        .filter { entry -> entry.status.hidesContinueWatching() }
         .mapNotNull { entry -> entry.media?.canonicalContentId() }
         .toSet()
+
+internal fun SimklListStatus?.hidesContinueWatching(): Boolean =
+    this == SimklListStatus.ON_HOLD || this == SimklListStatus.DROPPED
 
 private fun WatchedItem.supersedes(progress: WatchProgressEntry): Boolean {
     if (!type.equals(progress.contentType, ignoreCase = true)) return false
@@ -46,9 +49,9 @@ private fun SimklLibraryEntry.hidesPlayback(progress: WatchProgressEntry): Boole
     ) {
         return false
     }
-    return when (status) {
-        SimklListStatus.DROPPED -> true
-        SimklListStatus.COMPLETED ->
+    return when {
+        status.hidesContinueWatching() -> true
+        status == SimklListStatus.COMPLETED ->
             parseSimklUtcEpochMs(lastWatchedAt)?.let { completedAt ->
                 completedAt >= progress.lastUpdatedEpochMs
             } == true

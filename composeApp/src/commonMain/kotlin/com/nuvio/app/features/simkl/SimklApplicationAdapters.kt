@@ -197,7 +197,8 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
         val state = SimklProgressRepository.uiState.value
         return TrackingProgressSnapshot(
             entries = state.entries,
-            hiddenContentIds = SimklSyncRepository.state.value.snapshot.droppedContentIds(),
+            hiddenContentIds = SimklSyncRepository.state.value.snapshot
+                .hiddenFromContinueWatchingContentIds(),
             hasLoadedRemoteProgress = state.hasLoadedRemoteProgress,
             errorMessage = state.errorMessage,
         )
@@ -207,7 +208,7 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
         SimklProgressRepository.removeProgress(entries)
 
     override fun isHiddenFromProgress(contentId: String): Boolean =
-        SimklSyncRepository.state.value.snapshot.isDroppedContent(contentId)
+        SimklSyncRepository.state.value.snapshot.isHiddenFromContinueWatching(contentId)
 }
 
 private const val SIMKL_PLAYBACK_PROGRESS_KEY_PREFIX = "simkl-playback:"

@@ -254,8 +254,39 @@ class SimklPlaybackReconciliationTest {
         )
 
         assertTrue(snapshot.reconcileWatchedPlayback().playback.isEmpty())
-        assertTrue(snapshot.isDroppedContent("tt4574334"))
-        assertEquals(setOf("tt4574334"), snapshot.droppedContentIds())
+        assertTrue(snapshot.isHiddenFromContinueWatching("tt4574334"))
+        assertEquals(
+            setOf("tt4574334"),
+            snapshot.hiddenFromContinueWatchingContentIds(),
+        )
+    }
+
+    @Test
+    fun `on hold series discards playback using provider identity`() {
+        val snapshot = SimklSyncSnapshot(
+            entries = listOf(
+                SimklLibraryEntry(
+                    mediaType = SimklMediaType.SHOWS,
+                    status = SimklListStatus.ON_HOLD,
+                    show = media(39687, imdb = "tt4574334"),
+                ),
+            ),
+            playback = listOf(
+                episodePlayback(
+                    playbackMedia = media(39687, tvdb = "305288"),
+                    season = 1,
+                    episode = 5,
+                    pausedAt = "2024-04-30T22:14:00Z",
+                ),
+            ),
+        )
+
+        assertTrue(snapshot.reconcileWatchedPlayback().playback.isEmpty())
+        assertTrue(snapshot.isHiddenFromContinueWatching("tt4574334"))
+        assertEquals(
+            setOf("tt4574334"),
+            snapshot.hiddenFromContinueWatchingContentIds(),
+        )
     }
 
     @Test
@@ -279,8 +310,11 @@ class SimklPlaybackReconciliationTest {
         )
 
         assertEquals(snapshot.playback, snapshot.reconcileWatchedPlayback().playback)
-        assertFalse(snapshot.isDroppedContent("tt4574334"))
-        assertEquals(setOf("tt1111111"), snapshot.droppedContentIds())
+        assertFalse(snapshot.isHiddenFromContinueWatching("tt4574334"))
+        assertEquals(
+            setOf("tt1111111"),
+            snapshot.hiddenFromContinueWatchingContentIds(),
+        )
     }
 
     @Test
