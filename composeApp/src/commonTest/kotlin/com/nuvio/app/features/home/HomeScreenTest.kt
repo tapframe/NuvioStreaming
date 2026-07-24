@@ -565,6 +565,35 @@ class HomeScreenTest {
     }
 
     @Test
+    fun `hidden provider content cannot seed next up from progress or watched history`() {
+        val progress = progressEntry(
+            videoId = "dropped-show:1:2",
+            title = "Dropped Show",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            lastUpdatedEpochMs = 2_000L,
+            isCompleted = true,
+        )
+        val watched = watchedItem(
+            id = "dropped-show",
+            season = 1,
+            episode = 2,
+            markedAtEpochMs = 2_000L,
+        )
+
+        val result = buildHomeNextUpSeedCandidates(
+            progressEntries = listOf(progress),
+            watchedItems = listOf(watched),
+            providerOwnsCompletedHistory = false,
+            preferFurthestEpisode = true,
+            nowEpochMs = 3_000L,
+            isContentHidden = { contentId -> contentId == "dropped-show" },
+        )
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
     fun `stale live next up item is dropped when current seed advances`() {
         val staleNextUp = continueWatchingItem(
             videoId = "show:4:11",

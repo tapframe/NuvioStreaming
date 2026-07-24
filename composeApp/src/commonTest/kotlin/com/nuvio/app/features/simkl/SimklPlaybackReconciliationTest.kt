@@ -4,6 +4,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -183,7 +184,7 @@ class SimklPlaybackReconciliationTest {
     }
 
     @Test
-    fun `completed series summary does not discard exact episode playback`() {
+    fun `newer completed series summary discards stale episode playback`() {
         val showMedia = media(39687, imdb = "tt4574334")
         val snapshot = SimklSyncSnapshot(
             entries = listOf(
@@ -204,7 +205,80 @@ class SimklPlaybackReconciliationTest {
             ),
         )
 
+        assertTrue(snapshot.reconcileWatchedPlayback().playback.isEmpty())
+    }
+
+    @Test
+    fun `newer episode playback remains after completed series summary`() {
+        val showMedia = media(39687, imdb = "tt4574334")
+        val snapshot = SimklSyncSnapshot(
+            entries = listOf(
+                SimklLibraryEntry(
+                    mediaType = SimklMediaType.SHOWS,
+                    status = SimklListStatus.COMPLETED,
+                    lastWatchedAt = "2024-04-30T22:13:00Z",
+                    show = showMedia,
+                ),
+            ),
+            playback = listOf(
+                episodePlayback(
+                    playbackMedia = showMedia,
+                    season = 1,
+                    episode = 5,
+                    pausedAt = "2024-04-30T22:14:00Z",
+                ),
+            ),
+        )
+
         assertEquals(snapshot.playback, snapshot.reconcileWatchedPlayback().playback)
+    }
+
+    @Test
+    fun `dropped series discards playback using provider identity`() {
+        val snapshot = SimklSyncSnapshot(
+            entries = listOf(
+                SimklLibraryEntry(
+                    mediaType = SimklMediaType.SHOWS,
+                    status = SimklListStatus.DROPPED,
+                    show = media(39687, imdb = "tt4574334"),
+                ),
+            ),
+            playback = listOf(
+                episodePlayback(
+                    playbackMedia = media(39687, tvdb = "305288"),
+                    season = 1,
+                    episode = 5,
+                    pausedAt = "2024-04-30T22:14:00Z",
+                ),
+            ),
+        )
+
+        assertTrue(snapshot.reconcileWatchedPlayback().playback.isEmpty())
+        assertTrue(snapshot.isDroppedContent("tt4574334"))
+    }
+
+    @Test
+    fun `different dropped series does not discard playback`() {
+        val snapshot = SimklSyncSnapshot(
+            entries = listOf(
+                SimklLibraryEntry(
+                    mediaType = SimklMediaType.SHOWS,
+                    status = SimklListStatus.DROPPED,
+                    show = media(11111, imdb = "tt1111111"),
+                ),
+            ),
+            playback = listOf(
+                episodePlayback(
+                    playbackMedia = media(39687, imdb = "tt4574334"),
+                    season = 1,
+                    episode = 5,
+                    pausedAt = "2024-04-30T22:14:00Z",
+                ),
+            ),
+        )
+
+        assertEquals(snapshot.playback, snapshot.reconcileWatchedPlayback().playback)
+        assertFalse(snapshot.isDroppedContent("tt4574334"))
     }
 
     @Test

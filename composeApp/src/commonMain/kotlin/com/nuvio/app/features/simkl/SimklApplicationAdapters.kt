@@ -204,6 +204,9 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
 
     override suspend fun removeProgress(entries: Collection<WatchProgressEntry>) =
         SimklProgressRepository.removeProgress(entries)
+
+    override fun isHiddenFromProgress(contentId: String): Boolean =
+        SimklSyncRepository.state.value.snapshot.isDroppedContent(contentId)
 }
 
 private const val SIMKL_PLAYBACK_PROGRESS_KEY_PREFIX = "simkl-playback:"

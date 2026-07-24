@@ -272,10 +272,10 @@ internal fun SimklPlaybackSession.toWatchProgressEntry(): WatchProgressEntry? {
     )
 }
 
-private fun SimklMedia.simklTrackingProviderItemId(): String? =
+internal fun SimklMedia.simklTrackingProviderItemId(): String? =
     ids.simklIdValue()?.toLongOrNull()?.takeIf { it > 0L }?.let { id -> "simkl:$id" }
 
-private fun SimklLibraryEntry.matchesContentId(contentId: String): Boolean {
+internal fun SimklLibraryEntry.matchesContentId(contentId: String): Boolean {
     val media = media ?: return false
     if (media.canonicalContentId().equals(contentId, ignoreCase = true)) return true
     val parsed = parseTrackingExternalIds(contentId)

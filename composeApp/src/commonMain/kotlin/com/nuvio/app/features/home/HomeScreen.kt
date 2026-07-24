@@ -212,16 +212,14 @@ fun HomeScreen(
         progressProviderOwnsCompletedHistory,
         continueWatchingPreferences.upNextFromFurthestEpisode,
     ) {
-        val visibleProviderEntries = watchProgressUiState.entries.filterNot { entry ->
-            WatchProgressRepository.isDroppedShow(entry.parentMetaId)
-        }
         buildHomeNextUpSeedCandidates(
-            progressEntries = visibleProviderEntries,
+            progressEntries = watchProgressUiState.entries,
             watchedItems = nextUpWatchedItems,
             providerOwnsCompletedHistory = progressProviderOwnsCompletedHistory,
             preferFurthestEpisode = continueWatchingPreferences.upNextFromFurthestEpisode,
             nowEpochMs = WatchProgressClock.nowEpochMs(),
             shouldUseProgressSeed = WatchProgressRepository::shouldUseAsNextUpSeed,
+            isContentHidden = WatchProgressRepository::isDroppedShow,
         )
     }
 
@@ -1192,9 +1190,11 @@ internal fun buildHomeNextUpSeedCandidates(
     shouldUseProgressSeed: (WatchProgressEntry, Long) -> Boolean = { entry, _ ->
         entry.shouldUseAsCompletedSeedForContinueWatching()
     },
+    isContentHidden: (String) -> Boolean = { false },
 ): List<CompletedSeriesCandidate> {
     val progressSeeds = progressEntries
         .asSequence()
+        .filterNot { entry -> isContentHidden(entry.parentMetaId) }
         .filter { entry -> entry.parentMetaType.isSeriesTypeForContinueWatching() }
         .filter { entry -> entry.seasonNumber != null && entry.episodeNumber != null && entry.seasonNumber != 0 }
         .filter { entry -> !isMalformedNextUpSeedContentId(entry.parentMetaId) }
@@ -1204,7 +1204,8 @@ internal fun buildHomeNextUpSeedCandidates(
         emptyList()
     } else {
         watchedItems.filter { item ->
-            item.type.isSeriesTypeForContinueWatching() &&
+            !isContentHidden(item.id) &&
+                item.type.isSeriesTypeForContinueWatching() &&
                 item.season != null &&
                 item.episode != null &&
                 item.season != 0 &&
