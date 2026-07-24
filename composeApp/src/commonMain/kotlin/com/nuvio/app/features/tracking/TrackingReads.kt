@@ -110,6 +110,7 @@ interface TrackingWatchedProvider : WatchedSyncAdapter {
 
 data class TrackingProgressSnapshot(
     val entries: List<WatchProgressEntry> = emptyList(),
+    val hiddenContentIds: Set<String> = emptySet(),
     val hasLoadedRemoteProgress: Boolean = false,
     val errorMessage: String? = null,
 )

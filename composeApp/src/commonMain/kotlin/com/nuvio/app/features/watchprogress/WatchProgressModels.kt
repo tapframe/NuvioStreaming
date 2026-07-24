@@ -134,6 +134,7 @@ data class WatchProgressEntry(
 data class WatchProgressUiState(
     val source: WatchProgressSource = WatchProgressSource.NUVIO_SYNC,
     val entries: List<WatchProgressEntry> = emptyList(),
+    val hiddenContentIds: Set<String> = emptySet(),
     val hasLoadedRemoteProgress: Boolean = false,
 ) {
     val byProgressKey: Map<String, WatchProgressEntry>

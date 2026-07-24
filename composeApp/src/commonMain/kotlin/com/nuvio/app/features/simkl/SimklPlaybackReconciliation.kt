@@ -21,6 +21,12 @@ internal fun SimklSyncSnapshot.isDroppedContent(contentId: String): Boolean =
             entry.matchesContent(contentId = contentId, trackingProviderItemId = null)
     }
 
+internal fun SimklSyncSnapshot.droppedContentIds(): Set<String> =
+    entries.asSequence()
+        .filter { entry -> entry.status == SimklListStatus.DROPPED }
+        .mapNotNull { entry -> entry.media?.canonicalContentId() }
+        .toSet()
+
 private fun WatchedItem.supersedes(progress: WatchProgressEntry): Boolean {
     if (!type.equals(progress.contentType, ignoreCase = true)) return false
     if (season != progress.seasonNumber || episode != progress.episodeNumber) return false

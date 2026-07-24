@@ -195,10 +195,12 @@ fun HomeScreen(
 
     val effectiveWatchProgressEntries = remember(
         watchProgressUiState.entries,
+        watchProgressUiState.hiddenContentIds,
         continueWatchingCutoffEpochMs,
     ) {
         val visibleProviderEntries = watchProgressUiState.entries.filterNot { entry ->
-            WatchProgressRepository.isDroppedShow(entry.parentMetaId)
+            entry.parentMetaId in watchProgressUiState.hiddenContentIds ||
+                WatchProgressRepository.isDroppedShow(entry.parentMetaId)
         }
         filterEntriesForContinueWatchingWindow(
             entries = visibleProviderEntries,
@@ -208,6 +210,7 @@ fun HomeScreen(
 
     val allNextUpSeedCandidates = remember(
         watchProgressUiState.entries,
+        watchProgressUiState.hiddenContentIds,
         nextUpWatchedItems,
         progressProviderOwnsCompletedHistory,
         continueWatchingPreferences.upNextFromFurthestEpisode,
@@ -219,7 +222,10 @@ fun HomeScreen(
             preferFurthestEpisode = continueWatchingPreferences.upNextFromFurthestEpisode,
             nowEpochMs = WatchProgressClock.nowEpochMs(),
             shouldUseProgressSeed = WatchProgressRepository::shouldUseAsNextUpSeed,
-            isContentHidden = WatchProgressRepository::isDroppedShow,
+            isContentHidden = { contentId ->
+                contentId in watchProgressUiState.hiddenContentIds ||
+                    WatchProgressRepository.isDroppedShow(contentId)
+            },
         )
     }
 
@@ -346,6 +352,7 @@ fun HomeScreen(
         nextUpItemsBySeries,
         continueWatchingPreferences.showUnairedNextUp,
         watchedUiState.isLoaded,
+        watchProgressUiState.hiddenContentIds,
     ) {
         cachedSnapshots.first.mapNotNull { cached ->
             if (
@@ -382,7 +389,10 @@ fun HomeScreen(
             if (!cachedNextUpHasAired(cached) && !continueWatchingPreferences.showUnairedNextUp) {
                 return@mapNotNull null
             }
-            if (WatchProgressRepository.isDroppedShow(cached.contentId)) {
+            if (
+                cached.contentId in watchProgressUiState.hiddenContentIds ||
+                WatchProgressRepository.isDroppedShow(cached.contentId)
+            ) {
                 return@mapNotNull null
             }
             val item = cached.toContinueWatchingItem() ?: return@mapNotNull null
@@ -394,9 +404,16 @@ fun HomeScreen(
             cached.contentId to (sortTimestamp to item)
         }.toMap()
     }
-    val cachedInProgressItems = remember(cachedSnapshots.second, effectiveWatchProgressSource) {
+    val cachedInProgressItems = remember(
+        cachedSnapshots.second,
+        effectiveWatchProgressSource,
+        watchProgressUiState.hiddenContentIds,
+    ) {
         cachedSnapshots.second.mapNotNull { cached ->
-            if (WatchProgressRepository.isDroppedShow(cached.contentId)) {
+            if (
+                cached.contentId in watchProgressUiState.hiddenContentIds ||
+                WatchProgressRepository.isDroppedShow(cached.contentId)
+            ) {
                 return@mapNotNull null
             }
             cached.resolvedProgressKey() to cached.toContinueWatchingItem()

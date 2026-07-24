@@ -13,6 +13,7 @@ import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.player.PlayerPlaybackSnapshot
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tracking.TrackingProgressProvider
+import com.nuvio.app.features.tracking.TrackingProgressSnapshot
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
@@ -1340,14 +1341,12 @@ object WatchProgressRepository {
     private fun publish() {
         val entries = currentEntries()
         val sortedEntries = entries.sortedByDescending { it.lastUpdatedEpochMs }
-        val hasLoadedRemoteProgress = activeProgressProvider()
-            ?.snapshot()
-            ?.hasLoadedRemoteProgress
-            ?: hasLoadedNuvioRemoteProgress
-        _uiState.value = WatchProgressUiState(
+        val providerSnapshot = activeProgressProvider()?.snapshot()
+        _uiState.value = projectWatchProgressUiState(
             source = activeSource,
             entries = sortedEntries,
-            hasLoadedRemoteProgress = hasLoadedRemoteProgress,
+            providerSnapshot = providerSnapshot,
+            hasLoadedNuvioRemoteProgress = hasLoadedNuvioRemoteProgress,
         )
     }
 
@@ -1643,3 +1642,16 @@ object WatchProgressRepository {
         resources.any { resource -> resource.name == "meta" }
 
 }
+
+internal fun projectWatchProgressUiState(
+    source: WatchProgressSource,
+    entries: List<WatchProgressEntry>,
+    providerSnapshot: TrackingProgressSnapshot?,
+    hasLoadedNuvioRemoteProgress: Boolean,
+): WatchProgressUiState = WatchProgressUiState(
+    source = source,
+    entries = entries,
+    hiddenContentIds = providerSnapshot?.hiddenContentIds.orEmpty(),
+    hasLoadedRemoteProgress =
+        providerSnapshot?.hasLoadedRemoteProgress ?: hasLoadedNuvioRemoteProgress,
+)

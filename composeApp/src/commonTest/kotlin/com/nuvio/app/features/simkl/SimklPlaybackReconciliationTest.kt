@@ -255,6 +255,7 @@ class SimklPlaybackReconciliationTest {
 
         assertTrue(snapshot.reconcileWatchedPlayback().playback.isEmpty())
         assertTrue(snapshot.isDroppedContent("tt4574334"))
+        assertEquals(setOf("tt4574334"), snapshot.droppedContentIds())
     }
 
     @Test
@@ -279,6 +280,7 @@ class SimklPlaybackReconciliationTest {
 
         assertEquals(snapshot.playback, snapshot.reconcileWatchedPlayback().playback)
         assertFalse(snapshot.isDroppedContent("tt4574334"))
+        assertEquals(setOf("tt1111111"), snapshot.droppedContentIds())
     }
 
     @Test

@@ -197,6 +197,7 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
         val state = SimklProgressRepository.uiState.value
         return TrackingProgressSnapshot(
             entries = state.entries,
+            hiddenContentIds = SimklSyncRepository.state.value.snapshot.droppedContentIds(),
             hasLoadedRemoteProgress = state.hasLoadedRemoteProgress,
             errorMessage = state.errorMessage,
         )
