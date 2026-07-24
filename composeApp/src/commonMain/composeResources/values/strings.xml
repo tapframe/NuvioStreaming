@@ -1658,6 +1658,7 @@
     <string name="cloud_library_playable_file_count">%1$d playable files</string>
     <string name="cloud_library_provider_all">All</string>
     <string name="cloud_library_refresh">Refresh cloud library</string>
+    <string name="cloud_library_search_label">Search cloud library</string>
     <string name="cloud_library_select_provider">Select provider</string>
     <string name="cloud_library_select_type">Select type</string>
     <string name="cloud_library_status_ready">Ready to play</string>
