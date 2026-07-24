@@ -42,6 +42,17 @@ object HomeRepository {
     private var collectionHeroRequestKey: String? = null
     private var lastPublishedCatalogHeroEmpty: Boolean = true
     private var lastErrorMessage: String? = null
+    private var lastHandledAddonRefreshRevision: Long = 0L
+
+    fun refreshAfterAddonRefresh(
+        addons: List<ManagedAddon>,
+        revision: Long,
+    ): Boolean {
+        if (revision <= 0L || revision <= lastHandledAddonRefreshRevision) return false
+        lastHandledAddonRefreshRevision = revision
+        refresh(addons, force = true)
+        return true
+    }
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
         val activeAddons = addons.enabledAddons()

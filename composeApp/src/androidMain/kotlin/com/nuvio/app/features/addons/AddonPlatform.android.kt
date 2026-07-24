@@ -26,6 +26,7 @@ actual object AddonStorage {
     private const val preferencesName = "nuvio_addons"
     private const val addonUrlsKey = "installed_manifest_urls"
     private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
+    private const val addonNamesKey = "installed_manifest_names"
 
     private var preferences: SharedPreferences? = null
 
@@ -66,6 +67,24 @@ actual object AddonStorage {
             ?.putString("${addonEnabledStatesKey}_$profileId", payload)
             ?.apply()
     }
+
+    actual fun loadAddonNames(profileId: Int): Map<String, String> =
+        preferences
+            ?.getString("${addonNamesKey}_$profileId", null)
+            .orEmpty()
+            .lineSequence()
+            .mapNotNull(::parseAddonNameLine)
+            .toMap()
+
+    actual fun saveAddonNames(profileId: Int, names: Map<String, String>) {
+        val payload = names.entries.joinToString(separator = "\n") { (url, name) ->
+            "$url\t$name"
+        }
+        preferences
+            ?.edit()
+            ?.putString("${addonNamesKey}_$profileId", payload)
+            ?.apply()
+    }
 }
 
 private fun parseEnabledStateLine(line: String): Pair<String, Boolean>? {
@@ -76,6 +95,12 @@ private fun parseEnabledStateLine(line: String): Pair<String, Boolean>? {
         else -> true
     }
     return url to enabled
+}
+
+private fun parseAddonNameLine(line: String): Pair<String, String>? {
+    val url = line.substringBefore("\t").trim().takeIf { it.isNotEmpty() } ?: return null
+    val name = line.substringAfter("\t", "").trim().takeIf { it.isNotEmpty() } ?: return null
+    return url to name
 }
 
 private val addonHttpClient = OkHttpClient.Builder()

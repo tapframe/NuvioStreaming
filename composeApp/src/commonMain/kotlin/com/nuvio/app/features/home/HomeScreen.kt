@@ -535,10 +535,18 @@ fun HomeScreen(
         buildHomeCatalogRefreshSignature(enabledAddons)
     }
 
-    LaunchedEffect(catalogRefreshKey) {
-        if (catalogRefreshKey.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(catalogRefreshKey, addonsUiState.refreshRevision) {
+        if (catalogRefreshKey.isEmpty() && addonsUiState.refreshRevision == 0L) {
+            return@LaunchedEffect
+        }
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
-        HomeRepository.refresh(enabledAddons)
+        val forced = HomeRepository.refreshAfterAddonRefresh(
+            addons = enabledAddons,
+            revision = addonsUiState.refreshRevision,
+        )
+        if (!forced) {
+            HomeRepository.refresh(enabledAddons)
+        }
     }
 
     LaunchedEffect(collections, enabledAddons) {

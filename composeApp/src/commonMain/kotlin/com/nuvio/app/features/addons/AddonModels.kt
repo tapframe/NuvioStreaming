@@ -67,7 +67,29 @@ data class ManagedAddon(
 
 data class AddonsUiState(
     val addons: List<ManagedAddon> = emptyList(),
+    val refreshState: AddonRefreshState = AddonRefreshState.Idle,
+    val refreshRevision: Long = 0L,
 )
+
+sealed interface AddonRefreshState {
+    data object Idle : AddonRefreshState
+    data object Refreshing : AddonRefreshState
+
+    data class Complete(
+        val addonCount: Int,
+        val refreshedManifestCount: Int,
+    ) : AddonRefreshState
+
+    data class Partial(
+        val addonCount: Int,
+        val refreshedManifestCount: Int,
+        val failedManifestCount: Int,
+        val warningMessage: String? = null,
+    ) : AddonRefreshState
+
+    data object Conflict : AddonRefreshState
+    data class Failed(val message: String) : AddonRefreshState
+}
 
 data class AddonOverview(
     val totalAddons: Int,

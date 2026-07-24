@@ -105,6 +105,16 @@ internal fun AddonsSettingsPageContent(
         SectionHeader(stringResource(Res.string.addons_section_overview))
         OverviewCard(overview = overview)
 
+        SectionHeader(stringResource(Res.string.addons_section_sync))
+        RefreshAddonsCard(
+            refreshState = uiState.refreshState,
+            onRefreshClick = {
+                coroutineScope.launch {
+                    AddonRepository.refreshAll()
+                }
+            },
+        )
+
         SectionHeader(stringResource(Res.string.addons_section_add_addon))
         AddAddonCard(
             addonUrl = addonUrl,
@@ -218,6 +228,54 @@ internal fun AddonsSettingsPageContent(
 @Composable
 private fun SectionHeader(text: String) {
     NuvioSectionLabel(text = text)
+}
+
+@Composable
+private fun RefreshAddonsCard(
+    refreshState: AddonRefreshState,
+    onRefreshClick: () -> Unit,
+) {
+    val isRefreshing = refreshState is AddonRefreshState.Refreshing
+    val statusText = when (refreshState) {
+        AddonRefreshState.Idle -> stringResource(Res.string.addons_refresh_all_description)
+        AddonRefreshState.Refreshing -> stringResource(Res.string.addons_refresh_all_running)
+        is AddonRefreshState.Complete -> stringResource(
+            Res.string.addons_refresh_all_complete,
+            refreshState.addonCount,
+            refreshState.refreshedManifestCount,
+        )
+        is AddonRefreshState.Partial -> refreshState.warningMessage?.let { warning ->
+            stringResource(Res.string.addons_refresh_all_partial_warning, warning)
+        } ?: stringResource(
+            Res.string.addons_refresh_all_partial,
+            refreshState.addonCount,
+            refreshState.refreshedManifestCount,
+            refreshState.failedManifestCount,
+        )
+        AddonRefreshState.Conflict -> stringResource(Res.string.addons_refresh_all_conflict)
+        is AddonRefreshState.Failed -> stringResource(
+            Res.string.addons_refresh_all_failed,
+            refreshState.message,
+        )
+    }
+
+    NuvioSurfaceCard {
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        NuvioPrimaryButton(
+            text = if (isRefreshing) {
+                stringResource(Res.string.addons_refresh_all_running)
+            } else {
+                stringResource(Res.string.addons_refresh_all)
+            },
+            enabled = !isRefreshing,
+            onClick = onRefreshClick,
+        )
+    }
 }
 
 @Composable
