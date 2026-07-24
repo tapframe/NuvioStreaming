@@ -28,6 +28,7 @@ import nuvio.composeapp.generated.resources.action_close
 import nuvio.composeapp.generated.resources.settings_simkl_sync_info_activity
 import nuvio.composeapp.generated.resources.settings_simkl_sync_info_description
 import nuvio.composeapp.generated.resources.settings_simkl_sync_info_docs
+import nuvio.composeapp.generated.resources.settings_simkl_sync_info_library_statuses
 import nuvio.composeapp.generated.resources.settings_simkl_sync_info_manual
 import nuvio.composeapp.generated.resources.settings_simkl_sync_info_title
 import nuvio.composeapp.generated.resources.settings_trakt_failed_open_browser
@@ -70,6 +71,11 @@ internal fun SimklSyncInfoDialog(onDismiss: () -> Unit) {
                 )
                 Text(
                     text = stringResource(Res.string.settings_simkl_sync_info_manual),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_simkl_sync_info_library_statuses),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
