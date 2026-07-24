@@ -174,6 +174,26 @@ class SimklApiClientTest {
     }
 
     @Test
+    fun `post cooldown starts after the previous response completes`() = runBlocking {
+        val engine = RecordingEngine(response(200), response(200))
+        val harness = TestHarness(engine, responseDurationMs = 400L)
+
+        harness.client.execute(
+            SimklApiRequest(
+                method = SimklHttpMethod.POST,
+                path = "/oauth/token",
+                body = "{}",
+                requiresAuthentication = false,
+                retryPolicy = SimklRetryPolicy.NEVER,
+            ),
+        )
+        harness.client.execute(SimklApiRequest(SimklHttpMethod.POST, "/users/settings"))
+
+        assertEquals(listOf(1_000L), harness.sleeps)
+        assertEquals(listOf(0L, 1_400L), engine.requests.map { it.atEpochMs })
+    }
+
+    @Test
     fun `transient responses retry sequentially and deterministic errors do not`() = runBlocking {
         val transientEngine = RecordingEngine(response(503), response(502), response(200))
         val transientHarness = TestHarness(transientEngine)
@@ -290,12 +310,18 @@ class SimklApiClientTest {
         assertFalse(harness.wasUnauthorized)
     }
 
-    private class TestHarness(engine: RecordingEngine) {
+    private class TestHarness(
+        engine: RecordingEngine,
+        responseDurationMs: Long = 0L,
+    ) {
         var now = 0L
         val sleeps = mutableListOf<Long>()
         var wasUnauthorized = false
         val client = SimklApiClient(
-            engine = engine.also { recording -> recording.now = { now } },
+            engine = engine.also { recording ->
+                recording.now = { now }
+                recording.onResponse = { now += responseDurationMs }
+            },
             accessToken = { "token" },
             onUnauthorized = { wasUnauthorized = true },
             nowEpochMs = { now },
@@ -311,6 +337,7 @@ class SimklApiClientTest {
         private val queuedResponses = responses.toMutableList()
         val requests = mutableListOf<RecordedRequest>()
         var now: () -> Long = { 0L }
+        var onResponse: () -> Unit = {}
 
         override suspend fun execute(
             method: String,
@@ -319,7 +346,7 @@ class SimklApiClientTest {
             body: String,
         ): RawHttpResponse {
             requests += RecordedRequest(method, url, headers, body, now())
-            return queuedResponses.removeAt(0)
+            return queuedResponses.removeAt(0).also { onResponse() }
         }
     }
 
