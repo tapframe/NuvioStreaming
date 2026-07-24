@@ -203,7 +203,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 commitHorizontalSeekState = gestureCallbacks.commitHorizontalSeek,
             ),
     ) {
-        val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activeSourceUrl
+        val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
         val initialPositionRequestKey = currentInitialPositionRequestKey()
         if (playerSurfaceSourceUrl != null) {
             PlatformPlayerSurface(
