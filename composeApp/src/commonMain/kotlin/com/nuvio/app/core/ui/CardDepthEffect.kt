@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
+import androidx.compose.ui.graphics.drawscope.clipPath
+
 @Composable
 fun rememberCardDepthStyleUiState(): CardDepthStyleUiState {
     CardDepthStyleRepository.ensureLoaded()
@@ -77,20 +79,31 @@ fun Modifier.cardDepthVisual(
             drawContent()
             val sheenHeight = size.height * 0.22f
             if (sheenHeight > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = sheen),
-                            Color.Transparent,
+                val outline = shape.createOutline(size, layoutDirection, this)
+                val shapePath = outline.toPath()
+                clipPath(shapePath) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = sheen),
+                                Color.Transparent,
+                            ),
+                            startY = 0f,
+                            endY = sheenHeight,
                         ),
-                        startY = 0f,
-                        endY = sheenHeight,
-                    ),
-                    size = Size(size.width, sheenHeight),
-                )
+                        size = Size(size.width, sheenHeight),
+                    )
+                }
             }
         }
     } else {
         withEdge
     }
 }
+
+private fun androidx.compose.ui.graphics.Outline.toPath(): androidx.compose.ui.graphics.Path = when (this) {
+    is androidx.compose.ui.graphics.Outline.Rectangle -> androidx.compose.ui.graphics.Path().apply { addRect(rect) }
+    is androidx.compose.ui.graphics.Outline.Rounded -> androidx.compose.ui.graphics.Path().apply { addRoundRect(roundRect) }
+    is androidx.compose.ui.graphics.Outline.Generic -> path
+}
+
