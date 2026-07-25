@@ -45,6 +45,54 @@ class PlayerScreenRuntimeStateTest {
         )
     }
 
+    @Test
+    fun stopScrobble_closesActiveSessionBelowOnePercent() {
+        assertTrue(
+            shouldSendStopScrobble(
+                hasActiveScrobble = true,
+                progressPercent = 0f,
+            ),
+        )
+        assertTrue(
+            shouldSendStopScrobble(
+                hasActiveScrobble = true,
+                progressPercent = 0.5f,
+            ),
+        )
+    }
+
+    @Test
+    fun stopScrobble_skipsEarlyProgressWithoutActiveSession() {
+        assertFalse(
+            shouldSendStopScrobble(
+                hasActiveScrobble = false,
+                progressPercent = 0.5f,
+            ),
+        )
+        assertFalse(
+            shouldSendStopScrobble(
+                hasActiveScrobble = false,
+                progressPercent = 79.99f,
+            ),
+        )
+    }
+
+    @Test
+    fun stopScrobble_allowsCompletionWithoutActiveSession() {
+        assertTrue(
+            shouldSendStopScrobble(
+                hasActiveScrobble = false,
+                progressPercent = 80f,
+            ),
+        )
+        assertTrue(
+            shouldSendStopScrobble(
+                hasActiveScrobble = false,
+                progressPercent = 100f,
+            ),
+        )
+    }
+
     private fun testPlayerScreenArgs() = PlayerScreenArgs(
         profileId = 1,
         title = "Title",

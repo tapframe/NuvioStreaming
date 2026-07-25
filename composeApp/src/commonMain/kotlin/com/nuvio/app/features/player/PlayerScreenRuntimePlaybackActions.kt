@@ -187,7 +187,10 @@ private fun PlayerScreenRuntime.emitTrackingScrobbleTerminal(
 
 internal fun PlayerScreenRuntime.emitStopScrobbleForCurrentProgress() {
     val progressPercent = currentPlaybackProgressPercent()
-    if (progressPercent >= 1f && progressPercent < 80f) {
+    if (!shouldSendStopScrobble(hasRequestedScrobbleStartForCurrentItem, progressPercent)) {
+        return
+    }
+    if (progressPercent < 80f) {
         emitTrackingScrobbleStop(progressPercent)
         return
     }
@@ -197,6 +200,11 @@ internal fun PlayerScreenRuntime.emitStopScrobbleForCurrentProgress() {
         emitTrackingScrobbleStop(progressPercent)
     }
 }
+
+internal fun shouldSendStopScrobble(
+    hasActiveScrobble: Boolean,
+    progressPercent: Float,
+): Boolean = hasActiveScrobble || progressPercent >= 80f
 
 internal fun shouldUpdateTrackingScrobbleAfterSeek(
     hasActiveScrobble: Boolean,
