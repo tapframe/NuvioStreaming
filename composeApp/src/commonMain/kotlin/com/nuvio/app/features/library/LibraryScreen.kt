@@ -78,7 +78,6 @@ import com.nuvio.app.features.cloud.CloudLibraryItemType
 import com.nuvio.app.features.cloud.CloudLibraryRepository
 import com.nuvio.app.features.cloud.CloudLibraryUiState
 import com.nuvio.app.features.debrid.DebridSettingsRepository
-import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
@@ -119,10 +118,6 @@ fun LibraryScreen(
     val displaySettings by remember {
         LibraryDisplaySettingsRepository.ensureLoaded()
         LibraryDisplaySettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
-    val homeCatalogSettingsUiState by remember {
-        HomeCatalogSettingsRepository.snapshot()
-        HomeCatalogSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     var observedOfflineState by remember { mutableStateOf(false) }
@@ -335,7 +330,6 @@ fun LibraryScreen(
                             items(3) {
                                 HomeSkeletonRow(
                                     modifier = Modifier.padding(horizontal = 16.dp),
-                                    showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
                                 )
                             }
                         }
@@ -415,7 +409,6 @@ fun LibraryScreen(
                             LibraryLayoutMode.HORIZONTAL -> librarySections(
                                 displaySections = librarySectionsDisplay,
                                 watchedKeys = watchedUiState.watchedKeys,
-                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
                                 sortOption = effectiveSortOption,
                                 onPosterClick = onPosterClick,
                                 onSectionViewAllClick = onSectionViewAllClick,
@@ -1113,7 +1106,6 @@ private enum class LibraryViewMode {
 private fun LazyListScope.librarySections(
     displaySections: List<LibraryDisplaySection>,
     watchedKeys: Set<String>,
-    showHeaderAccent: Boolean,
     sortOption: LibrarySortOption,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)?,
@@ -1130,7 +1122,6 @@ private fun LazyListScope.librarySections(
             modifier = libraryContentTransitionModifier(),
             headerHorizontalPadding = 16.dp,
             rowContentPadding = PaddingValues(horizontal = 16.dp),
-            showHeaderAccent = showHeaderAccent,
             onViewAllClick = section.source
                 ?.takeIf { it.items.size > LIBRARY_SECTION_PREVIEW_LIMIT }
                 ?.let { source -> onSectionViewAllClick?.let { { it(source, sortOption) } } },

@@ -600,8 +600,6 @@
     <string name="settings_homescreen_show_hero_description">Toon herocarrousel bovenaan de startpagina.</string>
     <string name="layout_hide_unreleased">Niet-uitgebrachte inhoud verbergen</string>
     <string name="layout_hide_unreleased_sub">Verberg films en series die nog niet zijn uitgebracht.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Catalogusonderstreping verbergen</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Verwijder de accentlijn onder catalogus- en collectietitels in de hele app.</string>
     <string name="settings_homescreen_summary">%1$d van %2$d catalogi zichtbaar • %3$d herobronnen geselecteerd</string>
     <string name="settings_homescreen_summary_hint">Open een catalogus alleen als je deze wilt hernoemen of herordenen.</string>
     <string name="settings_homescreen_visible">Zichtbaar</string>

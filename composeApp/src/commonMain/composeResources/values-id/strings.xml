@@ -547,8 +547,6 @@
     <string name="settings_homescreen_show_hero_description">Tampilkan karousel hero di bagian atas beranda.</string>
     <string name="layout_hide_unreleased">Sembunyikan Konten Belum Rilis</string>
     <string name="layout_hide_unreleased_sub">Sembunyikan film dan serial yang belum dirilis.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Sembunyikan Garis Bawah Katalog</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Hapus garis aksen di bawah judul katalog dan koleksi di seluruh aplikasi.</string>
     <string name="settings_homescreen_summary">%1$d dari %2$d katalog terlihat • %3$d sumber hero dipilih</string>
     <string name="settings_homescreen_summary_hint">Buka katalog hanya jika perlu mengganti nama atau mengurutkannya.</string>
     <string name="settings_homescreen_visible">Terlihat</string>

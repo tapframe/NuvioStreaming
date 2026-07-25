@@ -582,8 +582,6 @@
     <string name="settings_homescreen_show_hero_description">Mostrar un carrusel destacado en la parte superior del inicio. Elige hasta 2 catálogos de origen abajo.</string>
     <string name="layout_hide_unreleased">Ocultar contenido inédito</string>
     <string name="layout_hide_unreleased_sub">Oculta películas y programas que aún no se han estrenado.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Ocultar subrayado del catálogo</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Elimine la línea de acento debajo de los títulos de catálogos y colecciones en toda la aplicación.</string>
     <string name="settings_homescreen_summary">%1$d de %2$d catálogos visibles • %3$d fuentes de Destacado seleccionadas</string>
     <string name="settings_homescreen_summary_hint">Abre un catálogo solo cuando necesites cambiarle el nombre o reordenarlo.</string>
     <string name="settings_homescreen_visible">Visible</string>

@@ -609,8 +609,6 @@
     <string name="layout_hide_unreleased_sub">Hide movies and shows that haven't been released yet.</string>
     <string name="layout_catalog_type">Show Catalog Type</string>
     <string name="layout_catalog_type_sub">Show type suffix next to catalog name (Movie/Series).</string>
-    <string name="settings_homescreen_hide_catalog_underline">Hide Catalog Underline</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Remove the accent line under catalog and collection titles throughout the app.</string>
     <string name="settings_homescreen_summary">%1$d of %2$d catalogs visible • %3$d hero sources selected</string>
     <string name="settings_homescreen_summary_hint">Open a catalog only when you need to rename or reorder it.</string>
     <string name="settings_homescreen_visible">Visible</string>
