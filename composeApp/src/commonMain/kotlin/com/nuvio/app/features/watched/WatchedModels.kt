@@ -16,6 +16,7 @@ data class WatchedItem(
     val releaseInfo: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
+    val videoId: String? = null,
     override val trackingProviderId: String? = null,
     override val trackingProviderItemId: String? = null,
     override val trackingSourceUrl: String? = null,

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.simkl
 
+import com.nuvio.app.features.tracking.TrackingCatalogReference
 import com.nuvio.app.features.tracking.TrackingEpisode
 import com.nuvio.app.features.tracking.TrackingExternalIds
 import com.nuvio.app.features.tracking.TrackingMediaKind
@@ -103,6 +104,43 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
     )
 }
 
+/**
+ * Builds a set of extra watched keys under all alternate content IDs for anime entries.
+ * These are NOT added as items (to avoid CW duplicates), but are used to augment
+ * the watchedKeys set so the UI can resolve watched status regardless of which
+ * content ID the addon uses.
+ */
+internal fun SimklSyncSnapshot.animeAlternateWatchedKeys(): Set<String> {
+    val extraKeys = linkedSetOf<String>()
+    entries.forEach { entry ->
+        if (entry.mediaType != SimklMediaType.ANIME) return@forEach
+        val media = entry.media ?: return@forEach
+        val contentId = media.canonicalContentId() ?: return@forEach
+        val contentType = "series"
+        val alternateIds = media.alternateContentIds() - contentId
+
+        if (alternateIds.isEmpty()) return@forEach
+
+        entry.seasons.forEach { season ->
+            season.episodes.forEach episodeLoop@{ episode ->
+                val seasonNumber = episode.tvdb?.season ?: season.number ?: return@episodeLoop
+                val episodeNumber = episode.tvdb?.episode ?: episode.number ?: return@episodeLoop
+                if (episode.watchedAt == null) return@episodeLoop
+                alternateIds.forEach { altId ->
+                    extraKeys += watchedItemKey(contentType, altId, seasonNumber, episodeNumber)
+                }
+            }
+        }
+
+        if (entry.status == SimklListStatus.COMPLETED) {
+            alternateIds.forEach { altId ->
+                extraKeys += watchedItemKey(contentType, altId)
+            }
+        }
+    }
+    return extraKeys
+}
+
 internal fun SimklSyncSnapshot.toSimklProgressEntries(): List<WatchProgressEntry> =
     playback
         .mapNotNull(SimklPlaybackSession::toWatchProgressEntry)
@@ -118,6 +156,7 @@ internal fun SimklSyncSnapshot.mediaReference(
     season: Int? = null,
     episode: Int? = null,
     episodeTitle: String? = null,
+    videoId: String? = null,
 ): TrackingMediaReference {
     val entry = entries.firstOrNull { candidate -> candidate.matchesContentId(contentId) }
     val media = entry?.media
@@ -137,6 +176,11 @@ internal fun SimklSyncSnapshot.mediaReference(
         episode = episode?.let { number ->
             TrackingEpisode(season = season, number = number, title = episodeTitle)
         },
+        catalog = TrackingCatalogReference(
+            contentId = contentId,
+            contentType = contentType,
+            videoId = videoId?.trim()?.takeIf(String::isNotBlank),
+        ),
     )
 }
 
@@ -179,6 +223,22 @@ internal fun SimklMedia.canonicalContentId(): String? = when {
     !ids.idValue("kitsu").isNullOrBlank() -> "kitsu:${ids.idValue("kitsu")}"
     !ids.simklIdValue().isNullOrBlank() -> "simkl:${ids.simklIdValue()}"
     else -> null
+}
+
+/**
+ * Returns all content IDs (IMDB, MAL, AniDB, AniList, Kitsu, etc.) that this media entry
+ * is known under. Used to emit watched items under all possible IDs for anime entries so
+ * that the UI can find them regardless of which content ID the addon uses.
+ */
+private fun SimklMedia.alternateContentIds(): Set<String> = buildSet {
+    ids.idValue("imdb")?.takeIf(String::isNotBlank)?.let(::add)
+    ids.idValue("tmdb")?.takeIf(String::isNotBlank)?.let { add("tmdb:$it") }
+    ids.idValue("tvdb")?.takeIf(String::isNotBlank)?.let { add("tvdb:$it") }
+    ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { add("mal:$it") }
+    ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { add("anidb:$it") }
+    ids.idValue("anilist")?.takeIf(String::isNotBlank)?.let { add("anilist:$it") }
+    ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { add("kitsu:$it") }
+    ids.simklIdValue()?.takeIf(String::isNotBlank)?.let { add("simkl:$it") }
 }
 
 internal fun simklPosterUrl(path: String?): String? =
@@ -306,6 +366,111 @@ private fun daysInMonths(year: Int): IntArray = if (year.isLeapYear()) {
     intArrayOf(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 } else {
     intArrayOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+}
+
+/**
+ * For anime with per-season MAL/Kitsu/AniDB/AniList video IDs, resolves both the
+ * anime-specific IDs and the episode number to match Simkl's anime-native format
+ * (Path B: flat episode numbering per MAL/Kitsu entry, no season).
+ *
+ * Example: video ID "mal:42203:7" means episode 7 of mal:42203. Even if the UI shows
+ * this as "Season 2 Episode 20" of the franchise, Simkl needs:
+ * - ids with mal=42203 (not the franchise parent mal)
+ * - episode number=7 (not 20)
+ * - no season (flat/absolute numbering)
+ *
+ * Returns the reference unchanged if:
+ * - Not anime
+ * - No catalog videoId
+ * - VideoId doesn't have an anime-tracker prefix with episode number
+ */
+internal fun TrackingMediaReference.resolveAnimeEpisodeForSimkl(): TrackingMediaReference {
+    if (kind != TrackingMediaKind.ANIME) return this
+    val videoId = catalog?.videoId ?: return this
+    val parsed = parseSimklAnimeVideoId(videoId) ?: return this
+    val videoEpisodeNumber = parsed.episodeNumber ?: return this
+
+    // Override IDs: use ONLY the anime-specific ID from videoId.
+    // Clear all other IDs to prevent Simkl from matching a wrong entry
+    // (e.g. shared anidb/anilist IDs from the enriched parent entry).
+    val videoIds = parseTrackingExternalIds("${parsed.prefix}:${parsed.id}")
+    val overriddenIds = TrackingExternalIds(
+        imdb = null,
+        tmdb = null,
+        tvdb = null,
+        trakt = null,
+        simkl = null,
+        mal = videoIds.mal,
+        anidb = videoIds.anidb,
+        anilist = videoIds.anilist,
+        kitsu = videoIds.kitsu,
+    )
+
+    // Override episode: use absolute number from videoId, drop season
+    return copy(
+        ids = overriddenIds,
+        episode = episode?.copy(season = null, number = videoEpisodeNumber)
+            ?: TrackingEpisode(season = null, number = videoEpisodeNumber),
+    )
+}
+
+/**
+ * Resolve a contentId to its canonical form by finding a matching Simkl entry.
+ * e.g. "mal:123" → finds entry with mal=123 → returns "tt2560140" (its IMDB/canonical ID)
+ */
+internal fun SimklSyncSnapshot.resolveCanonicalContentId(contentId: String): String? {
+    val entry = entries.firstOrNull { it.matchesContentId(contentId) }
+    return entry?.media?.canonicalContentId()
+}
+
+/**
+ * Check if an episode is watched by resolving through the video ID.
+ * Parses the anime-specific ID from videoId (e.g. "mal:123:5" → mal=123, ep=5),
+ * finds the Simkl entry, and checks if that episode number has watched_at.
+ */
+internal fun isWatchedByAnimeVideoId(
+    snapshot: SimklSyncSnapshot,
+    videoId: String,
+    episode: Int,
+): Boolean {
+    val parsed = parseSimklAnimeVideoId(videoId) ?: return false
+    val parsedIds = parseTrackingExternalIds("${parsed.prefix}:${parsed.id}")
+    val entry = snapshot.entries.firstOrNull { entry ->
+        entry.mediaType == SimklMediaType.ANIME &&
+            entry.media?.toTrackingExternalIds()?.sharesAnimeIdentityWith(parsedIds) == true
+    } ?: return false
+
+    val targetEpisodeNumber = parsed.episodeNumber ?: episode
+    return entry.seasons.any { season ->
+        season.episodes.any { ep ->
+            ep.number == targetEpisodeNumber && ep.watchedAt != null
+        }
+    }
+}
+
+private fun TrackingExternalIds.sharesAnimeIdentityWith(other: TrackingExternalIds): Boolean =
+    (mal != null && mal == other.mal) ||
+        (anidb != null && anidb == other.anidb) ||
+        (anilist != null && anilist == other.anilist) ||
+        (kitsu != null && kitsu == other.kitsu)
+
+private val SIMKL_ANIME_VIDEO_ID_PREFIXES = setOf("mal", "anidb", "anilist", "kitsu")
+
+private data class SimklAnimeVideoIdParts(
+    val prefix: String,
+    val id: Long,
+    val episodeNumber: Int?,
+)
+
+private fun parseSimklAnimeVideoId(videoId: String): SimklAnimeVideoIdParts? {
+    val trimmed = videoId.trim()
+    if (trimmed.isBlank()) return null
+    val prefix = trimmed.substringBefore(':').lowercase()
+    if (prefix !in SIMKL_ANIME_VIDEO_ID_PREFIXES) return null
+    val afterPrefix = trimmed.substringAfter(':', "")
+    val idValue = afterPrefix.substringBefore(':').toLongOrNull() ?: return null
+    val episodePart = afterPrefix.substringAfter(':', "").substringBefore(':')
+    return SimklAnimeVideoIdParts(prefix, idValue, episodePart.toIntOrNull())
 }
 
 private val SIMKL_UTC_PATTERN = Regex(
