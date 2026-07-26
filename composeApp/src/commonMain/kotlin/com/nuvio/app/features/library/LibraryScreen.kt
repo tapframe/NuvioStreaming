@@ -31,15 +31,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ViewAgenda
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -127,6 +130,7 @@ fun LibraryScreen(
     }
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
+    var cloudSearchQuery by rememberSaveable { mutableStateOf("") }
     val selectedType = remember(selectedTypeName) {
         selectedTypeName?.let { runCatching { CloudLibraryItemType.valueOf(it) }.getOrNull() }
     }
@@ -300,6 +304,11 @@ fun LibraryScreen(
                     selectedProviderId = selectedProviderId,
                     selectedType = selectedType,
                     selectedCloudItemKey = selectedCloudItemKey,
+                    searchQuery = cloudSearchQuery,
+                    onSearchQueryChange = {
+                        cloudSearchQuery = it
+                        selectedCloudItemKey = null
+                    },
                     onProviderSelected = {
                         selectedProviderId = it
                         selectedTypeName = null
@@ -436,6 +445,8 @@ private fun LazyListScope.cloudLibraryContent(
     selectedProviderId: String?,
     selectedType: CloudLibraryItemType?,
     selectedCloudItemKey: String?,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     onProviderSelected: (String?) -> Unit,
     onTypeSelected: (CloudLibraryItemType?) -> Unit,
     onItemSelected: (CloudLibraryItem) -> Unit,
@@ -481,8 +492,19 @@ private fun LazyListScope.cloudLibraryContent(
                 .distinct()
                 .sortedBy { type -> type.ordinal }
             val effectiveSelectedType = selectedType?.takeIf { type -> type in availableTypes }
-            val filteredItems = providerItems
+            val typeFilteredItems = providerItems
                 .filter { item -> effectiveSelectedType == null || item.type == effectiveSelectedType }
+            // Local filter over the already-loaded library. Matches the item name or any of its
+            // file names, since the useful identifier is often in the filename, not the title.
+            val trimmedQuery = searchQuery.trim()
+            val filteredItems = if (trimmedQuery.isEmpty()) {
+                typeFilteredItems
+            } else {
+                typeFilteredItems.filter { item ->
+                    item.name.contains(trimmedQuery, ignoreCase = true) ||
+                        item.files.any { file -> file.name.contains(trimmedQuery, ignoreCase = true) }
+                }
+            }
             val selectedItem = filteredItems.firstOrNull { it.stableKey == selectedCloudItemKey }
 
             if (selectedItem != null) {
@@ -504,6 +526,14 @@ private fun LazyListScope.cloudLibraryContent(
                         onTypeSelected = onTypeSelected,
                         onRefresh = onRefresh,
                         modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+
+                item(key = "cloud-library-search") {
+                    CloudLibrarySearchField(
+                        query = searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
 
@@ -548,6 +578,38 @@ private fun LazyListScope.cloudLibraryContent(
             }
         }
     }
+}
+
+@Composable
+private fun CloudLibrarySearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        placeholder = { Text(stringResource(Res.string.cloud_library_search_label)) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(Res.string.compose_search_clear),
+                    )
+                }
+            }
+        },
+    )
 }
 
 private fun LazyListScope.cloudLibrarySkeletonItems() {
