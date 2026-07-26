@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MetaDetailsParserTest {
@@ -64,6 +65,34 @@ class MetaDetailsParserTest {
 
         assertFalse(result.videos[0].available)
         assertTrue(result.videos[1].available)
+    }
+
+    @Test
+    fun `parse normalizes valid runtime and rejects missing or invalid values`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "videos": [
+                  {"id": "valid", "title": "Valid", "runtime": "1h 5m"},
+                  {"id": "missing", "title": "Missing"},
+                  {"id": "invalid", "title": "Invalid", "runtime": "unknown"},
+                  {"id": "zero", "title": "Zero", "runtime": 0},
+                  {"id": "negative", "title": "Negative", "runtime": -20}
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(65, result.videos[0].runtime)
+        assertNull(result.videos[1].runtime)
+        assertNull(result.videos[2].runtime)
+        assertNull(result.videos[3].runtime)
+        assertNull(result.videos[4].runtime)
     }
 
     @Test
