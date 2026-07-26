@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -56,6 +57,23 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
         return projection.fullyWatchedSeriesKeys
     }
 
+    override suspend fun pullExtraWatchedKeys(profileId: Int): Set<String> {
+        if (profileId != ProfileRepository.activeProfileId) return emptySet()
+        SimklSyncRepository.refresh(
+            intent = TrackingRefreshIntent.AUTOMATIC,
+            origin = SimklRefreshOrigin.WATCHED_ITEMS,
+        )
+        return SimklSyncRepository.state.value.snapshot.animeAlternateWatchedKeys()
+    }
+
+    override fun observeExtraWatchedKeys(profileId: Int): kotlinx.coroutines.flow.Flow<Set<String>> =
+        SimklSyncRepository.state
+            .map { state ->
+                SimklAnimeWatchedFallback.clearOptimisticRemovals()
+                state.snapshot.animeAlternateWatchedKeys()
+            }
+            .distinctUntilChanged()
+
     override suspend fun push(profileId: Int, items: Collection<WatchedItem>) {
         if (profileId != ProfileRepository.activeProfileId || items.isEmpty()) return
         SimklSyncRepository.ensureLoaded()
@@ -69,6 +87,7 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
                     releaseInfo = item.releaseInfo,
                     season = item.season,
                     episode = item.episode,
+                    videoId = item.videoId,
                 ),
                 watchedAtEpochMs = item.markedAtEpochMs,
             )
@@ -81,6 +100,8 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
 
     override suspend fun delete(profileId: Int, items: Collection<WatchedItem>) {
         if (profileId != ProfileRepository.activeProfileId || items.isEmpty()) return
+        // Optimistically mark video IDs as removed so fallback won't show them as watched
+        items.forEach { item -> item.videoId?.let(SimklAnimeWatchedFallback::markOptimisticallyRemoved) }
         SimklSyncRepository.ensureLoaded()
         val snapshot = SimklSyncRepository.state.value.snapshot
         val media = items.map { item ->
@@ -91,7 +112,11 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
                 releaseInfo = item.releaseInfo,
                 season = item.season,
                 episode = item.episode,
-            )
+                videoId = item.videoId,
+            ).let { ref ->
+                val enriched = snapshot.enrichMediaReference(ref)
+                enriched.resolveAnimeEpisodeForSimkl()
+            }
         }
         val result = SimklMutationRepository.removeFromHistory(profileId = profileId, items = media)
         check(result.isComplete) {
@@ -209,6 +234,12 @@ object SimklTrackingProgressProvider : TrackingProgressProvider {
 
     override fun isHiddenFromProgress(contentId: String): Boolean =
         SimklSyncRepository.state.value.snapshot.isHiddenFromContinueWatching(contentId)
+
+    override fun normalizeParentContentId(parentContentId: String, videoId: String?): String {
+        val snapshot = SimklSyncRepository.state.value.snapshot
+        val resolvedId = snapshot.resolveCanonicalContentId(parentContentId)
+        return resolvedId ?: parentContentId
+    }
 }
 
 private const val SIMKL_PLAYBACK_PROGRESS_KEY_PREFIX = "simkl-playback:"

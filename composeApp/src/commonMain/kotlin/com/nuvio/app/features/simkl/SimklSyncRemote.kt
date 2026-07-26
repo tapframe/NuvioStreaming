@@ -51,9 +51,11 @@ internal class SimklApiSyncRemote(
             ?: "/sync/all-items"
         val query = when (request) {
             is SimklAllItemsRequest.Bootstrap -> mapOf(
-                "extended" to "full",
+                "extended" to "full_anime_seasons",
                 "episode_watched_at" to "yes",
+                "episode_tvdb_id" to "yes",
                 "include_all_episodes" to "yes",
+                "language" to "en",
             )
             is SimklAllItemsRequest.Changes -> mapOf(
                 "date_from" to request.dateFrom,
@@ -61,6 +63,7 @@ internal class SimklApiSyncRemote(
                 "episode_watched_at" to "yes",
                 "episode_tvdb_id" to "yes",
                 "include_all_episodes" to "yes",
+                "language" to "en",
             )
             SimklAllItemsRequest.CurrentIds -> mapOf(
                 "extended" to "simkl_ids_only",
