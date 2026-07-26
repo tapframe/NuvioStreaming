@@ -36,6 +36,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,6 +73,7 @@ import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.features.details.EpisodeSortOrder
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaVideo
@@ -77,6 +82,7 @@ import com.nuvio.app.features.details.SeasonViewModeStorage
 import com.nuvio.app.features.details.formatRuntimeFromMinutes
 import com.nuvio.app.features.details.metaVideoSeasonEpisodeComparator
 import com.nuvio.app.features.details.normalizeSeasonNumber
+import com.nuvio.app.features.details.orderedForEpisodeDisplay
 import com.nuvio.app.features.details.seasonSortKey
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
@@ -175,6 +181,12 @@ fun DetailSeriesContent(
     val currentSeason = selectedSeasonOverride
         ?.takeIf { it in groupedEpisodes }
         ?: defaultSeason
+    var isEpisodeOrderDescending by rememberSaveable(meta.id) { mutableStateOf(false) }
+    val episodeSortOrder = if (isEpisodeOrderDescending) {
+        EpisodeSortOrder.Descending
+    } else {
+        EpisodeSortOrder.Ascending
+    }
 
     var seasonViewMode by remember {
         mutableStateOf(SeasonViewModeStorage.load() ?: SeasonViewMode.Posters)
@@ -284,13 +296,34 @@ fun DetailSeriesContent(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    DetailSectionTitle(
-                        title = sectionTitle,
-                    )
-                    val seasonEpisodes = groupedEpisodes.getValue(seasonForContent)
+                    val seasonEpisodes = remember(groupedEpisodes, seasonForContent, episodeSortOrder) {
+                        groupedEpisodes
+                            .getValue(seasonForContent)
+                            .orderedForEpisodeDisplay(episodeSortOrder)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DetailSectionTitle(
+                            title = sectionTitle,
+                            fullWidth = false,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (meta.type == "series" && seasonEpisodes.size > 1) {
+                            EpisodeSortToggle(
+                                order = episodeSortOrder,
+                                onClick = {
+                                    isEpisodeOrderDescending = !isEpisodeOrderDescending
+                                },
+                            )
+                        }
+                    }
                     if (episodeCardStyle == MetaEpisodeCardStyle.Horizontal) {
                         EpisodeHorizontalRow(
                             episodes = seasonEpisodes,
+                            sortOrder = episodeSortOrder,
                             maxWidthDp = containerWidthDp,
                             horizontalScrollPadding = horizontalScrollPadding,
                             parentMetaId = meta.id,
@@ -338,6 +371,44 @@ fun DetailSeriesContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EpisodeSortToggle(
+    order: EpisodeSortOrder,
+    onClick: () -> Unit,
+) {
+    val sortsDescending = order == EpisodeSortOrder.Ascending
+    val actionDescription = if (sortsDescending) {
+        stringResource(Res.string.episodes_sort_descending_action)
+    } else {
+        stringResource(Res.string.episodes_sort_ascending_action)
+    }
+
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(10.dp),
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (sortsDescending) {
+                Icons.Rounded.ArrowDownward
+            } else {
+                Icons.Rounded.ArrowUpward
+            },
+            contentDescription = actionDescription,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -593,6 +664,7 @@ private fun SeasonPosterButton(
 @Composable
 private fun EpisodeHorizontalRow(
     episodes: List<MetaVideo>,
+    sortOrder: EpisodeSortOrder,
     maxWidthDp: Float,
     horizontalScrollPadding: Dp,
     parentMetaId: String,
@@ -608,15 +680,20 @@ private fun EpisodeHorizontalRow(
 ) {
     val rowMetrics = rememberEpisodeHorizontalCardMetrics(maxWidthDp)
     val listState = rememberLazyListState()
-    var hasPositioned by remember(episodes) { mutableStateOf(false) }
+    var hasPositioned by remember { mutableStateOf(false) }
+    var previousSortOrder by remember { mutableStateOf(sortOrder) }
 
-    LaunchedEffect(episodes, preferredEpisodeNumber) {
+    LaunchedEffect(episodes, preferredEpisodeNumber, sortOrder) {
+        val sortOrderChanged = sortOrder != previousSortOrder
         val targetIndex = if (preferredEpisodeNumber != null) {
             episodes.indexOfFirst { it.episode == preferredEpisodeNumber }
         } else {
             -1
         }
-        if (targetIndex >= 0) {
+        if (sortOrderChanged) {
+            listState.animateScrollToItem(0)
+            hasPositioned = true
+        } else if (targetIndex >= 0) {
             if (hasPositioned) {
                 listState.animateScrollToItem(targetIndex)
             } else {
@@ -624,6 +701,7 @@ private fun EpisodeHorizontalRow(
                 hasPositioned = true
             }
         }
+        previousSortOrder = sortOrder
     }
 
     LazyRow(
@@ -639,7 +717,7 @@ private fun EpisodeHorizontalRow(
     ) {
         itemsIndexed(
             items = episodes,
-            key = { index, episode -> "${episode.season}:${episode.episode}:${episode.id}#$index" },
+            key = { _, episode -> "${episode.season}:${episode.episode}:${episode.id}" },
         ) { _, episode ->
             val episodeVideoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
