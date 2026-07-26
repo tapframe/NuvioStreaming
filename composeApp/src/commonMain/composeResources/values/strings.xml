@@ -432,6 +432,7 @@
     <string name="compose_settings_page_playback">Playback</string>
     <string name="compose_settings_page_plugins">Plugins</string>
     <string name="compose_settings_page_poster_customization">Poster Card Style</string>
+    <string name="compose_settings_page_privacy_policy">Privacy Policy</string>
     <string name="compose_settings_page_root">Settings</string>
     <string name="compose_settings_page_streams">Streams</string>
     <string name="settings_appearance_section_streams">STREAMS</string>
@@ -454,6 +455,7 @@
     <string name="compose_settings_root_general_section">GENERAL</string>
     <string name="compose_settings_root_integrations_description">Manage available integrations</string>
     <string name="compose_settings_root_notifications_description">Manage episode release alerts and send a test notification.</string>
+    <string name="compose_settings_root_privacy_policy_description">Learn how Nuvio handles your data</string>
     <string name="compose_settings_root_streams_description">Stream result display and badge URL rules.</string>
     <string name="compose_settings_root_switch_profile_description">Change to a different profile.</string>
     <string name="compose_settings_root_switch_profile_title">Switch Profile</string>
