@@ -531,8 +531,6 @@
     <string name="settings_homescreen_show_hero_description">Vis hero-karusell øverst på hjemskjermen.</string>
     <string name="layout_hide_unreleased">Skjul ikke-utgitt innhold</string>
     <string name="layout_hide_unreleased_sub">Skjul filmer og serier som ikke er utgitt ennå.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Skjul katalog-understrek</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Fjern aksentlinjen under katalog- og samlingstitler.</string>
     <string name="settings_homescreen_summary">%1$d av %2$d kataloger synlige • %3$d hero-kilder valgt</string>
     <string name="settings_homescreen_summary_hint">Åpne en katalog kun når du skal gi nytt navn eller endre rekkefølge.</string>
     <string name="settings_homescreen_visible">Synlig</string>

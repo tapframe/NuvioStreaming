@@ -592,8 +592,6 @@
     <string name="settings_homescreen_show_hero_description">Afficher un carrousel Hero en vedette en haut de l’accueil. Choisissez jusqu’à 2 catalogues sources ci-dessous.</string>
     <string name="layout_hide_unreleased">Masquer le contenu non sorti</string>
     <string name="layout_hide_unreleased_sub">Masque les films et séries qui ne sont pas encore sortis.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Masquer le soulignement des catalogues</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Supprime la ligne d’accent sous les titres de catalogues et de collections dans toute l’app.</string>
     <string name="settings_homescreen_summary">%1$d sur %2$d catalogues visibles • %3$d sources Hero sélectionnées</string>
     <string name="settings_homescreen_summary_hint">Ouvrez un catalogue uniquement si vous avez besoin de le renommer ou de le réorganiser.</string>
     <string name="settings_homescreen_visible">Visible</string>

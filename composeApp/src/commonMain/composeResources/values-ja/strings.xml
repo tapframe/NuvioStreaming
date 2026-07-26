@@ -582,8 +582,6 @@
     <string name="settings_homescreen_show_hero_description">ホーム上部にヒーローカルーセルを表示します。</string>
     <string name="layout_hide_unreleased">未公開コンテンツを非表示</string>
     <string name="layout_hide_unreleased_sub">まだ公開されていない映画やシリーズを非表示にします。</string>
-    <string name="settings_homescreen_hide_catalog_underline">カタログの下線を非表示</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">アプリ全体のカタログ・コレクションタイトル下のアクセントラインを非表示にします。</string>
     <string name="settings_homescreen_summary">%1$d / %2$d カタログ表示中 • %3$d ヒーローソース選択中</string>
     <string name="settings_homescreen_summary_hint">カタログは名前の変更や並べ替えが必要なときのみ開いてください。</string>
     <string name="settings_homescreen_visible">表示</string>

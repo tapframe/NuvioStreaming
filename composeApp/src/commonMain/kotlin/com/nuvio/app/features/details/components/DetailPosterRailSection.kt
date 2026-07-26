@@ -43,7 +43,6 @@ fun DetailPosterRailSection(
                 horizontal = headerHorizontalPadding + horizontalScrollPadding,
             ),
             rowModifier = Modifier.nuvioHorizontalScrollBleed(horizontalScrollPadding),
-            showHeaderAccent = false,
             key = { item -> item.stableKey() },
         ) { item ->
             HomePosterCard(

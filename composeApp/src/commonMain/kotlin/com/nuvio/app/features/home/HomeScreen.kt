@@ -874,7 +874,6 @@ fun HomeScreen(
             hasContinueWatchingRows,
             continueWatchingLayout,
             posterCardStyle.widthDp,
-            homeSettingsUiState.hideCatalogUnderline,
             nativeBottomNavigationOverlayHeight,
         ) {
             if (
@@ -886,7 +885,6 @@ fun HomeScreen(
                     style = continueWatchingPreferences.style,
                     layout = continueWatchingLayout,
                     basePosterWidthDp = posterCardStyle.widthDp,
-                    showHeaderAccent = !homeSettingsUiState.hideCatalogUnderline,
                 ) + nativeBottomNavigationOverlayHeight
             } else {
                 null
@@ -973,7 +971,6 @@ fun HomeScreen(
                     items(3) {
                         HomeSkeletonRow(
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            showHeaderAccent = !homeSettingsUiState.hideCatalogUnderline,
                         )
                     }
                 }

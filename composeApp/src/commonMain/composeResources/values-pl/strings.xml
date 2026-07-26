@@ -547,8 +547,6 @@
     <string name="settings_homescreen_show_hero_description">Wyświetl wyróżnioną karuzelę hero na górze ekranu głównego. Wybierz do 2 katalogów źródłowych poniżej.</string>
     <string name="layout_hide_unreleased">Ukryj niewydane treści</string>
     <string name="layout_hide_unreleased_sub">Ukryj filmy i seriale, które nie zostały jeszcze wydane.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Ukryj podkreślenie katalogu</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Usuń linię akcentu pod tytułami katalogów i kolekcji w całej aplikacji.</string>
     <string name="settings_homescreen_summary">%1$d z %2$d katalogów widocznych • %3$d źródeł hero wybranych</string>
     <string name="settings_homescreen_summary_hint">Otwórz katalog tylko wtedy, gdy chcesz zmienić jego nazwę lub kolejność.</string>
     <string name="settings_homescreen_visible">Widoczne</string>

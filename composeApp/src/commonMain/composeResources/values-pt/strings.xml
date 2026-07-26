@@ -576,8 +576,6 @@
     <string name="settings_homescreen_show_hero_description">Apresenta o carrossel de destaques no topo da página inicial.</string>
     <string name="layout_hide_unreleased">Ocultar conteúdo não lançado</string>
     <string name="layout_hide_unreleased_sub">Ocultar filmes e séries que ainda não foram lançados.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Ocultar sublinhado dos catálogos</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Remove a linha de destaque sob os títulos de catálogos e coleções em toda a app.</string>
     <string name="settings_homescreen_summary">%1$d de %2$d catálogos visíveis • %3$d fontes de destaque selecionadas</string>
     <string name="settings_homescreen_summary_hint">Abre um catálogo apenas quando precisares de o renomear ou reordenar.</string>
     <string name="settings_homescreen_visible">Visível</string>
