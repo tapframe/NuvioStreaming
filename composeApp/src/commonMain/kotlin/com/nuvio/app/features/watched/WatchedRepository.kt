@@ -26,6 +26,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -133,6 +136,7 @@ object WatchedRepository {
     private var providerItemsByKey: MutableMap<TrackingProviderId, MutableMap<String, WatchedItem>> = mutableMapOf()
     private var nuvioFullyWatchedSeriesKeys: Set<String> = emptySet()
     private var providerFullyWatchedSeriesKeys: MutableMap<TrackingProviderId, Set<String>> = mutableMapOf()
+    private var providerExtraWatchedKeys: MutableMap<TrackingProviderId, Set<String>> = mutableMapOf()
     private var nuvioHasLoaded: Boolean = false
     private var loadedProviders: MutableSet<TrackingProviderId> = mutableSetOf()
     private var nuvioHasLoadedRemote: Boolean = false
@@ -142,6 +146,7 @@ object WatchedRepository {
     private var deltaCursorEventId: Long = 0L
     private var deltaInitialized: Boolean = false
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
+    private var extraKeysObserverJob: Job? = null
 
     fun ensureLoaded() {
         ensureTrackingProvidersRegistered()
@@ -156,6 +161,7 @@ object WatchedRepository {
                 ),
             )
         }
+        startExtraKeysObserverIfNeeded()
     }
 
     fun onProfileChanged(profileId: Int) {
@@ -171,6 +177,7 @@ object WatchedRepository {
             }
         }
         previousAccountJob.cancel()
+        extraKeysObserverJob = null
         hasLoaded = false
         currentProfileId = 1
         profileGeneration += 1L
@@ -180,6 +187,7 @@ object WatchedRepository {
         providerItemsByKey.clear()
         nuvioFullyWatchedSeriesKeys = emptySet()
         providerFullyWatchedSeriesKeys.clear()
+        providerExtraWatchedKeys.clear()
         nuvioHasLoaded = false
         loadedProviders.clear()
         nuvioHasLoadedRemote = false
@@ -202,6 +210,7 @@ object WatchedRepository {
         providerItemsByKey.clear()
         nuvioFullyWatchedSeriesKeys = emptySet()
         providerFullyWatchedSeriesKeys.clear()
+        providerExtraWatchedKeys.clear()
         nuvioHasLoaded = true
         loadedProviders.clear()
         nuvioHasLoadedRemote = false
@@ -253,6 +262,7 @@ object WatchedRepository {
         source.providerId?.let { providerId ->
             providerItemsByKey.getOrPut(providerId, ::mutableMapOf).clear()
             providerFullyWatchedSeriesKeys[providerId] = emptySet()
+            providerExtraWatchedKeys.remove(providerId)
             loadedProviders -= providerId
             providersLoadedFromRemote -= providerId
         } ?: run {
@@ -260,11 +270,13 @@ object WatchedRepository {
         }
         activeSource = source
         sourceGeneration += 1L
+        stopExtraKeysObserver()
         log.i {
             "Watched source activated previous=$previousSource current=$source generation=$sourceGeneration " +
                 "provider=${source.providerId?.storageId}"
         }
         publish()
+        startExtraKeysObserverIfNeeded()
         return source
     }
 
@@ -460,7 +472,11 @@ object WatchedRepository {
         fullyWatchedSeriesKeys?.let { keys ->
             setFullyWatchedSeriesKeysForSource(operation.sourceOperation.source, keys)
         }
+        val extraWatchedKeys = adapter.pullExtraWatchedKeys(profileId)
         operation.sourceOperation.source.providerId?.let { providerId ->
+            if (extraWatchedKeys.isNotEmpty()) {
+                providerExtraWatchedKeys[providerId] = extraWatchedKeys
+            }
             loadedProviders += providerId
             providersLoadedFromRemote += providerId
         } ?: run {
@@ -772,9 +788,24 @@ object WatchedRepository {
         val targetItems = itemsForSource(source)
         val removedItems = items.mapNotNull { watchedItem ->
             val key = watchedItemKey(watchedItem.type, watchedItem.id, watchedItem.season, watchedItem.episode)
-            targetItems.remove(key)?.also {
+            targetItems.remove(key)?.let { storeItem ->
+                // Preserve videoId from the original request (store items don't have it)
+                if (watchedItem.videoId != null && storeItem.videoId == null) {
+                    storeItem.copy(videoId = watchedItem.videoId)
+                } else {
+                    storeItem
+                }
+            }?.also {
                 if (source.providerId == null) {
                     nuvioDirtyWatchedKeys -= key
+                }
+                // Optimistically remove from extra keys so publish() doesn't re-add it
+                source.providerId?.let { providerId ->
+                    providerExtraWatchedKeys[providerId]?.let { extraKeys ->
+                        if (key in extraKeys) {
+                            providerExtraWatchedKeys[providerId] = extraKeys - key
+                        }
+                    }
                 }
             }
         }
@@ -784,6 +815,10 @@ object WatchedRepository {
                 persistNuvio()
             }
             pushDeleteToServer(items = removedItems, source = source)
+        } else if (source.providerId != null) {
+            // Items not found in local store (e.g. anime resolved via snapshot fallback).
+            // Still push delete to provider so it can remove from remote.
+            pushDeleteToServer(items = items.toList(), source = source)
         }
     }
 
@@ -941,6 +976,10 @@ object WatchedRepository {
         val watchedKeys = items.mapTo(linkedSetOf()) {
             watchedItemKey(it.type, it.id, it.season, it.episode)
         }
+        // Merge extra watched keys from providers (e.g. Simkl anime alternate IDs)
+        activeSource.providerId?.let { providerId ->
+            providerExtraWatchedKeys[providerId]?.let { extraKeys -> watchedKeys += extraKeys }
+        }
         val isLoaded = hasLoadedSource(activeSource)
         val hasLoadedRemoteItems = activeSource.providerId
             ?.let(providersLoadedFromRemote::contains)
@@ -967,6 +1006,34 @@ object WatchedRepository {
         .joinToString(separator = ",") { item ->
             watchedItemKey(item.type, item.id, item.season, item.episode)
         }
+
+    /**
+     * Observes provider extra watched keys (e.g. Simkl anime alternate IDs).
+     * When the provider's snapshot changes (after mutations, syncs), recomputes
+     * extra keys and re-publishes so watchedKeys stays reactive and current.
+     */
+    private fun startExtraKeysObserverIfNeeded() {
+        if (extraKeysObserverJob != null) return
+        val providerId = activeSource.providerId ?: return
+        val adapter = TrackingProviderRegistry.connectedWatchedProviders()
+            .firstOrNull { it.providerId == providerId } ?: return
+        extraKeysObserverJob = accountScopeSnapshot().launch {
+            adapter.observeExtraWatchedKeys(currentProfileId)
+                .distinctUntilChanged()
+                .collectLatest { extraKeys ->
+                    val changed = providerExtraWatchedKeys[providerId] != extraKeys
+                    if (changed) {
+                        providerExtraWatchedKeys[providerId] = extraKeys
+                        publish()
+                    }
+                }
+        }
+    }
+
+    private fun stopExtraKeysObserver() {
+        extraKeysObserverJob?.cancel()
+        extraKeysObserverJob = null
+    }
 
     private fun persistNuvio() {
         WatchedStorage.savePayload(

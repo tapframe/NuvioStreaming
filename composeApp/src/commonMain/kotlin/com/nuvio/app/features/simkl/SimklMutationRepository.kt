@@ -164,7 +164,13 @@ object SimklMutationRepository : TrackingListWriter, TrackingHistoryWriter, Trac
         items: Collection<TrackingHistoryItem>,
     ): TrackingMutationResult {
         if (!isActiveProfile(profileId)) return TrackingMutationResult(attemptedCount = 0)
-        return service.addToHistory(items)
+        SimklSyncRepository.ensureLoaded()
+        val snapshot = SimklSyncRepository.state.value.snapshot
+        val resolved = items.map { item ->
+            val enriched = snapshot.enrichMediaReference(item.media)
+            item.copy(media = enriched.resolveAnimeEpisodeForSimkl())
+        }
+        return service.addToHistory(resolved)
     }
 
     override suspend fun removeFromHistory(
@@ -182,10 +188,11 @@ object SimklMutationRepository : TrackingListWriter, TrackingHistoryWriter, Trac
     ) {
         if (!isActiveProfile(profileId)) return
         SimklSyncRepository.ensureLoaded()
+        val enriched = SimklSyncRepository.state.value.snapshot.enrichMediaReference(event.media)
         service.scrobble(
             action = action,
             event = event.copy(
-                media = SimklSyncRepository.state.value.snapshot.enrichMediaReference(event.media),
+                media = enriched.resolveAnimeEpisodeForSimkl(),
             ),
         )
     }

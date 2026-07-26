@@ -28,28 +28,28 @@ internal val simklLibraryStatusDefinitions = listOf(
         key = "simkl:status:watching",
         title = "Watching",
         trackingStatus = TrackingListStatus.WATCHING,
-        supportedContentTypes = setOf("series"),
+        supportedContentTypes = setOf("series", "anime"),
     ),
     SimklLibraryStatusDefinition(
         status = SimklListStatus.PLAN_TO_WATCH,
         key = "simkl:status:plantowatch",
         title = "Plan to Watch",
         trackingStatus = TrackingListStatus.PLAN_TO_WATCH,
-        supportedContentTypes = setOf("movie", "series"),
+        supportedContentTypes = setOf("movie", "series", "anime"),
     ),
     SimklLibraryStatusDefinition(
         status = SimklListStatus.ON_HOLD,
         key = "simkl:status:hold",
         title = "On Hold",
         trackingStatus = TrackingListStatus.ON_HOLD,
-        supportedContentTypes = setOf("series"),
+        supportedContentTypes = setOf("series", "anime"),
     ),
     SimklLibraryStatusDefinition(
         status = SimklListStatus.COMPLETED,
         key = "simkl:status:completed",
         title = "Completed",
         trackingStatus = TrackingListStatus.COMPLETED,
-        supportedContentTypes = setOf("movie", "series"),
+        supportedContentTypes = setOf("movie", "series", "anime"),
         isMembershipDestination = false,
     ),
     SimklLibraryStatusDefinition(
@@ -57,7 +57,7 @@ internal val simklLibraryStatusDefinitions = listOf(
         key = "simkl:status:dropped",
         title = "Dropped",
         trackingStatus = TrackingListStatus.DROPPED,
-        supportedContentTypes = setOf("movie", "series"),
+        supportedContentTypes = setOf("movie", "series", "anime"),
     ),
 )
 
@@ -100,9 +100,14 @@ private fun SimklLibraryEntry.toLibraryItem(
     val media = media ?: return null
     val contentId = media.canonicalContentId() ?: return null
     val simklId = media.ids.simklIdValue()?.toLongOrNull()
+    val entryType = when (mediaType) {
+        SimklMediaType.MOVIES -> "movie"
+        SimklMediaType.ANIME -> "anime"
+        SimklMediaType.SHOWS -> "series"
+    }
     return LibraryItem(
         id = contentId,
-        type = if (mediaType == SimklMediaType.MOVIES) "movie" else "series",
+        type = entryType,
         name = media.title?.takeIf(String::isNotBlank) ?: contentId,
         poster = simklPosterUrl(media.poster),
         releaseInfo = media.year?.toString(),
