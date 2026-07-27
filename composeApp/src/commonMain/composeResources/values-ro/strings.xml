@@ -600,8 +600,6 @@
     <string name="settings_homescreen_show_hero_description">Afișează un carusel în partea de sus a ecranului principal.</string>
     <string name="layout_hide_unreleased">Ascunde conținutul nelansat</string>
     <string name="layout_hide_unreleased_sub">Ascunde filmele și serialele care nu au fost lansate încă.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Ascunde sublinierea catalogului</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Elimină linia de accent de sub titlurile cataloagelor și colecțiilor din întreaga aplicație.</string>
     <string name="settings_homescreen_summary">%1$d din %2$d cataloage vizibile • %3$d surse hero selectate</string>
     <string name="settings_homescreen_summary_hint">Deschide un catalog doar când trebuie să îl redenumești sau să îl rearanjezi.</string>
     <string name="settings_homescreen_visible">Vizibil</string>

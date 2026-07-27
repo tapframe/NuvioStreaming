@@ -532,8 +532,6 @@
     <string name="settings_homescreen_show_hero_description">Exibir carrossel hero no topo da página inicial.</string>
     <string name="layout_hide_unreleased">Ocultar Conteúdo Não Lançado</string>
     <string name="layout_hide_unreleased_sub">Ocultar filmes e séries que ainda não foram lançados.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Ocultar Linha Sublinhada do Catálogo</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Remover a linha de destaque abaixo dos títulos de catálogo e coleção em todo o app.</string>
     <string name="settings_homescreen_summary">%1$d de %2$d catálogos visíveis • %3$d fontes de hero selecionadas</string>
     <string name="settings_homescreen_summary_hint">Abra um catálogo apenas quando precisar renomeá-lo ou reordená-lo.</string>
     <string name="settings_homescreen_visible">Visível</string>

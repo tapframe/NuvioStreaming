@@ -1723,8 +1723,6 @@
     <string name="settings_fusion_badges_empty">Δεν έχουν εισαχθεί URL badge Fusion.</string>
     <string name="settings_fusion_badges_summary">%1$d/%2$d URLs, %3$d active Fusion badges</string>
     <string name="settings_hide_secret">Απόκρυψη value</string>
-    <string name="settings_homescreen_hide_catalog_underline">Απόκρυψη Catalog Underline</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Αφαίρεση της γραμμής τονισμού κάτω από τους τίτλους καταλόγων και συλλογών σε όλη την εφαρμογή.</string>
     <string name="settings_integrations_debrid_description">Συνδέστε λογαριασμούς για συνδέσμους και πρόσβαση στη βιβλιοθήκη</string>
     <string name="settings_licenses_attributions_exoplayer_body">Χρησιμοποιείται για αναπαραγωγή σε εκδόσεις Android.</string>
     <string name="settings_licenses_attributions_exoplayer_license">Licensed under the Apache License, Έκδοση 2.0.</string>

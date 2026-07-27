@@ -81,7 +81,6 @@ fun HomescreenSettingsScreen(
             heroEnabled = homescreenSettingsUiState.heroEnabled,
             showCatalogType = homescreenSettingsUiState.showCatalogType,
             hideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
-            hideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
             items = homescreenSettingsUiState.items,
         )
     }

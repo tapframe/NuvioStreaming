@@ -579,8 +579,6 @@
     <string name="settings_homescreen_show_hero_description">Hiển thị Hero ở đầu Trang chủ</string>
     <string name="layout_hide_unreleased">Ẩn nội dung chưa phát hành</string>
     <string name="layout_hide_unreleased_sub">Ẩn phim và chương trình chưa phát hành</string>
-    <string name="settings_homescreen_hide_catalog_underline">Ẩn gạch chân danh mục</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Ẩn gạch chân dưới tiêu đề danh mục và bộ sưu tập</string>
     <string name="settings_homescreen_summary">%1$d/%2$d danh mục • %3$d nguồn Hero</string>
     <string name="settings_homescreen_summary_hint">Chỉ mở danh mục khi cần đổi tên hoặc sắp xếp</string>
     <string name="settings_homescreen_visible">Hiển thị</string>

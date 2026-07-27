@@ -571,8 +571,6 @@
     <string name="settings_homescreen_show_hero_description">Zobraziť hero karusel v hornej časti domovskej obrazovky.</string>
     <string name="layout_hide_unreleased">Skryť nevydaný obsah</string>
     <string name="layout_hide_unreleased_sub">Skryť filmy a seriály, ktoré ešte neboli vydané.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Skryť podčiarknutie katalógu</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Odstrániť zvýrazňovací riadok pod názvami katalógov a kolekcií v celej aplikácii.</string>
     <string name="settings_homescreen_summary">%1$d z %2$d katalógov viditeľných • %3$d zdrojov hero sekcie vybraných</string>
     <string name="settings_homescreen_summary_hint">Otvorte katalóg iba vtedy, keď ho potrebujete premenovať alebo zmeniť poradie.</string>
     <string name="settings_homescreen_visible">Viditeľné</string>
