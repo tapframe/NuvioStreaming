@@ -20,6 +20,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.nuvio.app.R
+import com.nuvio.app.core.build.AppFeaturePolicy
 import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 import java.net.HttpURLConnection
@@ -106,7 +107,9 @@ internal class AndroidPlayerNowPlayingController(
         get() = !released && metadata != null
 
     init {
-        createNotificationChannel(appContext)
+        if (AppFeaturePolicy.mediaPlaybackForegroundServiceEnabled) {
+            createNotificationChannel(appContext)
+        }
         AndroidNowPlayingActionDispatcher.register(this)
     }
 
@@ -288,6 +291,7 @@ internal class AndroidPlayerNowPlayingController(
     }
 
     private fun publishNotification() {
+        if (!AppFeaturePolicy.mediaPlaybackForegroundServiceEnabled) return
         val currentMetadata = metadata ?: return
         val notification = buildNotification(
             context = appContext,
@@ -377,6 +381,7 @@ class PlayerNowPlayingService : Service() {
 
     companion object {
         internal fun publish(context: Context, notification: Notification) {
+            if (!AppFeaturePolicy.mediaPlaybackForegroundServiceEnabled) return
             PlayerNowPlayingServiceState.notification = notification
             val intent = Intent(context, PlayerNowPlayingService::class.java)
                 .setAction(ACTION_START_FOREGROUND)
@@ -394,6 +399,7 @@ class PlayerNowPlayingService : Service() {
         }
 
         internal fun hide(context: Context) {
+            if (!AppFeaturePolicy.mediaPlaybackForegroundServiceEnabled) return
             PlayerNowPlayingServiceState.notification = null
             runCatching { context.stopService(Intent(context, PlayerNowPlayingService::class.java)) }
             context.getSystemService(NotificationManager::class.java)
