@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 0.3.1-enhanced-rebased
+      - 0.3.2-enhanced
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
