@@ -18,6 +18,7 @@ data class ExternalPlayerPlaybackRequest(
     val sourceHeaders: Map<String, String> = emptyMap(),
     val resumePositionMs: Long = 0L,
     val subtitles: List<SubtitleInput>? = null,
+    val currentSubtitle: SubtitleInput? = null,
     val season: Int? = null,
     val episode: Int? = null,
     val episodeTitle: String? = null,

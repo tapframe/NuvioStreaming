@@ -36,7 +36,7 @@ private val iosExternalPlayerSpecs = listOf(
             buildString {
                 append("vlc-x-callback://x-callback-url/stream?url=")
                 append(request.sourceUrl.urlQueryEncode())
-                request.subtitles?.firstOrNull()?.let { subtitle ->
+                (request.currentSubtitle ?: request.subtitles?.firstOrNull())?.let { subtitle ->
                     append("&sub=")
                     append(subtitle.url.urlQueryEncode())
                 }
