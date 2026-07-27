@@ -100,11 +100,13 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
 
     override suspend fun delete(profileId: Int, items: Collection<WatchedItem>) {
         if (profileId != ProfileRepository.activeProfileId || items.isEmpty()) return
+        val episodeItems = items.filter { item -> item.season != null && item.episode != null }
+        if (episodeItems.isEmpty()) return
         // Optimistically mark video IDs as removed so fallback won't show them as watched
-        items.forEach { item -> item.videoId?.let(SimklAnimeWatchedFallback::markOptimisticallyRemoved) }
+        episodeItems.forEach { item -> item.videoId?.let(SimklAnimeWatchedFallback::markOptimisticallyRemoved) }
         SimklSyncRepository.ensureLoaded()
         val snapshot = SimklSyncRepository.state.value.snapshot
-        val media = items.map { item ->
+        val media = episodeItems.map { item ->
             snapshot.mediaReference(
                 contentId = item.id,
                 contentType = item.type,

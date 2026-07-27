@@ -818,6 +818,7 @@ object WatchedRepository {
         } else if (source.providerId != null) {
             // Items not found in local store (e.g. anime resolved via snapshot fallback).
             // Still push delete to provider so it can remove from remote.
+            // The observer on snapshot changes will re-pull items and update the store.
             pushDeleteToServer(items = items.toList(), source = source)
         }
     }
@@ -1010,7 +1011,8 @@ object WatchedRepository {
     /**
      * Observes provider extra watched keys (e.g. Simkl anime alternate IDs).
      * When the provider's snapshot changes (after mutations, syncs), recomputes
-     * extra keys and re-publishes so watchedKeys stays reactive and current.
+     * extra keys, re-pulls watched items, and re-publishes so watchedKeys and
+     * items stay reactive and current.
      */
     private fun startExtraKeysObserverIfNeeded() {
         if (extraKeysObserverJob != null) return
@@ -1021,9 +1023,19 @@ object WatchedRepository {
             adapter.observeExtraWatchedKeys(currentProfileId)
                 .distinctUntilChanged()
                 .collectLatest { extraKeys ->
-                    val changed = providerExtraWatchedKeys[providerId] != extraKeys
-                    if (changed) {
+                    val keysChanged = providerExtraWatchedKeys[providerId] != extraKeys
+                    if (keysChanged) {
                         providerExtraWatchedKeys[providerId] = extraKeys
+                        // Re-pull items from provider to reflect snapshot changes
+                        // (e.g. after remote episode removal)
+                        val freshItems = adapter.pull(
+                            profileId = currentProfileId,
+                            pageSize = watchedItemsPageSize,
+                        )
+                        val itemsByKey = freshItems.associateBy { item ->
+                            watchedItemKey(item.type, item.id, item.season, item.episode)
+                        }.toMutableMap()
+                        providerItemsByKey[providerId] = itemsByKey
                         publish()
                     }
                 }
