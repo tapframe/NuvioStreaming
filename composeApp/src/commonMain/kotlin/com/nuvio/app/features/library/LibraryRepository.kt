@@ -4,9 +4,11 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.auth.AuthState
-import com.nuvio.app.core.network.SupabaseProvider
-import com.nuvio.app.core.sync.putSyncOriginClientId
-import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.library.sync.LibrarySyncAdapter
+import com.nuvio.app.features.library.sync.SupabaseLibrarySyncAdapter
+import com.nuvio.app.features.library.sync.consumeCursorPages
+import com.nuvio.app.features.library.sync.libraryDeltaPageSize
+import com.nuvio.app.features.library.sync.librarySnapshotPageSize
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktLibraryRepository
@@ -16,8 +18,6 @@ import com.nuvio.app.features.trakt.TraktMembershipChanges
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.trakt.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
 import com.nuvio.app.features.trakt.shouldUseTraktLibrary
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.rpc
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -36,14 +36,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.put
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.library_local_tab_title
 import nuvio.composeapp.generated.resources.library_other
@@ -51,45 +43,21 @@ import nuvio.composeapp.generated.resources.trakt_lists_update_failed
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
-@Serializable
-private data class StoredLibraryPayload(
-    val items: List<LibraryItem> = emptyList(),
-)
-
-@Serializable
-private data class LibrarySyncItem(
-    @SerialName("content_id") val contentId: String,
-    @SerialName("content_type") val contentType: String,
-    val name: String = "",
-    val poster: String? = null,
-    @SerialName("poster_shape") val posterShape: String = "POSTER",
-    val background: String? = null,
-    val description: String? = null,
-    @SerialName("release_info") val releaseInfo: String? = null,
-    @SerialName("imdb_rating") val imdbRating: Float? = null,
-    val genres: List<String> = emptyList(),
-    @SerialName("addon_base_url") val addonBaseUrl: String? = null,
-    @SerialName("added_at") val addedAt: Long = 0,
-)
-
 object LibraryRepository {
-    private const val PULL_PAGE_SIZE = 500
+    private const val pushDebounceMs = 500L
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("LibraryRepository")
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
 
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
     private val localState = LibraryLocalState()
     private val loadLock = SynchronizedObject()
-    private val nuvioPullMutex = Mutex()
+    private val nuvioSyncMutex = Mutex()
     private val persistenceLock = SynchronizedObject()
-    private val lastPersistedContentRevisionByProfile = mutableMapOf<Int, Long>()
+    private val lastPersistedRevisionByProfile = mutableMapOf<Int, Long>()
+    internal var syncAdapter: LibrarySyncAdapter = SupabaseLibrarySyncAdapter
 
     init {
         syncScope.launch {
@@ -177,7 +145,7 @@ object LibraryRepository {
                 try {
                     wipeStorage()
                 } finally {
-                    lastPersistedContentRevisionByProfile.clear()
+                    lastPersistedRevisionByProfile.clear()
                 }
             }
         }
@@ -203,18 +171,20 @@ object LibraryRepository {
 
     private fun completeLoadFromDisk(token: LibraryProfileToken): Boolean {
         val payload = LibraryStorage.loadPayload(token.profileId).orEmpty().trim()
-        val items = if (payload.isNotEmpty()) {
-            runCatching {
-                json.decodeFromString<StoredLibraryPayload>(payload).items
-            }.getOrDefault(emptyList())
+        val storedPayload = if (payload.isNotEmpty()) {
+            LibraryStoragePayloadCodec.decode(payload)
         } else {
-            emptyList()
+            StoredLibraryPayload()
         }
 
         return localState.completeProfileLoad(
             token = token,
             activeProfileId = ProfileRepository.activeProfileId,
-            items = items,
+            items = storedPayload.items,
+            deltaCursorEventId = storedPayload.deltaCursorEventId,
+            deltaInitialized = storedPayload.deltaInitialized,
+            pendingUpsertKeys = storedPayload.pendingUpsertKeys,
+            pendingDeleteKeys = storedPayload.pendingDeleteKeys,
         ) != null
     }
 
@@ -223,6 +193,7 @@ object LibraryRepository {
             log.d { "Skipping library pull for inactive profile $profileId" }
             return
         }
+        var serializedOperationToken: LibraryProfileToken? = null
 
         if (isTraktLibrarySourceActive()) {
             try {
@@ -237,32 +208,77 @@ object LibraryRepository {
             return
         }
 
-        nuvioPullMutex.withLock {
+        nuvioSyncMutex.withLock {
             val serializedToken = activeOperationToken(profileId) ?: return@withLock
+            serializedOperationToken = serializedToken
             val pullSnapshot = localState.markPullStarted(serializedToken) ?: return@withLock
 
-            var appliedItems = false
             try {
-                val serverItems = pullAllLibrarySyncItems(profileId).map { it.toLibraryItem() }
-                val applyResult = localState.applyServerItems(pullSnapshot, serverItems)
-                    ?: return@withLock
-                appliedItems = true
-                if (applyResult.preservedLocalItems) {
-                    log.w {
-                        "Preserving ${applyResult.snapshot.items.size} local library items because the remote " +
-                            "snapshot is empty or local changes are pending"
-                    }
-                } else {
+                if (!pullSnapshot.deltaInitialized) {
+                    val cursorBeforeSnapshot = syncAdapter.getDeltaCursor(profileId)
+                    val serverItems = syncAdapter.pullSnapshot(
+                        profileId = profileId,
+                        pageSize = librarySnapshotPageSize,
+                    )
+                    val applyResult = localState.applyServerItems(
+                        pullSnapshot = pullSnapshot,
+                        serverItems = serverItems,
+                        cursorEventId = cursorBeforeSnapshot,
+                    ) ?: return@withLock
                     persist(applyResult.snapshot)
+                    publish()
+                    if (applyResult.preservedLocalItems) {
+                        log.i {
+                            "Merged pending local library changes during snapshot bootstrap " +
+                                "profile=$profileId items=${applyResult.snapshot.items.size}"
+                        }
+                    }
                 }
+                pullLibraryDelta(serializedToken, profileId)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
                 log.e(error) { "Failed to pull library from server" }
             }
-
-            if (appliedItems) publish()
         }
+        val completedToken = serializedOperationToken ?: operationToken
+        val pendingSnapshot = localState.snapshot()
+        if (pendingSnapshot.token == completedToken && isActiveOperation(completedToken)) {
+            pushToServer(pendingSnapshot, delayMs = 0L)
+        }
+    }
+
+    private suspend fun pullLibraryDelta(
+        token: LibraryProfileToken,
+        profileId: Int,
+    ) {
+        val initialSnapshot = localState.snapshot()
+        if (initialSnapshot.token != token) return
+        consumeCursorPages(
+            initialCursor = initialSnapshot.deltaCursorEventId,
+            pageSize = libraryDeltaPageSize,
+            fetchPage = { cursor, limit ->
+                if (isActiveOperation(token)) {
+                    syncAdapter.pullDelta(
+                        profileId = profileId,
+                        sinceEventId = cursor,
+                        limit = limit,
+                    )
+                } else {
+                    emptyList()
+                }
+            },
+            applyPage = { events, _ ->
+                if (!isActiveOperation(token)) {
+                    null
+                } else {
+                    localState.applyDeltaEvents(token, events)?.also { snapshot ->
+                        persist(snapshot)
+                        publish()
+                    }?.deltaCursorEventId
+                }
+            },
+        )
     }
 
     private fun activeOperationToken(profileId: Int): LibraryProfileToken? {
@@ -447,10 +463,13 @@ object LibraryRepository {
         applyMembershipChanges(item, desiredMembership)
     }
 
-    private fun pushToServer(snapshot: LibraryLocalSnapshot) {
+    private fun pushToServer(
+        snapshot: LibraryLocalSnapshot,
+        delayMs: Long = pushDebounceMs,
+    ) {
+        if (!snapshot.hasPendingPush) return
         val authState = AuthRepository.state.value
         val profileId = snapshot.token.profileId
-        val itemCount = snapshot.items.size
         if (authState !is AuthState.Authenticated) {
             log.w { "Skipping library push: auth state is ${authState::class.simpleName} profile=$profileId" }
             return
@@ -460,38 +479,42 @@ object LibraryRepository {
             return
         }
         val pushJob = syncScope.launch(start = CoroutineStart.LAZY) {
-            delay(500)
-            if (!localState.isContentCurrent(snapshot)) {
-                val current = localState.snapshot()
-                log.w {
-                    "Skipping stale debounced library push: scheduled=${snapshot.token} " +
-                        "current=${current.token} scheduledContentRevision=${snapshot.contentRevision} " +
-                        "currentContentRevision=${current.contentRevision}"
+            delay(delayMs)
+            nuvioSyncMutex.withLock {
+                if (!localState.isCurrent(snapshot)) {
+                    val current = localState.snapshot()
+                    log.d {
+                        "Skipping stale debounced library push scheduled=${snapshot.token} " +
+                            "current=${current.token} scheduledRevision=${snapshot.revision} " +
+                            "currentRevision=${current.revision}"
+                    }
+                    return@withLock
                 }
-                return@launch
-            }
-            runCatching {
-                val syncItems = snapshot.items.map { it.toSyncItem() }
-                if (syncItems.isEmpty()) {
-                    log.w { "Skipping library push: sync payload is empty profile=$profileId" }
-                    return@runCatching false
+                val currentAuthState = AuthRepository.state.value
+                if (currentAuthState !is AuthState.Authenticated || currentAuthState.isAnonymous) {
+                    return@withLock
                 }
-                val params = buildJsonObject {
-                    put("p_profile_id", profileId)
-                    put("p_items", json.encodeToJsonElement(syncItems))
-                    putSyncOriginClientId()
+                runCatching {
+                    val itemsByKey = snapshot.items.associateBy { item ->
+                        libraryItemKey(item.id, item.type)
+                    }
+                    val upsertItems = snapshot.pendingUpsertKeys.mapNotNull { key ->
+                        itemsByKey[libraryItemKey(key.contentId, key.contentType)]
+                    }
+                    syncAdapter.pushItems(profileId, upsertItems)
+                    syncAdapter.deleteItems(profileId, snapshot.pendingDeleteKeys)
+                    localState.markPushCompleted(snapshot)?.let(::persist)
+                    log.i {
+                        "Library delta push completed profile=$profileId " +
+                            "upserts=${upsertItems.size} deletes=${snapshot.pendingDeleteKeys.size}"
+                    }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    log.e(error) {
+                        "Failed to push library delta profile=$profileId " +
+                            "upserts=${snapshot.pendingUpsertKeys.size} deletes=${snapshot.pendingDeleteKeys.size}"
+                    }
                 }
-                log.i { "Pushing library to server profile=$profileId itemCount=${syncItems.size}" }
-                SupabaseProvider.client.postgrest.rpc("sync_push_library", params)
-                true
-            }.onSuccess { pushed ->
-                if (pushed) {
-                    localState.markPushCompleted(snapshot)
-                    log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
-                }
-            }.onFailure { e ->
-                if (e is CancellationException) throw e
-                log.e(e) { "Failed to push library to server profile=$profileId itemCount=$itemCount" }
             }
         }
         pushJob.invokeOnCompletion { localState.clearPushJob(pushJob) }
@@ -503,27 +526,6 @@ object LibraryRepository {
         }
         installResult.detachedPushJob?.cancel()
         pushJob.start()
-    }
-
-    private suspend fun pullAllLibrarySyncItems(profileId: Int): List<LibrarySyncItem> {
-        val allItems = mutableListOf<LibrarySyncItem>()
-        var offset = 0
-
-        while (true) {
-            val params = buildJsonObject {
-                put("p_profile_id", profileId)
-                put("p_limit", PULL_PAGE_SIZE)
-                put("p_offset", offset)
-            }
-            val result = SupabaseProvider.client.postgrest.rpc("sync_pull_library", params)
-            val page = result.decodeList<LibrarySyncItem>()
-            allItems.addAll(page)
-
-            if (page.size < PULL_PAGE_SIZE) break
-            offset += PULL_PAGE_SIZE
-        }
-
-        return allItems
     }
 
     private fun publish() {
@@ -584,18 +586,14 @@ object LibraryRepository {
     }
 
     private fun persist(snapshot: LibraryLocalSnapshot) {
-        val payload = json.encodeToString(
-            StoredLibraryPayload(
-                items = snapshot.items.sortedByDescending { it.savedAtEpochMs },
-            ),
-        )
+        val payload = LibraryStoragePayloadCodec.encode(snapshot)
         synchronized(persistenceLock) {
             val profileId = snapshot.token.profileId
-            val lastPersistedRevision = lastPersistedContentRevisionByProfile[profileId] ?: Long.MIN_VALUE
-            if (snapshot.contentRevision <= lastPersistedRevision) return@synchronized
-            localState.runIfContentCurrent(snapshot) {
+            val lastPersistedRevision = lastPersistedRevisionByProfile[profileId] ?: Long.MIN_VALUE
+            if (snapshot.revision <= lastPersistedRevision) return@synchronized
+            localState.runIfCurrent(snapshot) {
                 LibraryStorage.savePayload(profileId, payload)
-                lastPersistedContentRevisionByProfile[profileId] = snapshot.contentRevision
+                lastPersistedRevisionByProfile[profileId] = snapshot.revision
             }
         }
     }
@@ -654,50 +652,6 @@ internal fun libraryMembershipWithRemovedList(
 ): Map<String, Boolean> =
     currentMembership.toMutableMap().apply {
         this[listKey] = false
-    }
-
-private fun LibrarySyncItem.toLibraryItem(): LibraryItem = LibraryItem(
-    id = contentId,
-    type = contentType,
-    name = name,
-    poster = poster,
-    banner = background,
-    description = description,
-    releaseInfo = releaseInfo,
-    imdbRating = imdbRating?.toString(),
-    genres = genres,
-    posterShape = posterShape.toPosterShape(),
-    addonBaseUrl = addonBaseUrl,
-    savedAtEpochMs = addedAt,
-)
-
-private fun LibraryItem.toSyncItem(): LibrarySyncItem = LibrarySyncItem(
-    contentId = id,
-    contentType = type,
-    name = name,
-    poster = poster,
-    posterShape = posterShape.toSyncName(),
-    background = banner,
-    description = description,
-    releaseInfo = releaseInfo,
-    imdbRating = imdbRating?.toFloatOrNull(),
-    genres = genres,
-    addonBaseUrl = addonBaseUrl,
-    addedAt = savedAtEpochMs,
-)
-
-private fun String.toPosterShape(): PosterShape =
-    when (trim().uppercase()) {
-        "LANDSCAPE" -> PosterShape.Landscape
-        "SQUARE" -> PosterShape.Square
-        else -> PosterShape.Poster
-    }
-
-private fun PosterShape.toSyncName(): String =
-    when (this) {
-        PosterShape.Poster -> "POSTER"
-        PosterShape.Square -> "SQUARE"
-        PosterShape.Landscape -> "LANDSCAPE"
     }
 
 internal fun String.toLibraryDisplayTitle(): String {
