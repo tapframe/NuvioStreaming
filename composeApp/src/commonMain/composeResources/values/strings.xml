@@ -504,8 +504,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio connects to TorBox for account authentication, cloud library access, cache checks, and cloud playback features. Nuvio is not affiliated with or endorsed by TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio uses MDBList for ratings and external score provider data. Nuvio is not affiliated with or endorsed by MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio uses the IntroDB API for community-provided intro, recap, credits, and preview timestamps used by skip controls. Nuvio is not affiliated with or endorsed by IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio uses the SkipDB API for community-provided intro, recap, credits, and preview timestamps used by skip controls. Nuvio is not affiliated with or endorsed by SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Used for playback on iOS builds.</string>
     <string name="settings_licenses_attributions_mpvkit_license">MPVKit source alone is licensed under LGPL v3.0. MPVKit bundles, including libmpv and FFmpeg libraries, are also licensed under LGPL v3.0.</string>
@@ -904,8 +904,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Enter your AnimeSkip API client ID. Get one at anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Enable Intro Submission</string>
     <string name="settings_playback_intro_submit_enabled_description">Show a button to submit intro/outro timestamps to the community database.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB API Key</string>
-    <string name="settings_playback_introdb_api_key_description">Enter your IntroDB API key to submit timestamps. Required for submission.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB API Key</string>
+    <string name="settings_playback_skipdb_api_key_description">Enter your SkipDB API key to submit timestamps. Required for submission.</string>
     <string name="settings_playback_anime_skip_description">Also search AnimeSkip for skip timestamps (requires client ID).</string>
     <string name="settings_playback_auto_play_next_episode">Auto-play Next Episode</string>
     <string name="settings_playback_auto_play_next_episode_description">Start next episode automatically when prompt appears.</string>
@@ -1032,7 +1032,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when audio matches the subtitle language; if unavailable, select nothing.</string>
     <string name="settings_playback_subtitle_vertical_offset">Vertical Offset</string>
     <string name="settings_playback_skip_intro_outro_recap">Skip Intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Use introdb.app to detect intros and recaps.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Use skipdb.tv to detect intros and recaps.</string>
     <string name="settings_playback_source_scope">Auto-play Source Scope</string>
     <string name="settings_playback_source_scope_all_addons">All installed addons</string>
     <string name="settings_playback_source_scope_all_addons_description">Auto-play only considers streams coming from your installed addons.</string>
@@ -1862,8 +1862,8 @@
     <string name="collections_editor_media_series_suffix">Series</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">Cloud library is disabled.</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">Invalid API Key or connection failed</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">Invalid API Key or connection failed</string>
     <string name="addons_manifest_missing_field">Manifest missing \"%1$s\"</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDB Collection %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">TMDB Director %1$s</string>
@@ -1965,7 +1965,7 @@
     <string name="plugins_test_results_count">Test results (%1$d)</string>
     <string name="plugins_tmdb_required_message">Plugin providers require a TMDB API key. Set it on the TMDB screen or plugin providers will not work correctly.</string>
     <string name="search_error_no_results_for_catalog">No search results returned for %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Invalid API Key or connection failed</string>
+    <string name="settings_playback_skipdb_invalid_key">Invalid API Key or connection failed</string>
     <string name="streams_plugin_repository_fallback">Plugin repository</string>
     <string name="submit_intro_action">Submit Intro</string>
     <string name="submit_intro_button_submit">Submit</string>

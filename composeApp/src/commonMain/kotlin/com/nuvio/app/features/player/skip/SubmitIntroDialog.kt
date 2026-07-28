@@ -73,6 +73,7 @@ fun SubmitIntroDialog(
     season: Int,
     episode: Int,
     currentTimeSec: Double,
+    durationMs: Long,
     segmentType: String,
     onSegmentTypeChange: (String) -> Unit,
     startTimeStr: String,
@@ -210,13 +211,14 @@ fun SubmitIntroDialog(
                                 if (start != null && end != null && end > start) {
                                     isSubmitting = true
                                     scope.launch {
-                                        val result = SkipIntroRepository.submitIntro(
+                                        val result = SkipIntroRepository.submitSegment(
                                             imdbId = imdbId,
                                             season = season,
                                             episode = episode,
-                                            startSec = start,
-                                            endSec = end,
+                                            startMs = (start * 1000).toLong(),
+                                            endMs = (end * 1000).toLong(),
                                             segmentType = segmentType,
+                                            durationMs = durationMs.takeIf { it > 0L },
                                         )
                                         isSubmitting = false
                                         if (result) {

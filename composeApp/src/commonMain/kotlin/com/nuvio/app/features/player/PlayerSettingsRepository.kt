@@ -66,7 +66,7 @@ data class PlayerSettingsUiState(
     val skipIntroEnabled: Boolean = true,
     val animeSkipEnabled: Boolean = false,
     val animeSkipClientId: String = "",
-    val introDbApiKey: String = "",
+    val skipDbApiKey: String = "",
     val introSubmitEnabled: Boolean = false,
     val streamAutoPlayNextEpisodeEnabled: Boolean = false,
     val streamAutoPlayPreferBingeGroup: Boolean = true,
@@ -132,7 +132,7 @@ object PlayerSettingsRepository {
     private var skipIntroEnabled = true
     private var animeSkipEnabled = false
     private var animeSkipClientId = ""
-    private var introDbApiKey = ""
+    private var skipDbApiKey = ""
     private var introSubmitEnabled = false
     private var streamAutoPlayNextEpisodeEnabled = false
     private var streamAutoPlayPreferBingeGroup = true
@@ -203,7 +203,7 @@ object PlayerSettingsRepository {
         skipIntroEnabled = true
         animeSkipEnabled = false
         animeSkipClientId = ""
-        introDbApiKey = ""
+        skipDbApiKey = ""
         introSubmitEnabled = false
         streamAutoPlayNextEpisodeEnabled = false
         streamAutoPlayPreferBingeGroup = true
@@ -326,7 +326,7 @@ object PlayerSettingsRepository {
         skipIntroEnabled = PlayerSettingsStorage.loadSkipIntroEnabled() ?: true
         animeSkipEnabled = PlayerSettingsStorage.loadAnimeSkipEnabled() ?: false
         animeSkipClientId = PlayerSettingsStorage.loadAnimeSkipClientId() ?: ""
-        introDbApiKey = PlayerSettingsStorage.loadIntroDbApiKey() ?: ""
+        skipDbApiKey = PlayerSettingsStorage.loadSkipDbApiKey() ?: ""
         introSubmitEnabled = PlayerSettingsStorage.loadIntroSubmitEnabled() ?: false
         streamAutoPlayNextEpisodeEnabled = PlayerSettingsStorage.loadStreamAutoPlayNextEpisodeEnabled() ?: false
         streamAutoPlayPreferBingeGroup = PlayerSettingsStorage.loadStreamAutoPlayPreferBingeGroup() ?: true
@@ -663,12 +663,12 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveAnimeSkipClientId(clientId)
     }
 
-    fun setIntroDbApiKey(apiKey: String) {
+    fun setSkipDbApiKey(apiKey: String) {
         ensureLoaded()
-        if (introDbApiKey == apiKey) return
-        introDbApiKey = apiKey
+        if (skipDbApiKey == apiKey) return
+        skipDbApiKey = apiKey
         publish()
-        PlayerSettingsStorage.saveIntroDbApiKey(apiKey)
+        PlayerSettingsStorage.saveSkipDbApiKey(apiKey)
     }
 
     fun setIntroSubmitEnabled(enabled: Boolean) {
@@ -944,7 +944,7 @@ object PlayerSettingsRepository {
             skipIntroEnabled = skipIntroEnabled,
             animeSkipEnabled = animeSkipEnabled,
             animeSkipClientId = animeSkipClientId,
-            introDbApiKey = introDbApiKey,
+            skipDbApiKey = skipDbApiKey,
             introSubmitEnabled = introSubmitEnabled,
             streamAutoPlayNextEpisodeEnabled = streamAutoPlayNextEpisodeEnabled,
             streamAutoPlayPreferBingeGroup = streamAutoPlayPreferBingeGroup,

@@ -435,8 +435,8 @@
     <string name="settings_licenses_attributions_trakt_body">Nuvio kobler til Trakt for autentisering, seerhistorikk, synkronisering osv. Nuvio er ikke tilknyttet eller godkjent av Trakt.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio bruker MDBList for eksterne vurderinger. Nuvio er ikke tilknyttet eller godkjent av MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio bruker IntroDB API for intro-, recap-, credits- og preview-tidsstempler. Nuvio er ikke tilknyttet eller godkjent av IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio bruker SkipDB API for intro-, recap-, credits- og preview-tidsstempler. Nuvio er ikke tilknyttet eller godkjent av SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Brukes for avspilling på iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Lisensiert under LGPL v3.0.</string>
@@ -738,8 +738,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Skriv inn din AnimeSkip API client ID. Hent en på anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Aktiver intro-innsending</string>
     <string name="settings_playback_intro_submit_enabled_description">Vis en knapp for å sende intro/outro-tidsstempler til fellesskapsdatabasen.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB API-nøkkel</string>
-    <string name="settings_playback_introdb_api_key_description">Skriv inn din IntroDB API-nøkkel for å sende tidsstempler.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB API-nøkkel</string>
+    <string name="settings_playback_skipdb_api_key_description">Skriv inn din SkipDB API-nøkkel for å sende tidsstempler.</string>
     <string name="settings_playback_anime_skip_description">Søk også i AnimeSkip etter hopp-tidsstempler (krever client ID).</string>
     <string name="settings_playback_auto_play_next_episode">Auto-spill neste episode</string>
     <string name="settings_playback_auto_play_next_episode_description">Start neste episode automatisk når prompt vises.</string>
@@ -819,7 +819,7 @@
     <string name="settings_playback_show_loading_overlay">Laste-overlay</string>
     <string name="settings_playback_show_loading_overlay_description">Vis lasts skjerm til første bilde vises.</string>
     <string name="settings_playback_skip_intro_outro_recap">Hopp intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Bruk introdb.app for å oppdage introer og recaps.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Bruk skipdb.tv for å oppdage introer og recaps.</string>
     <string name="settings_playback_source_scope">Auto-play kildeomfang</string>
     <string name="settings_playback_source_scope_all_addons">Alle installerte tillegg</string>
     <string name="settings_playback_source_scope_all_addons_description">Auto-play vurderer kun strømmer fra installerte tillegg.</string>

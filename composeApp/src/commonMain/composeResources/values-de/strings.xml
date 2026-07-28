@@ -634,8 +634,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Gib deine AnimeSkip-API-Client-ID ein. Erhältlich unter anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Intro-Übermittlung aktivieren</string>
     <string name="settings_playback_intro_submit_enabled_description">Eine Schaltfläche anzeigen, um Intro-/Outro-Zeitstempel an die Community-Datenbank zu übermitteln.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB-API-Schlüssel</string>
-    <string name="settings_playback_introdb_api_key_description">Gib deinen IntroDB-API-Schlüssel ein, um Zeitstempel zu übermitteln. Für die Übermittlung erforderlich.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB-API-Schlüssel</string>
+    <string name="settings_playback_skipdb_api_key_description">Gib deinen SkipDB-API-Schlüssel ein, um Zeitstempel zu übermitteln. Für die Übermittlung erforderlich.</string>
     <string name="settings_playback_anime_skip_description">Auch AnimeSkip nach Skip-Zeitstempeln durchsuchen (erfordert Client-ID).</string>
     <string name="settings_playback_auto_play_next_episode">Nächste Episode automatisch abspielen</string>
     <string name="settings_playback_auto_play_next_episode_description">Automatisch die nächste Episode finden und abspielen, wenn der Schwellenwert erreicht ist.</string>

@@ -482,8 +482,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio kết nối với TorBox để xác thực tài khoản, truy cập thư viện đám mây, kiểm tra bộ nhớ đệm và phát nội dung từ đám mây. Nuvio không liên kết hoặc được TorBox bảo trợ</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio dùng MDBList để lấy điểm đánh giá và dữ liệu từ các dịch vụ xếp hạng khác. Nuvio không liên kết hoặc được MDBList bảo trợ</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio dùng API IntroDB để lấy dữ liệu cộng đồng về thời điểm mở đầu, tóm tắt, phần credit và đoạn xem trước cho tính năng bỏ qua. Nuvio không liên kết hoặc được IntroDB bảo trợ</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio dùng API SkipDB để lấy dữ liệu cộng đồng về thời điểm mở đầu, tóm tắt, phần credit và đoạn xem trước cho tính năng bỏ qua. Nuvio không liên kết hoặc được SkipDB bảo trợ</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Dùng để phát nội dung trên iOS</string>
     <string name="settings_licenses_attributions_mpvkit_license">MPVKit được cấp phép theo LGPL v3.0. Các thành phần đi kèm như libmpv và FFmpeg cũng được cấp phép theo LGPL v3.0</string>
@@ -838,8 +838,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Nhập Client ID API Anime Skip. Tạo tại anime-skip.com</string>
     <string name="settings_playback_intro_submit_enabled">Cho phép gửi mốc mở đầu</string>
     <string name="settings_playback_intro_submit_enabled_description">Hiển thị nút gửi mốc Đoạn mở đầu/Đoạn kết thúc lên cơ sở dữ liệu cộng đồng</string>
-    <string name="settings_playback_introdb_api_key">Khóa API IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Nhập khóa API IntroDB để gửi mốc thời gian. Bắt buộc để dùng tính năng này</string>
+    <string name="settings_playback_skipdb_api_key">Khóa API SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Nhập khóa API SkipDB để gửi mốc thời gian. Bắt buộc để dùng tính năng này</string>
     <string name="settings_playback_anime_skip_description">Tìm thêm mốc bỏ qua từ Anime Skip (yêu cầu Client ID)</string>
     <string name="settings_playback_auto_play_next_episode">Tự động phát tập tiếp theo</string>
     <string name="settings_playback_auto_play_next_episode_description">Tự động phát tập tiếp theo khi thông báo xuất hiện</string>
@@ -966,7 +966,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Tự động áp dụng phụ đề khớp với ngôn ngữ đã chọn</string>
     <string name="settings_playback_subtitle_vertical_offset">Căn chỉnh dọc</string>
     <string name="settings_playback_skip_intro_outro_recap">Tự động bỏ qua Đoạn mở đầu</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Dùng IntroDB để phát hiện Đoạn mở đầu và Tóm tắt</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Dùng SkipDB để phát hiện Đoạn mở đầu và Tóm tắt</string>
     <string name="settings_playback_source_scope">Phạm vi chọn nguồn phát tự động</string>
     <string name="settings_playback_source_scope_all_addons">Tất cả addon đã cài</string>
     <string name="settings_playback_source_scope_all_addons_description">Chỉ tự động phát từ nguồn do addon đã cài cung cấp</string>
@@ -1746,7 +1746,7 @@
     <string name="collections_editor_media_movies_suffix">Phim</string>
     <string name="collections_editor_media_series_suffix">Loạt phim</string>
     <string name="cloud_library_playback_disabled">Thư viện đám mây đang tắt</string>
-    <string name="settings_playback_introdb_invalid_api_key">Khóa API không hợp lệ hoặc không thể kết nối</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Khóa API không hợp lệ hoặc không thể kết nối</string>
     <string name="addons_manifest_missing_field">Manifest thiếu trường "%1$s"</string>
     <string name="collections_editor_tmdb_collection_title_format">Bộ sưu tập TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">Đạo diễn TMDB %1$s</string>
@@ -1848,7 +1848,7 @@
     <string name="plugins_test_results_count">Kết quả kiểm tra (%1$d)</string>
     <string name="plugins_tmdb_required_message">Plugin yêu cầu khóa API TMDB. Vui lòng thiết lập trong màn hình TMDB để đảm bảo tính năng hoạt động chính xác</string>
     <string name="search_error_no_results_for_catalog">Không tìm thấy kết quả trong %1$s</string>
-    <string name="settings_playback_introdb_invalid_key">Khóa API không hợp lệ hoặc lỗi kết nối</string>
+    <string name="settings_playback_skipdb_invalid_key">Khóa API không hợp lệ hoặc lỗi kết nối</string>
     <string name="streams_plugin_repository_fallback">Kho Plugin</string>
     <string name="submit_intro_action">Gửi mốc Đoạn mở đầu</string>
     <string name="submit_intro_button_submit">Gửi</string>

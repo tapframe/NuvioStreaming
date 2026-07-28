@@ -474,8 +474,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio се свързва с TorBox за удостоверяване на акаунт, достъп до облачна библиотека, проверки на кеша и функции за облачно възпроизвеждане. Nuvio не е свързан с или одобрен от TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio използва MDBList за оценки и данни от доставчици на външни резултати. Nuvio не е свързан с или одобрен от MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio използва IntroDB API за предоставени от общността времеви маркери за въведения, резюмета, надписи и прегледи, използвани от контролите за пропускане. Nuvio не е свързан с или одобрен от IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio използва SkipDB API за предоставени от общността времеви маркери за въведения, резюмета, надписи и прегледи, използвани от контролите за пропускане. Nuvio не е свързан с или одобрен от SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Използва се за възпроизвеждане на iOS версии.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Самият изходен код на MPVKit е лицензиран под LGPL v3.0. Пакетите MPVKit, включително библиотеките libmpv и FFmpeg, също са лицензирани под LGPL v3.0.</string>
@@ -812,8 +812,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Въведете вашето AnimeSkip API клиентско ID. Вземете го от anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Активирай изпращане на въведения</string>
     <string name="settings_playback_intro_submit_enabled_description">Показвай бутон за изпращане на времеви маркери за въведения/финали към общностната база данни.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB API ключ</string>
-    <string name="settings_playback_introdb_api_key_description">Въведете вашия IntroDB API ключ, за да изпращате времеви маркери. Необходим за изпращане.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB API ключ</string>
+    <string name="settings_playback_skipdb_api_key_description">Въведете вашия SkipDB API ключ, за да изпращате времеви маркери. Необходим за изпращане.</string>
     <string name="settings_playback_anime_skip_description">Търси също в AnimeSkip за времеви маркери за пропускане (изисква клиентско ID).</string>
     <string name="settings_playback_auto_play_next_episode">Автоматично пускане на следващия епизод</string>
     <string name="settings_playback_auto_play_next_episode_description">Стартирай следващия епизод автоматично, когато се появи подкана.</string>
@@ -922,7 +922,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Предпочитай принудителни субтитри при съответствие с настройките ви за субтитри.</string>
     <string name="settings_playback_subtitle_vertical_offset">Вертикално отместване</string>
     <string name="settings_playback_skip_intro_outro_recap">Пропусни въведението</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Използвай introdb.app за засичане на въведения и резюмета.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Използвай skipdb.tv за засичане на въведения и резюмета.</string>
     <string name="settings_playback_source_scope">Обхват на автоматичното пускане</string>
     <string name="settings_playback_source_scope_all_addons">Всички инсталирани добавки</string>
     <string name="settings_playback_source_scope_all_addons_description">Автоматичното пускане разглежда само потоци от вашите инсталирани добавки.</string>
@@ -1691,7 +1691,7 @@
     <string name="collections_editor_media_movies_suffix">Филми</string>
     <string name="collections_editor_media_series_suffix">Сериали</string>
     <string name="cloud_library_playback_disabled">Облачната библиотека е деактивирана.</string>
-    <string name="settings_playback_introdb_invalid_api_key">Невалиден API ключ или неуспешна връзка</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Невалиден API ключ или неуспешна връзка</string>
     <string name="addons_manifest_missing_field">В манифеста липсва „%1$s"</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDB колекция %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">TMDB режисьор %1$s</string>
@@ -1793,7 +1793,7 @@
     <string name="plugins_test_results_count">Резултати от теста (%1$d)</string>
     <string name="plugins_tmdb_required_message">Доставчиците на плъгини изискват TMDB API ключ. Задайте го на TMDB екрана или доставчиците на плъгини няма да работят правилно.</string>
     <string name="search_error_no_results_for_catalog">Не са върнати резултати от търсенето за %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Невалиден API ключ или неуспешна връзка</string>
+    <string name="settings_playback_skipdb_invalid_key">Невалиден API ключ или неуспешна връзка</string>
     <string name="streams_plugin_repository_fallback">Хранилище с плъгини</string>
     <string name="submit_intro_action">Изпрати въведение</string>
     <string name="submit_intro_button_submit">Изпрати</string>

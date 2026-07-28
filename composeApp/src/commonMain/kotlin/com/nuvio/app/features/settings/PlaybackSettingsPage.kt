@@ -1066,22 +1066,22 @@ private fun PlaybackSettingsSection(
                 )
                 if (autoPlayPlayerSettings.introSubmitEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    var showIntroDbApiKeyDialog by remember { mutableStateOf(false) }
+                    var showSkipDbApiKeyDialog by remember { mutableStateOf(false) }
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
                     SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_introdb_api_key),
-                        description = autoPlayPlayerSettings.introDbApiKey.ifBlank { notSetLabel },
+                        title = stringResource(Res.string.settings_playback_skipdb_api_key),
+                        description = autoPlayPlayerSettings.skipDbApiKey.ifBlank { notSetLabel },
                         isTablet = isTablet,
-                        onClick = { showIntroDbApiKeyDialog = true },
+                        onClick = { showSkipDbApiKeyDialog = true },
                     )
-                    if (showIntroDbApiKeyDialog) {
-                        IntroDbApiKeyDialog(
-                            initialValue = autoPlayPlayerSettings.introDbApiKey,
+                    if (showSkipDbApiKeyDialog) {
+                        SkipDbApiKeyDialog(
+                            initialValue = autoPlayPlayerSettings.skipDbApiKey,
                             onSave = {
-                                PlayerSettingsRepository.setIntroDbApiKey(it)
-                                showIntroDbApiKeyDialog = false
+                                PlayerSettingsRepository.setSkipDbApiKey(it)
+                                showSkipDbApiKeyDialog = false
                             },
-                            onDismiss = { showIntroDbApiKeyDialog = false },
+                            onDismiss = { showSkipDbApiKeyDialog = false },
                         )
                     }
                 }
@@ -3351,7 +3351,7 @@ private fun AnimeSkipClientIdDialog(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun IntroDbApiKeyDialog(
+private fun SkipDbApiKeyDialog(
     initialValue: String,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -3360,7 +3360,7 @@ private fun IntroDbApiKeyDialog(
     var value by remember { mutableStateOf(initialValue) }
     var isVerifying by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val invalidKeyMessage = stringResource(Res.string.settings_playback_introdb_invalid_key)
+    val invalidKeyMessage = stringResource(Res.string.settings_playback_skipdb_invalid_key)
 
     BasicAlertDialog(onDismissRequest = { if (!isVerifying) onDismiss() }) {
         Surface(
@@ -3373,13 +3373,13 @@ private fun IntroDbApiKeyDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = stringResource(Res.string.settings_playback_introdb_api_key),
+                    text = stringResource(Res.string.settings_playback_skipdb_api_key),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = stringResource(Res.string.settings_playback_introdb_api_key_description),
+                    text = stringResource(Res.string.settings_playback_skipdb_api_key_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -3389,7 +3389,7 @@ private fun IntroDbApiKeyDialog(
                         value = it
                         errorMessage = null
                     },
-                    label = stringResource(Res.string.settings_playback_introdb_api_key),
+                    label = stringResource(Res.string.settings_playback_skipdb_api_key),
                     modifier = Modifier.fillMaxWidth(),
                     isError = errorMessage != null,
                 )
@@ -3424,7 +3424,7 @@ private fun IntroDbApiKeyDialog(
                             isVerifying = true
                             errorMessage = null
                             scope.launch {
-                                val isValid = com.nuvio.app.features.player.skip.SkipIntroRepository.verifyIntroDbApiKey(trimmed)
+                                val isValid = com.nuvio.app.features.player.skip.SkipIntroRepository.verifySkipDbApiKey(trimmed)
                                 isVerifying = false
                                 if (isValid) {
                                     onSave(trimmed)

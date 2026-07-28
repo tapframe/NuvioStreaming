@@ -318,7 +318,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onSubmitIntroClick = if (
                 isSeries &&
                 playerSettingsUiState.introSubmitEnabled &&
-                playerSettingsUiState.introDbApiKey.isNotBlank()
+                playerSettingsUiState.skipDbApiKey.isNotBlank()
             ) {
                 { showSubmitIntroModal = true }
             } else {
@@ -565,6 +565,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         activeVideoId = activeVideoId,
         metaUiState = metaUiState,
         displayedPositionMs = displayedPositionMs,
+        durationMs = playbackSnapshot.durationMs,
         submitIntroSegmentType = submitIntroSegmentType,
         onSubmitIntroSegmentTypeChanged = { submitIntroSegmentType = it },
         submitIntroStartTimeStr = submitIntroStartTimeStr,

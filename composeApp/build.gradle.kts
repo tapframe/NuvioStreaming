@@ -108,19 +108,6 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
             )
         }
 
-        outDir.resolve("com/nuvio/app/features/player/skip").apply {
-            mkdirs()
-            resolve("IntroDbConfig.kt").writeText(
-                """
-                |package com.nuvio.app.features.player.skip
-                |
-                |object IntroDbConfig {
-                |    const val URL = "${props.getProperty("INTRODB_API_URL", "")}" 
-                |}
-                """.trimMargin()
-            )
-        }
-
         outDir.resolve("com/nuvio/app/features/details").apply {
             mkdirs()
             resolve("ImdbEpisodeRatingsConfig.kt").writeText(

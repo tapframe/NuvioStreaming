@@ -60,7 +60,7 @@ actual object PlayerSettingsStorage {
     private const val skipIntroEnabledKey = "skip_intro_enabled"
     private const val animeSkipEnabledKey = "animeskip_enabled"
     private const val animeSkipClientIdKey = "animeskip_client_id"
-    private const val introDbApiKeyKey = "introdb_api_key"
+    private const val skipDbApiKeyKey = "skipdb_api_key"
     private const val introSubmitEnabledKey = "intro_submit_enabled"
     private const val streamAutoPlayNextEpisodeEnabledKey = "stream_auto_play_next_episode_enabled"
     private const val streamAutoPlayPreferBingeGroupKey = "stream_auto_play_prefer_binge_group"
@@ -680,14 +680,14 @@ actual object PlayerSettingsStorage {
         NSUserDefaults.standardUserDefaults.setObject(clientId, forKey = ProfileScopedKey.of(animeSkipClientIdKey))
     }
 
-    actual fun loadIntroDbApiKey(): String? {
+    actual fun loadSkipDbApiKey(): String? {
         val defaults = NSUserDefaults.standardUserDefaults
-        val key = ProfileScopedKey.of(introDbApiKeyKey)
+        val key = ProfileScopedKey.of(skipDbApiKeyKey)
         return defaults.stringForKey(key)
     }
 
-    actual fun saveIntroDbApiKey(apiKey: String) {
-        NSUserDefaults.standardUserDefaults.setObject(apiKey, forKey = ProfileScopedKey.of(introDbApiKeyKey))
+    actual fun saveSkipDbApiKey(apiKey: String) {
+        NSUserDefaults.standardUserDefaults.setObject(apiKey, forKey = ProfileScopedKey.of(skipDbApiKeyKey))
     }
 
     actual fun loadIntroSubmitEnabled(): Boolean? {
@@ -1011,7 +1011,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(skipIntroEnabledKey)?.let(::saveSkipIntroEnabled)
         payload.decodeSyncBoolean(animeSkipEnabledKey)?.let(::saveAnimeSkipEnabled)
         payload.decodeSyncString(animeSkipClientIdKey)?.let(::saveAnimeSkipClientId)
-        payload.decodeSyncString(introDbApiKeyKey)?.let(::saveIntroDbApiKey)
+        payload.decodeSyncString(skipDbApiKeyKey)?.let(::saveSkipDbApiKey)
         payload.decodeSyncBoolean(streamAutoPlayNextEpisodeEnabledKey)?.let(::saveStreamAutoPlayNextEpisodeEnabled)
         payload.decodeSyncBoolean(streamAutoPlayPreferBingeGroupKey)?.let(::saveStreamAutoPlayPreferBingeGroup)
         payload.decodeSyncBoolean(streamAutoPlayReuseBingeGroupKey)?.let(::saveStreamAutoPlayReuseBingeGroup)

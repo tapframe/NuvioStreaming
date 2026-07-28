@@ -501,8 +501,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio se conectează la TorBox pentru autentificarea contului, accesul la biblioteca din cloud, verificarea cache-ului și funcții de redare în cloud. Nuvio nu este afiliat cu și nici aprobat de TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio utilizează MDBList pentru evaluări și date de la furnizori externi de scoruri. Nuvio nu este afiliat cu și nici aprobat de MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio folosește API-ul IntroDB pentru marcajele de timp (intro, recapitulare, credite și previzualizări) oferite de comunitate și utilizate de comenzile de salt. Nuvio nu este afiliat cu și nici aprobat de IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio folosește API-ul SkipDB pentru marcajele de timp (intro, recapitulare, credite și previzualizări) oferite de comunitate și utilizate de comenzile de salt. Nuvio nu este afiliat cu și nici aprobat de SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Utilizat pentru redare pe build-urile de iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Codul sursă MPVKit în sine este licențiat sub LGPL v3.0. Pachetele MPVKit, inclusiv bibliotecile libmpv și FFmpeg, sunt de asemenea licențiate sub LGPL v3.0.</string>
@@ -859,8 +859,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Introdu ID-ul tău de client API AnimeSkip. Poți obține unul pe anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Activează trimiterea de intro-uri</string>
     <string name="settings_playback_intro_submit_enabled_description">Afișează un buton pentru a trimite marcajele de timp pentru intro/outro în baza de date a comunității.</string>
-    <string name="settings_playback_introdb_api_key">Cheie API IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Introdu cheia ta API IntroDB pentru a trimite marcaje de timp. Este necesară pentru trimitere.</string>
+    <string name="settings_playback_skipdb_api_key">Cheie API SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Introdu cheia ta API SkipDB pentru a trimite marcaje de timp. Este necesară pentru trimitere.</string>
     <string name="settings_playback_anime_skip_description">Caută marcaje de timp de salt și pe AnimeSkip (necesită ID de client).</string>
     <string name="settings_playback_auto_play_next_episode">Redă automat episodul următor</string>
     <string name="settings_playback_auto_play_next_episode_description">Pornește automat episodul următor când apare mesajul.</string>
@@ -985,7 +985,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Preferă subtitrările forțate atunci când corespund setărilor tale de limbă.</string>
     <string name="settings_playback_subtitle_vertical_offset">Decalaj vertical</string>
     <string name="settings_playback_skip_intro_outro_recap">Sari peste intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Folosește introdb.app pentru a detecta intro-urile și recapitulările.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Folosește skipdb.tv pentru a detecta intro-urile și recapitulările.</string>
     <string name="settings_playback_source_scope">Domeniu redare automată surse</string>
     <string name="settings_playback_source_scope_all_addons">Toate extensiile instalate</string>
     <string name="settings_playback_source_scope_all_addons_description">Redarea automată ia în considerare doar fluxurile care provin din extensiile tale instalate.</string>
@@ -1767,7 +1767,7 @@
     <string name="collections_editor_media_movies_suffix">Filme</string>
     <string name="collections_editor_media_series_suffix">Seriale</string>
     <string name="cloud_library_playback_disabled">Biblioteca în cloud este dezactivată.</string>
-    <string name="settings_playback_introdb_invalid_api_key">Cheie API nevalidă sau conexiunea a eșuat</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Cheie API nevalidă sau conexiunea a eșuat</string>
     <string name="addons_manifest_missing_field">Din manifest lipsește câmpul „%1$s”</string>
     <string name="collections_editor_tmdb_collection_title_format">Colecție TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">Regizor TMDB %1$s</string>
@@ -1869,7 +1869,7 @@
     <string name="plugins_test_results_count">Rezultate test (%1$d)</string>
     <string name="plugins_tmdb_required_message">Furnizorii de module necesită o cheie API TMDB. Seteaz-o în ecranul TMDB, altfel modulele furnizorilor nu vor funcționa corect.</string>
     <string name="search_error_no_results_for_catalog">Nu s-au returnat rezultate de căutare pentru %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Cheie API nevalidă sau conexiunea a eșuat</string>
+    <string name="settings_playback_skipdb_invalid_key">Cheie API nevalidă sau conexiunea a eșuat</string>
     <string name="streams_plugin_repository_fallback">Depozit de module</string>
     <string name="submit_intro_action">Trimite Intro</string>
     <string name="submit_intro_button_submit">Trimite</string>

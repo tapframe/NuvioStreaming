@@ -390,7 +390,7 @@
     <string name="settings_playback_subtitle_size">גודל כתוביות</string>
     <string name="settings_playback_subtitle_text_color">צבע הטקסט</string>
     <string name="settings_playback_skip_intro_outro_recap">דלג על הקדמה</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">השתמש ב-introdb.app לזיהוי הקדמות ותקצירים.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">השתמש ב-skipdb.tv לזיהוי הקדמות ותקצירים.</string>
     <string name="settings_playback_threshold_percentage">אחוז סף</string>
     <string name="settings_tmdb_module_collections">אוספים</string>
     <string name="settings_tmdb_module_credits">קרדיטים</string>

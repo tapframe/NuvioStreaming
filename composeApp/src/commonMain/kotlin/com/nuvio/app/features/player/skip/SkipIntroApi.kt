@@ -11,33 +11,37 @@ internal object SkipIntroApi {
     private const val ANISKIP_BASE = "https://api.aniskip.com/v2/"
     private const val ARM_BASE = "https://arm.haglund.dev/api/v2/"
     private const val ANIMESKIP_BASE = "https://api.anime-skip.com/"
+    private const val SKIPDB_BASE = "https://api.skipdb.tv"
 
-    // --- IntroDb ---
+    // --- SkipDB ---
 
-    suspend fun getIntroDbSegments(
+    suspend fun getSkipDbSegments(
         imdbId: String,
         season: Int,
         episode: Int,
-    ): IntroDbSegmentsResponse? {
-        val baseUrl = IntroDbConfig.URL.trimEnd('/')
-        if (baseUrl.isBlank()) return null
-        val url = "$baseUrl/segments?imdb_id=$imdbId&season=$season&episode=$episode"
+        durationSec: Double? = null,
+    ): SkipDbSegmentsResponse? {
+        val baseUrl = SKIPDB_BASE.trimEnd('/')
+        var url = "$baseUrl/api/segments?imdb_id=$imdbId&season=$season&episode=$episode"
+        if (durationSec != null && durationSec > 0) {
+            url += "&duration=${durationSec.toLong()}"
+        }
         return try {
             val text = httpGetText(url)
-            json.decodeFromString<IntroDbSegmentsResponse>(text)
+            json.decodeFromString<SkipDbSegmentsResponse>(text)
         } catch (_: Exception) {
             null
         }
     }
 
-    suspend fun submitIntro(
+    suspend fun submitSegment(
         apiKey: String,
-        request: SubmitIntroRequest,
+        request: SubmitSegmentRequest,
     ): Boolean {
-        val baseUrl = IntroDbConfig.URL.trimEnd('/')
-        if (baseUrl.isBlank() || apiKey.isBlank()) return false
-        val url = "$baseUrl/submit"
-        val body = json.encodeToString(SubmitIntroRequest.serializer(), request)
+        val baseUrl = SKIPDB_BASE.trimEnd('/')
+        if (apiKey.isBlank()) return false
+        val url = "$baseUrl/api/segments"
+        val body = json.encodeToString(SubmitSegmentRequest.serializer(), request)
         val headers = mapOf(
             "Authorization" to "Bearer $apiKey",
             "Content-Type" to "application/json"
@@ -55,10 +59,10 @@ internal object SkipIntroApi {
         }
     }
 
-    suspend fun verifyIntroDbApiKey(apiKey: String): Boolean {
-        val baseUrl = IntroDbConfig.URL.trimEnd('/')
-        if (baseUrl.isBlank() || apiKey.isBlank()) return false
-        val url = "$baseUrl/submit"
+    suspend fun verifySkipDbApiKey(apiKey: String): Boolean {
+        val baseUrl = SKIPDB_BASE.trimEnd('/')
+        if (apiKey.isBlank()) return false
+        val url = "$baseUrl/api/segments"
         val headers = mapOf(
             "Authorization" to "Bearer $apiKey",
             "Content-Type" to "application/json"
@@ -70,16 +74,9 @@ internal object SkipIntroApi {
                 headers = headers,
                 body = "{}"
             )
-            
-            // 400 means Auth passed but payload was empty/invalid -> Key is Valid
-            if (response.status == 400) return true
-            
-            // 200/201 would also mean valid (though unexpected with empty body)
+            if (response.status == 400 || response.status == 422) return true
             if (response.status == 200 || response.status == 201) return true
-            
-            // Explicitly handle auth failures
             if (response.status == 401 || response.status == 403) return false
-            
             false
         } catch (_: Exception) {
             false

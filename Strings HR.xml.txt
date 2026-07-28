@@ -471,8 +471,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio se povezuje s TorBoxom radi autentifikacije računa, pristupa biblioteci u oblaku, provjere predmemorije i značajki reprodukcije iz oblaka. Nuvio nije povezan s TorBoxom niti ga TorBox podržava.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio koristi MDBList za ocjene i podatke vanjskih pružatelja informacija o ocjenama. Nuvio nije povezan s uslugom MDBList niti ona podržava Nuvio.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio koristi IntroDB API za vremenske oznake koje osigurava zajednica, a odnose se na uvodne špice, sažetke, odjavne špice i najave koje koriste kontrole za preskakanje. Nuvio nije povezan s uslugom IntroDB niti ona podržava Nuvio.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio koristi SkipDB API za vremenske oznake koje osigurava zajednica, a odnose se na uvodne špice, sažetke, odjavne špice i najave koje koriste kontrole za preskakanje. Nuvio nije povezan s uslugom SkipDB niti ona podržava Nuvio.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Koristi se za reprodukciju na iOS sustavima.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Izvorni kod samog MPVKita licenciran je pod licencom LGPL v3.0. Paketi MPVKita, uključujući biblioteke libmpv i FFmpeg, također su licencirani pod licencom LGPL v3.0.</string>
@@ -818,8 +818,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Zadajte ID klienta API AnimeSkip. Nabavite ga na anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Omogući slanje uvoda</string>
     <string name="settings_playback_intro_submit_enabled_description">Prikaži gumb za slanje vremenskih oznaka za uvod i odjavu u bazu podataka zajednice.</string>
-    <string name="settings_playback_introdb_api_key">API ključ IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Unesite svoj IntroDB API ključ za slanje vremenskih oznaka. On je obavezan za slanje.</string>
+    <string name="settings_playback_skipdb_api_key">API ključ SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Unesite svoj SkipDB API ključ za slanje vremenskih oznaka. On je obavezan za slanje.</string>
     <string name="settings_playback_anime_skip_description">Također pretražite AnimeSkip za vremenske oznake za preskakanje (potreban je ID klijenta).</string>
     <string name="settings_playback_auto_play_next_episode">Automatski reproduciraj sljedeću epizodu</string>
     <string name="settings_playback_auto_play_next_episode_description">Automatski pokreni sljedeću epizodu kada se pojavi upit.</string>
@@ -930,7 +930,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Dajte prednost prisilnim titlovima kada se podudaraju s postavkama jezika titlova.</string>
     <string name="settings_playback_subtitle_vertical_offset">Okomiti pomak</string>
     <string name="settings_playback_skip_intro_outro_recap">Preskoči intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Koristite introdb.app za prepoznavanje uvodnih špica i sažetaka prethodnih događaja.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Koristite skipdb.tv za prepoznavanje uvodnih špica i sažetaka prethodnih događaja.</string>
     <string name="settings_playback_source_scope">Opseg izvora za automatsku reprodukciju</string>
     <string name="settings_playback_source_scope_all_addons">Svi instalirani dodaci</string>
     <string name="settings_playback_source_scope_all_addons_description">Automatska reprodukcija uzima u obzir samo prijenose iz vaših instaliranih dodataka.</string>
@@ -1737,8 +1737,8 @@
     <string name="collections_editor_media_series_suffix">Serije</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">Knjižnica u oblaku je isključena.</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">Neispravan API ključ ili neuspjela veza</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">Neispravan API ključ ili neuspjela veza</string>
     <string name="addons_manifest_missing_field">"%1$s" nedostaje u manifestu.</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDB Kolekcija %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">TMDB Redatelj %1$s</string>
@@ -1840,7 +1840,7 @@
     <string name="plugins_test_results_count">Rezultati testa (%1$d)</string>
     <string name="plugins_tmdb_required_message">Plugin-ovima pružatelja usluga potreban je TMDB API ključ. Konfigurirajte ga na zaslonu TMDB; u protivnom plugin-ovi pružatelja usluga neće ispravno raditi.</string>
     <string name="search_error_no_results_for_catalog">Nema rezultata pretraživanja za %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Neispravan API ključ ili neuspjela veza</string>
+    <string name="settings_playback_skipdb_invalid_key">Neispravan API ključ ili neuspjela veza</string>
     <string name="streams_plugin_repository_fallback">Repozitorij plugin-ova</string>
     <string name="submit_intro_action">Pošalji Intro</string>
     <string name="submit_intro_button_submit">Pošalji</string>
