@@ -52,8 +52,9 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
 @Serializable
-private data class StoredLibraryPayload(
+internal data class StoredLibraryPayload(
     val items: List<LibraryItem> = emptyList(),
+    val hasPendingPush: Boolean = false,
 )
 
 @Serializable
@@ -74,6 +75,8 @@ private data class LibrarySyncItem(
 
 object LibraryRepository {
     private const val PULL_PAGE_SIZE = 500
+    private const val PUSH_DEBOUNCE_MS = 500L
+    private const val MAX_PUSH_ATTEMPTS = 4
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("LibraryRepository")
@@ -185,6 +188,7 @@ object LibraryRepository {
 
     private fun loadFromDisk(profileId: Int): Boolean {
         var shouldPublish = false
+        var restoredPendingSnapshot: LibraryLocalSnapshot? = null
         val loaded = synchronized(loadLock) {
             if (ProfileRepository.activeProfileId != profileId) return@synchronized false
             val current = localState.snapshot()
@@ -194,28 +198,32 @@ object LibraryRepository {
 
             val transition = localState.beginProfileLoad(profileId)
             transition.detachedPushJob?.cancel()
-            shouldPublish = completeLoadFromDisk(transition.snapshot.token)
+            val loadedSnapshot = completeLoadFromDisk(transition.snapshot.token)
+            shouldPublish = loadedSnapshot != null
+            restoredPendingSnapshot = loadedSnapshot?.takeIf { it.hasPendingPush }
             shouldPublish
         }
         if (shouldPublish) publish()
+        restoredPendingSnapshot?.let(::pushToServer)
         return loaded
     }
 
-    private fun completeLoadFromDisk(token: LibraryProfileToken): Boolean {
+    private fun completeLoadFromDisk(token: LibraryProfileToken): LibraryLocalSnapshot? {
         val payload = LibraryStorage.loadPayload(token.profileId).orEmpty().trim()
-        val items = if (payload.isNotEmpty()) {
+        val storedPayload = if (payload.isNotEmpty()) {
             runCatching {
-                json.decodeFromString<StoredLibraryPayload>(payload).items
-            }.getOrDefault(emptyList())
+                json.decodeFromString<StoredLibraryPayload>(payload)
+            }.getOrDefault(StoredLibraryPayload())
         } else {
-            emptyList()
+            StoredLibraryPayload()
         }
 
         return localState.completeProfileLoad(
             token = token,
             activeProfileId = ProfileRepository.activeProfileId,
-            items = items,
-        ) != null
+            items = storedPayload.items,
+            hasPendingPush = storedPayload.hasPendingPush,
+        )
     }
 
     suspend fun pullFromServer(profileId: Int) {
@@ -223,6 +231,9 @@ object LibraryRepository {
             log.d { "Skipping library pull for inactive profile $profileId" }
             return
         }
+        localState.snapshot()
+            .takeIf { it.token == operationToken && it.hasPendingPush }
+            ?.let(::pushToServer)
 
         if (isTraktLibrarySourceActive()) {
             try {
@@ -459,39 +470,53 @@ object LibraryRepository {
             log.w { "Skipping library push: anonymous auth user=${authState.userId} profile=$profileId" }
             return
         }
-        val pushJob = syncScope.launch(start = CoroutineStart.LAZY) {
-            delay(500)
-            if (!localState.isContentCurrent(snapshot)) {
-                val current = localState.snapshot()
-                log.w {
-                    "Skipping stale debounced library push: scheduled=${snapshot.token} " +
-                        "current=${current.token} scheduledContentRevision=${snapshot.contentRevision} " +
-                        "currentContentRevision=${current.contentRevision}"
-                }
-                return@launch
+        val pendingItems = snapshot.pendingItemsForSync()
+        if (pendingItems == null) {
+            log.w {
+                "Skipping library push without a loaded local mutation " +
+                    "profile=$profileId hasLoaded=${snapshot.hasLoaded} pending=${snapshot.hasPendingPush}"
             }
-            runCatching {
-                val syncItems = snapshot.items.map { it.toSyncItem() }
-                if (syncItems.isEmpty()) {
-                    log.w { "Skipping library push: sync payload is empty profile=$profileId" }
-                    return@runCatching false
+            return
+        }
+        val pushJob = syncScope.launch(start = CoroutineStart.LAZY) {
+            val syncItems = pendingItems.map { it.toSyncItem() }
+            var attempt = 0
+            while (attempt < MAX_PUSH_ATTEMPTS) {
+                delay(libraryPushDelayMs(attempt, PUSH_DEBOUNCE_MS))
+                if (!localState.isContentCurrent(snapshot)) {
+                    val current = localState.snapshot()
+                    log.w {
+                        "Skipping stale debounced library push: scheduled=${snapshot.token} " +
+                            "current=${current.token} scheduledContentRevision=${snapshot.contentRevision} " +
+                            "currentContentRevision=${current.contentRevision}"
+                    }
+                    return@launch
                 }
-                val params = buildJsonObject {
-                    put("p_profile_id", profileId)
-                    put("p_items", json.encodeToJsonElement(syncItems))
-                    putSyncOriginClientId()
+                val result = runCatching {
+                    val params = buildJsonObject {
+                        put("p_profile_id", profileId)
+                        put("p_items", json.encodeToJsonElement(syncItems))
+                        putSyncOriginClientId()
+                    }
+                    log.i {
+                        "Pushing library to server profile=$profileId itemCount=${syncItems.size} " +
+                            "attempt=${attempt + 1}/$MAX_PUSH_ATTEMPTS"
+                    }
+                    SupabaseProvider.client.postgrest.rpc("sync_push_library", params)
                 }
-                log.i { "Pushing library to server profile=$profileId itemCount=${syncItems.size}" }
-                SupabaseProvider.client.postgrest.rpc("sync_push_library", params)
-                true
-            }.onSuccess { pushed ->
-                if (pushed) {
-                    localState.markPushCompleted(snapshot)
+                if (result.isSuccess) {
+                    localState.markPushCompleted(snapshot)?.let(::persist)
                     log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
+                    return@launch
                 }
-            }.onFailure { e ->
-                if (e is CancellationException) throw e
-                log.e(e) { "Failed to push library to server profile=$profileId itemCount=$itemCount" }
+
+                val error = result.exceptionOrNull()
+                if (error is CancellationException) throw error
+                attempt += 1
+                log.e(error) {
+                    "Failed to push library to server profile=$profileId itemCount=$itemCount " +
+                        "attempt=$attempt/$MAX_PUSH_ATTEMPTS"
+                }
             }
         }
         pushJob.invokeOnCompletion { localState.clearPushJob(pushJob) }
@@ -587,6 +612,7 @@ object LibraryRepository {
         val payload = json.encodeToString(
             StoredLibraryPayload(
                 items = snapshot.items.sortedByDescending { it.savedAtEpochMs },
+                hasPendingPush = snapshot.hasPendingPush,
             ),
         )
         synchronized(persistenceLock) {
@@ -622,6 +648,9 @@ object LibraryRepository {
     private fun isTraktLibrarySourceActive(): Boolean =
         effectiveLibrarySourceMode() == LibrarySourceMode.TRAKT
 }
+
+internal fun libraryPushDelayMs(attempt: Int, baseDelayMs: Long = 500L): Long =
+    baseDelayMs * (1L shl attempt.coerceIn(0, 3))
 
 internal const val LOCAL_LIBRARY_LIST_KEY = "local"
 private const val DEFAULT_LOCAL_LIBRARY_TAB_TITLE = "Nuvio Library"

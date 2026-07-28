@@ -135,6 +135,7 @@ internal class LibraryLocalState {
         token: LibraryProfileToken,
         activeProfileId: Int,
         items: Collection<LibraryItem>,
+        hasPendingPush: Boolean = false,
     ): LibraryLocalSnapshot? = synchronized(lock) {
         if (activeProfileId != token.profileId || !isCurrentLocked(token)) {
             return@synchronized null
@@ -142,6 +143,7 @@ internal class LibraryLocalState {
         itemsById = items.associateByTo(mutableMapOf()) { libraryItemKey(it.id, it.type) }
         hasLoaded = true
         isLoading = false
+        this.hasPendingPush = hasPendingPush
         revision += 1L
         contentRevision += 1L
         snapshotLocked()
@@ -177,7 +179,7 @@ internal class LibraryLocalState {
 
         val localContentChanged = contentRevision != pullSnapshot.contentRevision
         val hasLocalChanges = pullSnapshot.hasPendingPush || hasPendingPush || localContentChanged
-        val preserveLocalItems = itemsById.isNotEmpty() && (serverItems.isEmpty() || hasLocalChanges)
+        val preserveLocalItems = hasLocalChanges || (itemsById.isNotEmpty() && serverItems.isEmpty())
         if (!preserveLocalItems) {
             itemsById = serverItems.associateByTo(mutableMapOf()) { libraryItemKey(it.id, it.type) }
             contentRevision += 1L
@@ -276,12 +278,12 @@ internal class LibraryLocalState {
         }
     }
 
-    fun markPushCompleted(snapshot: LibraryLocalSnapshot) {
-        synchronized(lock) {
-            if (isContentCurrentLocked(snapshot)) {
-                hasPendingPush = false
-            }
-        }
+    fun markPushCompleted(snapshot: LibraryLocalSnapshot): LibraryLocalSnapshot? = synchronized(lock) {
+        if (!isContentCurrentLocked(snapshot)) return@synchronized null
+        hasPendingPush = false
+        revision += 1L
+        contentRevision += 1L
+        snapshotLocked()
     }
 
     private fun tokenLocked(): LibraryProfileToken =
@@ -310,6 +312,9 @@ internal class LibraryLocalState {
     private fun isContentCurrentLocked(snapshot: LibraryLocalSnapshot): Boolean =
         isCurrentLocked(snapshot.token) && contentRevision == snapshot.contentRevision
 }
+
+internal fun LibraryLocalSnapshot.pendingItemsForSync(): List<LibraryItem>? =
+    items.takeIf { hasLoaded && hasPendingPush }
 
 private fun libraryItemKey(id: String, type: String): String =
     "${type.trim().lowercase()}:${id.trim()}"
