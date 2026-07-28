@@ -16,6 +16,8 @@
     <string name="profile_insights_stat_continue_caption">Titles currently in progress</string>
     <string name="profile_insights_stat_completed">Completed</string>
     <string name="profile_insights_stat_completed_caption">Movies and series you finished</string>
+    <string name="profile_insights_stat_ongoing">Ongoing</string>
+    <string name="profile_insights_stat_ongoing_caption">Series you watched but not finished yet</string>
     <string name="profile_insights_stat_library">Library</string>
     <string name="profile_insights_stat_library_caption">Titles saved to your library</string>
     <string name="profile_insights_stat_time">Watch time</string>
