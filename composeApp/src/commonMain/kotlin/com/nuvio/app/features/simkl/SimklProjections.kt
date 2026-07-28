@@ -148,6 +148,20 @@ internal fun SimklSyncSnapshot.toSimklProgressEntries(): List<WatchProgressEntry
         .mapNotNull { (_, candidates) -> candidates.maxByOrNull(WatchProgressEntry::lastUpdatedEpochMs) }
         .sortedByDescending(WatchProgressEntry::lastUpdatedEpochMs)
 
+internal fun SimklSyncSnapshot.toSimklShowIdSiblings(): Map<String, Set<String>> {
+    val siblingsMap = mutableMapOf<String, MutableSet<String>>()
+    entries.forEach { entry ->
+        val media = entry.media ?: return@forEach
+        if (entry.mediaType == SimklMediaType.MOVIES) return@forEach
+        val keys = media.alternateContentIds().toList()
+        if (keys.size <= 1) return@forEach
+        for (key in keys) {
+            siblingsMap.getOrPut(key) { mutableSetOf() }.addAll(keys - key)
+        }
+    }
+    return siblingsMap.mapValues { (_, siblings) -> siblings.toSet() }
+}
+
 internal fun SimklSyncSnapshot.mediaReference(
     contentId: String,
     contentType: String,

@@ -867,12 +867,17 @@ object WatchedRepository {
         meta: MetaDetails,
         todayIsoDate: String,
         isEpisodeWatched: (MetaVideo) -> Boolean = { episode ->
-            isWatched(
-                id = meta.id,
-                type = meta.type,
-                season = episode.season,
-                episode = episode.episode,
-            )
+            val key = watchedItemKey(meta.type, meta.id, episode.season, episode.episode)
+            if (key in _uiState.value.watchedKeys) {
+                true
+            } else {
+                val episodeNumber = episode.episode
+                if (episodeNumber != null) {
+                    com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(episode.id, episodeNumber)
+                } else {
+                    false
+                }
+            }
         },
         isEpisodeCompleted: (MetaVideo) -> Boolean = { false },
     ): Boolean {
@@ -915,6 +920,12 @@ object WatchedRepository {
         if (shouldPersistWatchedSource(source)) {
             persistNuvio()
         }
+    }
+
+    fun setExpandedFullyWatchedSeriesKeys(keys: Set<String>) {
+        val source = activeSource
+        setFullyWatchedSeriesKeysForSource(source = source, keys = keys)
+        publish()
     }
 
     private fun pushMarksToServer(
