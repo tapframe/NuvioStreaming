@@ -1350,21 +1350,31 @@ struct NativeNavContentView: View {
         )
     }
 
+    @State private var mountedLegacyTabs: Set<NuvioAppTab> = []
+
     private var legacyTabs: some View {
         ZStack {
-            ForEach(NuvioAppTab.allCases, id: \.self) { tab in
-                TabContentView(
-                    tab: tab,
-                    usesNativeTabBar: usesNativeTabBar,
-                    usesTabletFloatingTabBar: usesTabletFloatingTabBar,
-                    coordinator: appCoordinator.coordinator(for: tab),
-                    appCoordinator: appCoordinator
-                )
-                .opacity(appCoordinator.selectedTab == tab ? 1 : 0)
-                .allowsHitTesting(appCoordinator.selectedTab == tab)
-                .accessibilityHidden(appCoordinator.selectedTab != tab)
-                .zIndex(appCoordinator.selectedTab == tab ? 1 : 0)
+            ForEach(appCoordinator.availableTabs, id: \.self) { tab in
+                if mountedLegacyTabs.contains(tab) {
+                    TabContentView(
+                        tab: tab,
+                        usesNativeTabBar: usesNativeTabBar,
+                        usesTabletFloatingTabBar: usesTabletFloatingTabBar,
+                        coordinator: appCoordinator.coordinator(for: tab),
+                        appCoordinator: appCoordinator
+                    )
+                    .opacity(appCoordinator.selectedTab == tab ? 1 : 0)
+                    .allowsHitTesting(appCoordinator.selectedTab == tab)
+                    .accessibilityHidden(appCoordinator.selectedTab != tab)
+                    .zIndex(appCoordinator.selectedTab == tab ? 1 : 0)
+                }
             }
+        }
+        .onAppear {
+            mountedLegacyTabs.insert(appCoordinator.selectedTab)
+        }
+        .onChange(of: appCoordinator.selectedTab) { newTab in
+            mountedLegacyTabs.insert(newTab)
         }
     }
 
