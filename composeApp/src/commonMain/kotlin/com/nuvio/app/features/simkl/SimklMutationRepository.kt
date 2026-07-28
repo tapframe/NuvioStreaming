@@ -94,12 +94,15 @@ internal class SimklMutationService(
         return response.toMutationResult(candidates.size, json)
     }
 
-    suspend fun scrobble(action: TrackingScrobbleAction, event: TrackingScrobbleEvent) {
+    suspend fun scrobble(
+        action: TrackingScrobbleAction,
+        event: TrackingScrobbleEvent,
+    ): SimklScrobbleResult {
         require(event.media.hasResolvableIdentity) { "Simkl scrobble requires a media ID or title" }
         require(event.media.kind == TrackingMediaKind.MOVIE || event.media.episode != null) {
             "Simkl series scrobble requires an episode"
         }
-        client.execute(
+        val response = client.execute(
             SimklApiRequest(
                 method = SimklHttpMethod.POST,
                 path = "/scrobble/${action.wireValue}",
@@ -108,7 +111,7 @@ internal class SimklMutationService(
                 scrobbleStopConflictIsSuccess = action == TrackingScrobbleAction.STOP,
             ),
         )
-        if (action != TrackingScrobbleAction.START) onMutationCommitted()
+        return response.toSimklScrobbleResult(action, event, json)
     }
 
     private fun Collection<TrackingMediaReference>.validated(): List<TrackingMediaReference> =
@@ -189,12 +192,15 @@ object SimklMutationRepository : TrackingListWriter, TrackingHistoryWriter, Trac
         if (!isActiveProfile(profileId)) return
         SimklSyncRepository.ensureLoaded()
         val enriched = SimklSyncRepository.state.value.snapshot.enrichMediaReference(event.media)
-        service.scrobble(
+        val result = service.scrobble(
             action = action,
             event = event.copy(
                 media = enriched.resolveAnimeEpisodeForSimkl(),
             ),
         )
+        if (action != TrackingScrobbleAction.START) {
+            SimklSyncRepository.commitScrobble(result)
+        }
     }
 
     private fun isActiveProfile(profileId: Int): Boolean = ProfileRepository.activeProfileId == profileId
@@ -371,7 +377,7 @@ private fun TrackingEpisode.toEpisodeDto(
     watchedAt = watchedAtEpochMs.takeIf { includeWatchedAt }?.epochMsToUtcIso(),
 )
 
-private fun TrackingExternalIds.toSimklJsonObjectOrNull(): JsonObject? {
+internal fun TrackingExternalIds.toSimklJsonObjectOrNull(): JsonObject? {
     val value = buildJsonObject {
         simkl?.let { put("simkl", it) }
         imdb.nonBlankOrNull()?.let { put("imdb", it) }
@@ -461,7 +467,7 @@ private fun Double.clampAndRoundProgress(): Double = round(coerceIn(0.0, 100.0) 
 
 private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf(String::isNotEmpty)
 
-private fun Long.epochMsToUtcIso(): String? {
+internal fun Long.epochMsToUtcIso(): String? {
     if (this < 10_000_000_000L) return null
     val totalSeconds = this / 1_000L
     val second = (totalSeconds % 60L).toInt()
