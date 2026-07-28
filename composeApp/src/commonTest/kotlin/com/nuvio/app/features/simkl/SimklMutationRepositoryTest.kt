@@ -153,13 +153,16 @@ class SimklMutationRepositoryTest {
     }
 
     @Test
-    fun `service reports partial not found and treats duplicate stop as committed`() = runBlocking {
+    fun `service reports partial not found and returns duplicate stop as scrobbled`() = runBlocking {
         val engine = RecordingEngine(
             response(
                 status = 201,
                 body = """{"added":{"movies":[{"to":"completed"}]},"not_found":{"movies":[{"title":"Missing"}],"shows":[]}}""",
             ),
-            response(status = 409),
+            response(
+                status = 409,
+                body = """{"watched_at":"2026-05-14T23:46:29Z","expires_at":"2026-05-15T00:46:29Z"}""",
+            ),
         )
         var now = 0L
         var committed = 0
@@ -179,7 +182,7 @@ class SimklMutationRepositoryTest {
             items = listOf(movie(), movie().copy(title = "Missing", ids = TrackingExternalIds())),
             destination = TrackingListStatus.PLAN_TO_WATCH,
         )
-        service.scrobble(
+        val scrobbleResult = service.scrobble(
             action = TrackingScrobbleAction.STOP,
             event = TrackingScrobbleEvent(movie(), progressPercent = 90.0),
         )
@@ -189,7 +192,9 @@ class SimklMutationRepositoryTest {
         assertEquals(listOf(TrackingListStatus.COMPLETED), result.resolvedListStatuses)
         assertFalse(result.isComplete)
         assertEquals(listOf("/sync/add-to-list", "/scrobble/stop"), engine.paths)
-        assertEquals(2, committed)
+        assertEquals(SimklScrobbleOutcome.SCROBBLE, scrobbleResult.outcome)
+        assertEquals("2026-05-14T23:46:29Z", scrobbleResult.watchedAt)
+        assertEquals(1, committed)
     }
 
     @Test
@@ -266,6 +271,72 @@ class SimklMutationRepositoryTest {
         }
 
         assertEquals(listOf("/scrobble/pause"), engine.paths)
+    }
+
+    @Test
+    fun `successful pause returns local reconciliation data without invalidating sync`() = runBlocking {
+        val engine = RecordingEngine(
+            response(
+                status = 201,
+                body = """{"id":42,"action":"pause","progress":45,"movie":{"title":"Terminator 3: Rise of the Machines","year":2003,"ids":{"simkl":53536}}}""",
+            ),
+        )
+        var committed = 0
+        val service = SimklMutationService(
+            client = SimklApiClient(
+                engine = engine,
+                accessToken = { "token" },
+                onUnauthorized = {},
+                nowEpochMs = { 0L },
+                sleep = {},
+                retryJitterMs = { 0L },
+            ),
+            onMutationCommitted = { committed += 1 },
+        )
+
+        val result = service.scrobble(
+            action = TrackingScrobbleAction.PAUSE,
+            event = TrackingScrobbleEvent(movie(), progressPercent = 45.0),
+        )
+
+        assertEquals(listOf("/scrobble/pause"), engine.paths)
+        assertEquals(SimklScrobbleOutcome.PAUSE, result.outcome)
+        assertEquals(42L, result.playbackId)
+        assertEquals(45.0, result.progress)
+        assertEquals(0, committed)
+    }
+
+    @Test
+    fun `low progress stop returns a paused playback without invalidating sync`() = runBlocking {
+        val engine = RecordingEngine(
+            response(
+                status = 201,
+                body = """{"id":42,"action":"pause","progress":30,"movie":{"title":"Terminator 3: Rise of the Machines","year":2003,"ids":{"simkl":53536}}}""",
+            ),
+        )
+        var committed = 0
+        val service = SimklMutationService(
+            client = SimklApiClient(
+                engine = engine,
+                accessToken = { "token" },
+                onUnauthorized = {},
+                nowEpochMs = { 0L },
+                sleep = {},
+                retryJitterMs = { 0L },
+            ),
+            onMutationCommitted = { committed += 1 },
+        )
+
+        val result = service.scrobble(
+            action = TrackingScrobbleAction.STOP,
+            event = TrackingScrobbleEvent(movie(), progressPercent = 30.0),
+        )
+
+        assertEquals(listOf("/scrobble/stop"), engine.paths)
+        assertEquals(SimklScrobbleOutcome.PAUSE, result.outcome)
+        assertEquals(42L, result.playbackId)
+        assertEquals(30.0, result.progress)
+        assertEquals(0, committed)
     }
 
     private fun String.asObject() = json.parseToJsonElement(this).jsonObject

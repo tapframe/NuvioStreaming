@@ -359,7 +359,7 @@ class SimklSyncEngineTest {
         assertTrue("extended=full" in urls[0])
         assertTrue("episode_watched_at=yes" in urls[0])
         assertTrue("include_all_episodes=yes" in urls[0])
-        assertFalse("episode_tvdb_id=" in urls[0])
+        assertTrue("episode_tvdb_id=yes" in urls[0])
         assertTrue("date_from=2026-05-08T14%3A23%3A11Z" in urls[1])
         assertTrue("extended=full_anime_seasons" in urls[1])
         assertTrue("episode_watched_at=yes" in urls[1])
