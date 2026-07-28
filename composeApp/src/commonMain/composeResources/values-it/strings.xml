@@ -1315,8 +1315,6 @@
   <string name="settings_appearance_liquid_glass_description">Usa la barra dei pannelli nativa dell'iPhone su iOS 26 e versioni successive.</string>
   <string name="layout_hide_unreleased">Nascondi contenuti non rilasciati</string>
   <string name="layout_hide_unreleased_sub">Nascondi i film e le serie TV che non sono ancora stati rilasciati.</string>
-  <string name="settings_homescreen_hide_catalog_underline">Nascondi sottolineatura catalogo</string>
-  <string name="settings_homescreen_hide_catalog_underline_description">Rimuove la linea di evidenziazione sotto i titoli dei cataloghi e delle collezioni in tutta l'app.</string>
   <string name="settings_hide_secret">Nascondi valore</string>
   <string name="settings_show_secret">Mostra valore</string>
   <string name="settings_continue_watching_blur_next_up_description">Sfoca le miniature del prossimo episodio in Inizia a guardare per evitare spoiler.</string>

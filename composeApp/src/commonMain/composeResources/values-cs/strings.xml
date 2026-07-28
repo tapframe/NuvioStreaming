@@ -582,8 +582,6 @@
     <string name="settings_homescreen_show_hero_description">Zobrazit hlavní karusel v horní části domovské stránky.</string>
     <string name="layout_hide_unreleased">Skrýt nevydaný obsah</string>
     <string name="layout_hide_unreleased_sub">Skrýt filmy a pořady, které ještě neměly premiéru.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Skrýt podtržení katalogu</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Odstranit barevnou linii pod názvy katalogů a sbírek v celé aplikaci.</string>
     <string name="settings_homescreen_summary">%1$d z %2$d katalogů viditelných • %3$d zdrojů Hero sekce vybráno</string>
     <string name="settings_homescreen_summary_hint">Otevřete katalog pouze tehdy, když jej potřebujete přejmenovat nebo změnit jeho pořadí.</string>
     <string name="settings_homescreen_visible">Viditelné</string>

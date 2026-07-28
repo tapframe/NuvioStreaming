@@ -525,8 +525,6 @@
     <string name="settings_homescreen_show_hero_description">Kiemelt galéria (carousel) megjelenítése a kezdőlap tetején.</string>
     <string name="layout_hide_unreleased">Meg nem jelent tartalmak elrejtése</string>
     <string name="layout_hide_unreleased_sub">A még meg nem jelent filmek és sorozatok elrejtése.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Katalógus aláhúzás elrejtése</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">A kiemelő vonal eltávolítása a katalógusok és gyűjtemények címei alól az alkalmazás egészében.</string>
     <string name="settings_homescreen_summary">%1$d / %2$d katalógus látható • %3$d kiemelt forrás kiválasztva</string>
     <string name="settings_homescreen_summary_hint">Csak akkor nyiss meg egy katalógust, ha át szeretnéd nevezni vagy át szeretnéd rendezni.</string>
     <string name="settings_homescreen_visible">Látható</string>

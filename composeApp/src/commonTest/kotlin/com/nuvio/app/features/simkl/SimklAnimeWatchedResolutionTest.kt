@@ -227,8 +227,8 @@ class SimklAnimeWatchedResolutionTest {
         val resolved = reference.resolveAnimeEpisodeForSimkl()
 
         assertEquals(42203L, resolved.ids.mal)
-        assertEquals("tt2560140", resolved.ids.imdb)
-        assertEquals(39687L, resolved.ids.simkl)
+        assertNull(resolved.ids.imdb)
+        assertNull(resolved.ids.simkl)
         assertNull(resolved.episode?.season)
         assertEquals(7, resolved.episode?.number)
     }
@@ -250,7 +250,7 @@ class SimklAnimeWatchedResolutionTest {
         val resolved = reference.resolveAnimeEpisodeForSimkl()
 
         assertEquals(12268L, resolved.ids.kitsu)
-        assertEquals("tt5311514", resolved.ids.imdb)
+        assertNull(resolved.ids.imdb)
         assertNull(resolved.episode?.season)
         assertEquals(3, resolved.episode?.number)
     }

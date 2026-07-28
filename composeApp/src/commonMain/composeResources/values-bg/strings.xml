@@ -570,8 +570,6 @@
     <string name="settings_homescreen_show_hero_description">Покажи въртележка в горната част на началото.</string>
     <string name="layout_hide_unreleased">Скрий невипуснатото съдържание</string>
     <string name="layout_hide_unreleased_sub">Скрий филми и сериали, които все още не са излезли.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Скрий подчертаването на каталога</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Премахни акцентната линия под заглавията на каталозите и колекциите в цялото приложение.</string>
     <string name="settings_homescreen_summary">%1$d от %2$d каталога видими • %3$d основни извора избрани</string>
     <string name="settings_homescreen_summary_hint">Отворете каталог само когато трябва да го преименувате или пренаредите.</string>
     <string name="settings_homescreen_visible">Видим</string>
