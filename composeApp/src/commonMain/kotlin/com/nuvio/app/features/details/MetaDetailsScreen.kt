@@ -106,6 +106,11 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.parentsguide.ParentsGuideConfig
+import com.nuvio.app.features.parentsguide.ParentsGuideRepository
+import com.nuvio.app.features.parentsguide.ParentsGuideSection
+import com.nuvio.app.features.parentsguide.ParentsGuideUiState
+import com.nuvio.app.features.parentsguide.resolveParentsGuideRequest
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbService
@@ -516,6 +521,21 @@ fun MetaDetailsScreen(
                     meta.trailers.isNotEmpty()
                 }
                 val uriHandler = LocalUriHandler.current
+                var parentsGuideState by remember(meta.id) { mutableStateOf<ParentsGuideUiState>(ParentsGuideUiState.Loading) }
+                var parentsGuideRetryToken by remember(meta.id) { mutableIntStateOf(0) }
+                val parentsGuideRequest = remember(meta.type, meta.id) { resolveParentsGuideRequest(meta.type, meta.id) }
+                LaunchedEffect(meta.id, parentsGuideRetryToken, playerSettingsUiState.showParentalGuide) {
+                    if (!playerSettingsUiState.showParentalGuide || parentsGuideRequest == null) {
+                        parentsGuideState = ParentsGuideUiState.Unavailable()
+                        return@LaunchedEffect
+                    }
+                    parentsGuideState = ParentsGuideUiState.Loading
+                    parentsGuideState = ParentsGuideRepository.load(
+                        apiBaseUrl = ParentsGuideConfig.API_BASE_URL,
+                        request = parentsGuideRequest,
+                        forceRefresh = parentsGuideRetryToken > 0,
+                    )
+                }
                 val inAppTrailerPlaybackEnabled = AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP
                 val trailerScope = rememberCoroutineScope()
                 var selectedTrailer by remember(meta.id) { mutableStateOf<MetaTrailer?>(null) }
@@ -1005,6 +1025,14 @@ fun MetaDetailsScreen(
                                 onCompanyClick = onCompanyClick,
                                 sharedTransitionScope = sharedTransitionScope,
                                 animatedVisibilityScope = animatedVisibilityScope,
+                                showParentsGuide = playerSettingsUiState.showParentalGuide,
+                                parentsGuideState = parentsGuideState,
+                                onRetryParentsGuide = { parentsGuideRetryToken += 1 },
+                                onContributeParentsGuide = {
+                                    ParentsGuideConfig.API_BASE_URL.takeIf(String::isNotBlank)?.let { baseUrl ->
+                                        runCatching { uriHandler.openUri("${baseUrl.trimEnd('/')}/configure") }
+                                    }
+                                },
                             )
 
                             item(key = "detail-bottom-spacer") {
@@ -1613,6 +1641,10 @@ private fun LazyListScope.configuredMetaSectionItems(
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
+    showParentsGuide: Boolean,
+    parentsGuideState: ParentsGuideUiState,
+    onRetryParentsGuide: () -> Unit,
+    onContributeParentsGuide: () -> Unit,
 ) {
     val enabledItems = settings.items.filter { it.enabled }
     fun sectionHasContent(key: MetaScreenSectionKey): Boolean =
@@ -1694,29 +1726,62 @@ private fun LazyListScope.configuredMetaSectionItems(
         }
     }
 
-    if (!settings.tabLayout) {
-        enabledItems
-            .filter { sectionHasContent(it.key) }
-            .forEach { section ->
-                addSectionItem(
-                    key = "detail-section-${section.key.name}",
-                    sectionItems = listOf(section),
-                    forceTabLayout = false,
+    fun addParentsGuideItem() {
+        if (!showParentsGuide) return
+        item(key = "detail-parents-guide") {
+            DetailSectionContainer(
+                horizontalPadding = contentHorizontalPadding,
+                contentMaxWidth = contentMaxWidth,
+            ) {
+                ParentsGuideSection(
+                    state = parentsGuideState,
+                    onRetry = onRetryParentsGuide,
+                    onContribute = onContributeParentsGuide,
                 )
             }
+        }
+    }
+
+    if (!settings.tabLayout) {
+        var parentsGuideInserted = false
+        enabledItems.filter { sectionHasContent(it.key) }.forEach { section ->
+            if (!parentsGuideInserted && section.key == MetaScreenSectionKey.MORE_LIKE_THIS) {
+                addParentsGuideItem()
+                parentsGuideInserted = true
+            }
+            addSectionItem(
+                key = "detail-section-${section.key.name}",
+                sectionItems = listOf(section),
+                forceTabLayout = false,
+            )
+            if (!parentsGuideInserted && section.key == MetaScreenSectionKey.DETAILS) {
+                addParentsGuideItem()
+                parentsGuideInserted = true
+            }
+        }
+        if (!parentsGuideInserted) addParentsGuideItem()
         return
     }
 
     val processedGroups = mutableSetOf<Int>()
+    var parentsGuideInserted = false
     enabledItems.forEach { section ->
         val groupId = section.tabGroup
         if (groupId == null) {
             if (sectionHasContent(section.key)) {
+                if (!parentsGuideInserted && section.key == MetaScreenSectionKey.MORE_LIKE_THIS) {
+                    addParentsGuideItem()
+                    parentsGuideInserted = true
+                }
                 addSectionItem(
                     key = "detail-section-${section.key.name}",
                     sectionItems = listOf(section),
                     forceTabLayout = true,
                 )
+                if (!parentsGuideInserted && section.key == MetaScreenSectionKey.DETAILS) {
+                    addParentsGuideItem()
+                    parentsGuideInserted = true
+                }
             }
         } else if (groupId !in processedGroups) {
             processedGroups.add(groupId)
@@ -1724,14 +1789,23 @@ private fun LazyListScope.configuredMetaSectionItems(
                 item.tabGroup == groupId && sectionHasContent(item.key)
             }
             if (groupMembers.isNotEmpty()) {
+                if (!parentsGuideInserted && groupMembers.any { it.key == MetaScreenSectionKey.MORE_LIKE_THIS }) {
+                    addParentsGuideItem()
+                    parentsGuideInserted = true
+                }
                 addSectionItem(
                     key = "detail-section-group-$groupId",
                     sectionItems = groupMembers,
                     forceTabLayout = groupMembers.size > 1,
                 )
+                if (!parentsGuideInserted && groupMembers.any { it.key == MetaScreenSectionKey.DETAILS }) {
+                    addParentsGuideItem()
+                    parentsGuideInserted = true
+                }
             }
         }
     }
+    if (!parentsGuideInserted) addParentsGuideItem()
 }
 
 @Composable

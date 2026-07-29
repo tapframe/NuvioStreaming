@@ -2059,4 +2059,34 @@
         <item quantity="one">%d title</item>
         <item quantity="other">%d titles</item>
     </plurals>
+    <!-- Parents Guide details integration -->
+    <string name="parents_guide_title">Parents Guide</string>
+    <string name="parents_guide_sex_nudity">Sex &amp; Nudity</string>
+    <string name="parents_guide_violence_gore">Violence &amp; Gore</string>
+    <string name="parents_guide_profanity">Profanity</string>
+    <string name="parents_guide_alcohol_drugs_smoking">Alcohol, Drugs &amp; Smoking</string>
+    <string name="parents_guide_frightening_intense">Frightening &amp; Intense Scenes</string>
+    <string name="parents_guide_severity_none">None</string>
+    <string name="parents_guide_severity_mild">Mild</string>
+    <string name="parents_guide_severity_moderate">Moderate</string>
+    <string name="parents_guide_severity_severe">Severe</string>
+    <string name="parents_guide_severity_unknown">Unknown</string>
+    <string name="parents_guide_show_scenes">Show scenes</string>
+    <string name="parents_guide_hide_scenes">Hide scenes</string>
+    <string name="parents_guide_hide_spoilers">Hide spoilers</string>
+    <string name="parents_guide_show_spoilers">Show spoilers</string>
+    <string name="parents_guide_spoiler_hidden">Scene description hidden to avoid spoilers.</string>
+    <string name="parents_guide_unavailable">No detailed Parents Guide is available for this title yet.</string>
+    <string name="parents_guide_partial">Available information may be incomplete.</string>
+    <string name="parents_guide_series_fallback">Showing general guidance for this series.</string>
+    <string name="parents_guide_contribute">Contribute a guide</string>
+    <string name="parents_guide_retry">Retry</string>
+    <string name="parents_guide_source">Source</string>
+    <string name="parents_guide_verified">Verified</string>
+    <string name="parents_guide_community_submitted">Community submitted</string>
+    <string name="parents_guide_timestamp_disclaimer">Timestamp may vary by release version.</string>
+    <string name="parents_guide_loading">Loading Parents Guide…</string>
+    <string name="parents_guide_error">Parents Guide could not be loaded.</string>
+    <string name="parents_guide_expand">Expand Parents Guide</string>
+    <string name="parents_guide_collapse">Collapse Parents Guide</string>
 </resources>
