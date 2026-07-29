@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 0.3.2-enhanced
+      - 0.4.0-enhanced
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -211,9 +211,10 @@ jobs:
       - name: Package App into .ipa
         run: |
           cd iosApp/build/Build/Products/Release-iphoneos
-          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Nuvio.app/Info.plist)
+          APP_DIR=$(ls -d *.app | head -n 1)
+          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_DIR/Info.plist")
           mkdir Payload
-          mv Nuvio.app Payload/
+          mv "$APP_DIR" Payload/
           zip -q -r "Nuvio-v${APP_VERSION}-Enhanced.ipa" Payload
           echo "IPA_FILENAME=Nuvio-v${APP_VERSION}-Enhanced.ipa" >> $GITHUB_ENV
 
