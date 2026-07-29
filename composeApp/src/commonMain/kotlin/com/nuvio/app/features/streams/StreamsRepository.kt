@@ -15,7 +15,9 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginsUiState
+import com.nuvio.app.features.telegram.TelegramSourceResolver
 import kotlinx.coroutines.CoroutineScope
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -47,7 +49,7 @@ object StreamsRepository {
     ): String =
         "$type::$videoId::$season::$episode::$manualSelection"
 
-    fun load(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false) {
+    fun load(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false, mediaTitle: String? = null, year: Int? = null) {
         load(
             type = type,
             videoId = videoId,
@@ -56,10 +58,12 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
             forceRefresh = false,
+            mediaTitle = mediaTitle,
+            year = year,
         )
     }
 
-    fun reload(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false) {
+    fun reload(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false, mediaTitle: String? = null, year: Int? = null) {
         load(
             type = type,
             videoId = videoId,
@@ -68,10 +72,12 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
             forceRefresh = true,
+            mediaTitle = mediaTitle,
+            year = year,
         )
     }
 
-    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean) {
+    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean, mediaTitle: String? = null, year: Int? = null) {
         val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
             PluginRepository.uiState.value
@@ -165,7 +171,8 @@ object StreamsRepository {
             groupByRepository = pluginUiState.groupStreamsByRepository,
         )
 
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+        val telegramEnabled = TelegramSourceResolver.isEnabled()
+        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && !telegramEnabled) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -194,7 +201,7 @@ object StreamsRepository {
 
         log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && !telegramEnabled) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -205,6 +212,17 @@ object StreamsRepository {
 
         // Initialise loading placeholders
         val installedAddonOrder = streamAddons.map { it.addonName }
+        val telegramGroup = if (TelegramSourceResolver.isEnabled()) {
+            listOf(
+                AddonStreamGroup(
+                    addonName = "Telegram",
+                    addonId = "telegram_native",
+                    streams = emptyList(),
+                    isLoading = true,
+                )
+            )
+        } else emptyList()
+
         val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
@@ -219,7 +237,7 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }, installedAddonOrder)
+        } + telegramGroup, installedAddonOrder)
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         _uiState.value = StreamsUiState(
             requestToken = requestToken,
@@ -238,7 +256,9 @@ object StreamsRepository {
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
             val totalTasks = streamAddons.size +
-                pluginProviderGroups.sumOf { it.scrapers.size }
+                pluginProviderGroups.sumOf { it.scrapers.size } +
+                (if (TelegramSourceResolver.isEnabled()) 1 else 0)
+
 
             val installedAddonNames = installedAddonOrder.toSet()
             val installedAddonIds = streamAddons.map { it.addonId }.toSet()
@@ -514,7 +534,30 @@ object StreamsRepository {
                 }
             }
 
+            if (TelegramSourceResolver.isEnabled()) {
+
+                launch {
+                    val searchTitle = mediaTitle?.takeIf { it.isNotBlank() } ?: parentMetaId ?: videoId
+                    val streams = TelegramSourceResolver.resolve(
+                        title = searchTitle,
+                        year = year,
+                        season = season,
+                        episode = episode,
+                        imdbId = videoId,
+                        isMovie = type == "movie",
+                    )
+                    val group = AddonStreamGroup(
+                        addonName = "Telegram",
+                        addonId = "telegram_native",
+                        streams = streams,
+                        isLoading = false,
+                    )
+                    publishCompletion(StreamLoadCompletion.Addon(group))
+                }
+            }
+
             repeat(totalTasks) {
+
                 when (val completion = completions.receive()) {
                     is StreamLoadCompletion.Addon -> {
                         val result = completion.group

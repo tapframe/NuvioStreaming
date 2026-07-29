@@ -9,13 +9,17 @@ import nuvio.composeapp.generated.resources.settings_integrations_mdblist_descri
 import nuvio.composeapp.generated.resources.settings_integrations_debrid_description
 import nuvio.composeapp.generated.resources.settings_integrations_section_title
 import nuvio.composeapp.generated.resources.settings_integrations_tmdb_description
+import nuvio.composeapp.generated.resources.compose_settings_page_telegram
+import nuvio.composeapp.generated.resources.settings_integrations_telegram_description
 import org.jetbrains.compose.resources.stringResource
+
 
 internal fun LazyListScope.integrationsContent(
     isTablet: Boolean,
     onTmdbClick: () -> Unit,
     onMdbListClick: () -> Unit,
     onDebridClick: () -> Unit,
+    onTelegramClick: () -> Unit,
 ) {
     item {
         SettingsSection(
@@ -45,7 +49,15 @@ internal fun LazyListScope.integrationsContent(
                     isTablet = isTablet,
                     onClick = onDebridClick,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.compose_settings_page_telegram),
+                    description = stringResource(Res.string.settings_integrations_telegram_description),
+                    isTablet = isTablet,
+                    onClick = onTelegramClick,
+                )
             }
         }
     }
 }
+
