@@ -103,20 +103,25 @@ suspend fun resolveWatchedBadgesBulk(
 
 fun expandFullyWatchedWithSiblings() {
     val siblingMap = getActiveProviderSiblingMap()
-    if (siblingMap.isEmpty()) return
+    if (siblingMap.isEmpty()) {
+        WatchedRepository.setExpandedFullyWatchedSeriesKeys(emptySet())
+        return
+    }
 
-    val currentKeys = WatchedRepository.fullyWatchedSeriesKeys.value
-    if (currentKeys.isEmpty()) return
+    // Use base keys (without previous sibling expansion) to avoid feedback loops
+    val baseKeys = WatchedRepository.baseFullyWatchedSeriesKeys()
+    if (baseKeys.isEmpty()) {
+        WatchedRepository.setExpandedFullyWatchedSeriesKeys(emptySet())
+        return
+    }
 
-    val expanded = buildSet {
-        addAll(currentKeys)
-        for (key in currentKeys) {
-            // Extract the contentId from watchedItemKey format ("series:tt1234567" or "tv:tt1234567")
+    // Compute only the sibling-derived keys (not including base keys themselves)
+    val siblingKeys = buildSet {
+        for (key in baseKeys) {
             val contentId = extractContentIdFromWatchedKey(key) ?: continue
             val siblings = siblingMap[contentId] ?: continue
             siblings.forEach { siblingId ->
                 if (siblingId != contentId && !siblingId.startsWith(AMBIGUOUS_MARKER)) {
-                    // Build watched key with same type prefix
                     val siblingKey = rebuildWatchedKeyWithSiblingId(key, siblingId)
                     if (siblingKey != null) add(siblingKey)
                 }
@@ -124,9 +129,9 @@ fun expandFullyWatchedWithSiblings() {
         }
     }
 
-    if (expanded.size > currentKeys.size) {
-        log.i { "Sibling expansion: ${currentKeys.size} -> ${expanded.size} keys" }
-        WatchedRepository.setExpandedFullyWatchedSeriesKeys(expanded)
+    if (siblingKeys != WatchedRepository.currentExpandedSiblingKeys()) {
+        log.i { "Sibling expansion: ${baseKeys.size} base keys -> +${siblingKeys.size} sibling keys" }
+        WatchedRepository.setExpandedFullyWatchedSeriesKeys(siblingKeys)
     }
 }
 

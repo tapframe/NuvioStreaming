@@ -182,6 +182,7 @@ data class SimklSyncUiState(
     val isLoading: Boolean = false,
     val hasLoaded: Boolean = false,
     val errorMessage: String? = null,
+    val projectionVersion: Long = 0L,
 )
 
 internal fun Map<String, JsonElement>.idValue(key: String): String? =

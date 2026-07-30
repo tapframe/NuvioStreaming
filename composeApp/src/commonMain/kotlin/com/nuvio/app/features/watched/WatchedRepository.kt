@@ -933,6 +933,14 @@ object WatchedRepository {
         persistNuvio()
     }
 
+    fun currentExpandedSiblingKeys(): Set<String> = expandedSiblingKeys
+
+    /**
+     * Returns the base fully-watched series keys from the active source,
+     * without sibling expansion. Used by sibling expansion to avoid feedback loops.
+     */
+    fun baseFullyWatchedSeriesKeys(): Set<String> = fullyWatchedSeriesKeysForSource(activeSource)
+
     private fun pushMarksToServer(
         items: Collection<WatchedItem>,
         trackerHistorySync: WatchedTrackerHistorySync,

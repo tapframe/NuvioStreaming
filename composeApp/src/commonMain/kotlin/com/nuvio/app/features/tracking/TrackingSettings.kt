@@ -1,6 +1,7 @@
 package com.nuvio.app.features.tracking
 
 import com.nuvio.app.features.library.LibrarySourceMode
+import com.nuvio.app.features.simkl.SimklAnimeIdPreference
 import com.nuvio.app.features.trakt.MoreLikeThisSourcePreference
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.trakt.TraktSettingsUiState
@@ -36,4 +37,7 @@ object TrackingSettingsRepository {
 
     fun setMoreLikeThisSource(source: MoreLikeThisSourcePreference) =
         TraktSettingsRepository.setMoreLikeThisSource(source)
+
+    fun setSimklAnimeIdPreference(preference: SimklAnimeIdPreference) =
+        TraktSettingsRepository.setSimklAnimeIdPreference(preference)
 }

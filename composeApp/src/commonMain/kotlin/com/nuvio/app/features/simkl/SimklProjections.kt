@@ -6,6 +6,7 @@ import com.nuvio.app.features.tracking.TrackingExternalIds
 import com.nuvio.app.features.tracking.TrackingMediaKind
 import com.nuvio.app.features.tracking.TrackingMediaReference
 import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.extractTrackingYear
 import com.nuvio.app.features.tracking.parseTrackingExternalIds
 import com.nuvio.app.features.tracking.trackingMediaKind
@@ -227,32 +228,82 @@ internal fun SimklMedia.toTrackingExternalIds(): TrackingExternalIds = TrackingE
     kitsu = ids.idValue("kitsu")?.toLongOrNull(),
 )
 
-internal fun SimklMedia.canonicalContentId(): String? = when {
-    !ids.idValue("imdb").isNullOrBlank() -> ids.idValue("imdb")
-    !ids.idValue("tmdb").isNullOrBlank() -> "tmdb:${ids.idValue("tmdb")}"
-    !ids.idValue("tvdb").isNullOrBlank() -> "tvdb:${ids.idValue("tvdb")}"
-    !ids.idValue("mal").isNullOrBlank() -> "mal:${ids.idValue("mal")}"
-    !ids.idValue("anidb").isNullOrBlank() -> "anidb:${ids.idValue("anidb")}"
-    !ids.idValue("anilist").isNullOrBlank() -> "anilist:${ids.idValue("anilist")}"
-    !ids.idValue("kitsu").isNullOrBlank() -> "kitsu:${ids.idValue("kitsu")}"
-    !ids.simklIdValue().isNullOrBlank() -> "simkl:${ids.simklIdValue()}"
-    else -> null
+internal fun SimklMedia.canonicalContentId(): String? =
+    canonicalContentId(TrackingSettingsRepository.uiState.value.simklAnimeIdPreference)
+
+/**
+ * Resolves the canonical content ID for this media entry.
+ *
+ * For non-anime content the priority is always IMDB → TMDB → TVDB → (fallback chain).
+ * For anime, the [animeIdPreference] allows the user to choose which ID system takes priority:
+ * - [SimklAnimeIdPreference.IMDB]: standard fallback (IMDB wins, seasons get grouped)
+ * - [SimklAnimeIdPreference.MAL]: prefer MAL ID so each season is separate
+ * - [SimklAnimeIdPreference.KITSU]: prefer Kitsu ID so each season is separate
+ *
+ * The function is also available without the preference parameter for call-sites that
+ * don't have anime context (movies/shows always use the default chain).
+ */
+internal fun SimklMedia.canonicalContentId(animeIdPreference: SimklAnimeIdPreference): String? {
+    // Try the preferred anime ID first when preference is not IMDB
+    when (animeIdPreference) {
+        SimklAnimeIdPreference.MAL -> {
+            ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { return "mal:$it" }
+            ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { return "kitsu:$it" }
+            ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { return "anidb:$it" }
+        }
+        SimklAnimeIdPreference.KITSU -> {
+            ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { return "kitsu:$it" }
+            ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { return "mal:$it" }
+            ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { return "anidb:$it" }
+        }
+        SimklAnimeIdPreference.IMDB -> Unit // fall through to standard chain
+    }
+    // Standard fallback chain
+    return when {
+        !ids.idValue("imdb").isNullOrBlank() -> ids.idValue("imdb")
+        !ids.idValue("tmdb").isNullOrBlank() -> "tmdb:${ids.idValue("tmdb")}"
+        !ids.idValue("tvdb").isNullOrBlank() -> "tvdb:${ids.idValue("tvdb")}"
+        !ids.idValue("mal").isNullOrBlank() -> "mal:${ids.idValue("mal")}"
+        !ids.idValue("anidb").isNullOrBlank() -> "anidb:${ids.idValue("anidb")}"
+        !ids.idValue("anilist").isNullOrBlank() -> "anilist:${ids.idValue("anilist")}"
+        !ids.idValue("kitsu").isNullOrBlank() -> "kitsu:${ids.idValue("kitsu")}"
+        !ids.simklIdValue().isNullOrBlank() -> "simkl:${ids.simklIdValue()}"
+        else -> null
+    }
 }
 
 /**
  * Returns all content IDs (IMDB, MAL, AniDB, AniList, Kitsu, etc.) that this media entry
  * is known under. Used to emit watched items under all possible IDs for anime entries so
  * that the UI can find them regardless of which content ID the addon uses.
+ *
+ * When the user prefers MAL or Kitsu as the canonical anime ID, only the preferred ID type
+ * is emitted to prevent duplicates in continue watching and watched badge resolution.
  */
-private fun SimklMedia.alternateContentIds(): Set<String> = buildSet {
-    ids.idValue("imdb")?.takeIf(String::isNotBlank)?.let(::add)
-    ids.idValue("tmdb")?.takeIf(String::isNotBlank)?.let { add("tmdb:$it") }
-    ids.idValue("tvdb")?.takeIf(String::isNotBlank)?.let { add("tvdb:$it") }
-    ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { add("mal:$it") }
-    ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { add("anidb:$it") }
-    ids.idValue("anilist")?.takeIf(String::isNotBlank)?.let { add("anilist:$it") }
-    ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { add("kitsu:$it") }
-    ids.simklIdValue()?.takeIf(String::isNotBlank)?.let { add("simkl:$it") }
+private fun SimklMedia.alternateContentIds(): Set<String> {
+    val preference = TrackingSettingsRepository.uiState.value.simklAnimeIdPreference
+    return when (preference) {
+        SimklAnimeIdPreference.IMDB -> buildSet {
+            ids.idValue("imdb")?.takeIf(String::isNotBlank)?.let(::add)
+            ids.idValue("tmdb")?.takeIf(String::isNotBlank)?.let { add("tmdb:$it") }
+            ids.idValue("tvdb")?.takeIf(String::isNotBlank)?.let { add("tvdb:$it") }
+            ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { add("mal:$it") }
+            ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { add("anidb:$it") }
+            ids.idValue("anilist")?.takeIf(String::isNotBlank)?.let { add("anilist:$it") }
+            ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { add("kitsu:$it") }
+            ids.simklIdValue()?.takeIf(String::isNotBlank)?.let { add("simkl:$it") }
+        }
+        SimklAnimeIdPreference.MAL -> buildSet {
+            ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { add("mal:$it") }
+            ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { add("kitsu:$it") }
+            ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { add("anidb:$it") }
+        }
+        SimklAnimeIdPreference.KITSU -> buildSet {
+            ids.idValue("kitsu")?.takeIf(String::isNotBlank)?.let { add("kitsu:$it") }
+            ids.idValue("mal")?.takeIf(String::isNotBlank)?.let { add("mal:$it") }
+            ids.idValue("anidb")?.takeIf(String::isNotBlank)?.let { add("anidb:$it") }
+        }
+    }
 }
 
 internal fun simklPosterUrl(path: String?): String? =
@@ -400,9 +451,9 @@ private fun daysInMonths(year: Int): IntArray = if (year.isLeapYear()) {
  */
 internal fun TrackingMediaReference.resolveAnimeEpisodeForSimkl(): TrackingMediaReference {
     if (kind != TrackingMediaKind.ANIME) return this
-    val videoId = catalog?.videoId ?: return this
-    val parsed = parseSimklAnimeVideoId(videoId) ?: return this
-    val videoEpisodeNumber = parsed.episodeNumber ?: return this
+    val videoId = catalog?.videoId ?: return stripAnimeIdsIfSeasoned()
+    val parsed = parseSimklAnimeVideoId(videoId) ?: return stripAnimeIdsIfSeasoned()
+    val videoEpisodeNumber = parsed.episodeNumber ?: return stripAnimeIdsIfSeasoned()
 
     // Override IDs: use ONLY the anime-specific ID from videoId.
     // Clear all other IDs to prevent Simkl from matching a wrong entry
@@ -425,6 +476,20 @@ internal fun TrackingMediaReference.resolveAnimeEpisodeForSimkl(): TrackingMedia
         ids = overriddenIds,
         episode = episode?.copy(season = null, number = videoEpisodeNumber)
             ?: TrackingEpisode(season = null, number = videoEpisodeNumber),
+    )
+}
+
+/**
+ * If this anime reference uses TVDB-style season coordinates, strip anime-specific IDs
+ * (MAL, Kitsu, AniDB, AniList) to prevent Simkl from matching a wrong per-season entry.
+ * When a season is present the parent IMDB/TMDB is the correct identifier.
+ */
+private fun TrackingMediaReference.stripAnimeIdsIfSeasoned(): TrackingMediaReference {
+    val season = episode?.season ?: return this
+    if (season <= 0) return this
+    if (ids.mal == null && ids.kitsu == null && ids.anidb == null && ids.anilist == null && ids.simkl == null) return this
+    return copy(
+        ids = ids.copy(mal = null, kitsu = null, anidb = null, anilist = null, simkl = null),
     )
 }
 
