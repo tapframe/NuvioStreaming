@@ -109,7 +109,7 @@ private fun SimklLibraryEntry.toLibraryItem(
         id = contentId,
         type = entryType,
         name = media.title?.takeIf(String::isNotBlank) ?: contentId,
-        poster = simklPosterUrl(media.poster),
+        poster = resolvedPosterUrl(),
         releaseInfo = media.year?.toString(),
         posterShape = PosterShape.Poster,
         listKeys = setOf(listKey),

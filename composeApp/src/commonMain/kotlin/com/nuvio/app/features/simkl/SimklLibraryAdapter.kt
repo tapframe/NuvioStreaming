@@ -95,6 +95,7 @@ object SimklLibraryRepository {
             contentType = item.type,
             title = item.name,
             releaseInfo = item.releaseInfo,
+            posterUrl = item.poster,
         )
         val result = when {
             desiredStatus != null -> SimklMutationRepository.moveToList(

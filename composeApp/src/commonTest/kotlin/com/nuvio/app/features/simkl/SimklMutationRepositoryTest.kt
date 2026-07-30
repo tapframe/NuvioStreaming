@@ -27,7 +27,10 @@ class SimklMutationRepositoryTest {
     @Test
     fun `list mutation batches types and puts destination on every item`() {
         val body = buildSimklListMutationBody(
-            items = listOf(movie(), anime()),
+            items = listOf(
+                movie().copy(posterUrl = "https://catalog.example/poster.webp"),
+                anime(),
+            ),
             destination = TrackingListStatus.PLAN_TO_WATCH,
         ).asObject()
 
@@ -39,6 +42,8 @@ class SimklMutationRepositoryTest {
         assertEquals(53536L, movie.getValue("ids").jsonObject.getValue("simkl").jsonPrimitive.content.toLong())
         assertEquals("tt0181852", movie.getValue("ids").jsonObject.getValue("imdb").jsonPrimitive.content)
         assertNull(movie.getValue("ids").jsonObject["trakt"])
+        assertNull(movie["poster"])
+        assertNull(movie["posterUrl"])
         assertEquals(16498L, anime.getValue("ids").jsonObject.getValue("mal").jsonPrimitive.content.toLong())
     }
 

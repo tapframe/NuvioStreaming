@@ -314,6 +314,39 @@ class SimklSyncEngineTest {
     }
 
     @Test
+    fun `delta replaces local poster fallback with canonical Simkl artwork`() = runBlocking {
+        val currentEntry = entry(SimklMediaType.SHOWS, "1").copy(
+            localPosterUrl = "https://catalog.example/poster.webp",
+        )
+        val current = SimklSyncSnapshot(
+            isInitialized = true,
+            watermark = "v1",
+            activities = activities(all = "v1", library = "l1"),
+            entries = listOf(currentEntry),
+        )
+        val canonical = entry(SimklMediaType.SHOWS, "1").copy(
+            show = media("1").copy(poster = "12/canonical"),
+        )
+        val remote = ScriptedRemote(
+            Step.Activities(activities(all = "v2", library = "l2")),
+            Step.AllItems(null, responseOf(canonical)),
+        )
+
+        val result = SimklSyncEngine(remote) { 900L }.synchronize(current)
+
+        assertNull(result.entries.single().localPosterUrl)
+        assertEquals(
+            simklPosterUrl("12/canonical"),
+            result.toSimklLibraryProjection().items.single().poster,
+        )
+        assertEquals(
+            listOf<SimklAllItemsRequest>(SimklAllItemsRequest.Changes("v1")),
+            remote.allItemsRequests,
+        )
+        assertTrue(remote.isExhausted)
+    }
+
+    @Test
     fun `failed delta leaves the caller snapshot unchanged`() = runBlocking {
         val current = SimklSyncSnapshot(
             isInitialized = true,

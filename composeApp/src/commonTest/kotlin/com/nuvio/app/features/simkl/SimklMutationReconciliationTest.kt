@@ -51,6 +51,36 @@ class SimklMutationReconciliationTest {
     }
 
     @Test
+    fun `list response keeps catalog poster as a local fallback`() {
+        val localPoster = "https://catalog.example/poster.webp"
+        val request = movie().copy(posterUrl = localPoster)
+        val receipt = response(
+            """
+            {
+              "added": {
+                "movies": [
+                  {
+                    "to": "plantowatch",
+                    "ids": {"simkl": 472214, "imdb": "tt1375666"},
+                    "type": "movie"
+                  }
+                ],
+                "shows": []
+              },
+              "not_found": {"movies": [], "shows": []}
+            }
+            """,
+        ).toListMutationReceipt(listOf(request), json)
+
+        val updated = SimklSyncSnapshot()
+            .applyMutationReceipt(receipt, 1_700_000_000_000L)
+
+        assertEquals(localPoster, updated.entries.single().localPosterUrl)
+        assertEquals(localPoster, updated.toSimklLibraryProjection().items.single().poster)
+        assertFalse(receipt.requiresReconciliation)
+    }
+
+    @Test
     fun `partial list response commits only items present in added`() {
         val accepted = movie()
         val missing = movie().copy(

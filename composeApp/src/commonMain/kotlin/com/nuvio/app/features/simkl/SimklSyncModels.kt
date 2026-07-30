@@ -58,6 +58,7 @@ data class SimklSeason(
 @Serializable
 data class SimklLibraryEntry(
     val mediaType: SimklMediaType = SimklMediaType.SHOWS,
+    val localPosterUrl: String? = null,
     @SerialName("added_to_watchlist_at") val addedToWatchlistAt: String? = null,
     @SerialName("last_watched_at") val lastWatchedAt: String? = null,
     @SerialName("user_rated_at") val userRatedAt: String? = null,

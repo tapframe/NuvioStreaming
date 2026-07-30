@@ -33,6 +33,8 @@ private fun SimklSyncSnapshot.withListMutations(
         val mergedMedia = media.mergeMissing(existing?.media)
         val entry = (existing ?: SimklLibraryEntry()).copy(
             mediaType = mediaType,
+            localPosterUrl = existing?.localPosterUrl
+                ?: mutation.request.posterUrl?.trim()?.takeIf(String::isNotBlank),
             addedToWatchlistAt = existing?.addedToWatchlistAt ?: committedAt,
             status = mutation.status,
             show = mergedMedia.takeIf { mediaType != SimklMediaType.MOVIES },

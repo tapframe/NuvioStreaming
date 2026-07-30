@@ -61,6 +61,7 @@ data class TrackingMediaReference(
     val ids: TrackingExternalIds = TrackingExternalIds(),
     val episode: TrackingEpisode? = null,
     val catalog: TrackingCatalogReference? = null,
+    val posterUrl: String? = null,
 ) {
     val hasResolvableIdentity: Boolean
         get() = ids.hasAny || !title.isNullOrBlank()
