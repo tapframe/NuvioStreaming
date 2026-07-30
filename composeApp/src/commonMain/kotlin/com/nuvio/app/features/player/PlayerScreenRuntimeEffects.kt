@@ -398,7 +398,15 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
 
         launch {
             val imdbId = vid.split(":").firstOrNull()?.takeIf { it.startsWith("tt") }
-            val durationSec = playbackSnapshot.durationMs.takeIf { it > 0L }?.let { it / 1000.0 }
+            var durationSec: Double? = null
+            for (i in 1..20) {
+                val d = playbackSnapshot.durationMs
+                if (d > 0L) {
+                    durationSec = d / 1000.0
+                    break
+                }
+                kotlinx.coroutines.delay(250)
+            }
             val intervals = SkipIntroRepository.getSkipIntervals(
                 imdbId = imdbId,
                 season = season,
