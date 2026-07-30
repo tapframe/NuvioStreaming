@@ -41,6 +41,9 @@ data class PluginRepositoryItem(
     val lastUpdated: Long = 0L,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
+    val serverUrl: String? = null,
+    val serverRepoType: String? = null,
+    val serverEnabled: Boolean? = null,
 )
 
 data class PluginScraper(
@@ -117,6 +120,9 @@ internal data class StoredPluginRepository(
     val version: String? = null,
     val scraperCount: Int = 0,
     val lastUpdated: Long = 0L,
+    val serverUrl: String? = null,
+    val serverRepoType: String? = null,
+    val serverEnabled: Boolean? = null,
 )
 
 @Serializable
