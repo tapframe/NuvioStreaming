@@ -235,7 +235,7 @@ private fun List<SimklLibraryEntry>.indexOfMatchingEntry(
     }
 }
 
-private fun SimklMedia.matchesTarget(target: SimklMedia): Boolean {
+internal fun SimklMedia.matchesTarget(target: SimklMedia): Boolean {
     val candidateIds = toTrackingExternalIds()
     val targetIds = target.toTrackingExternalIds()
     candidateIds.comparableMatch(targetIds)?.let { return it }

@@ -112,13 +112,13 @@ private fun JsonObject.episode(
     )
 }
 
-private fun TrackingMediaReference.toSimklMedia(): SimklMedia = SimklMedia(
+internal fun TrackingMediaReference.toSimklMedia(): SimklMedia = SimklMedia(
     title = title?.takeIf(String::isNotBlank),
     year = year,
     ids = ids.toSimklJsonObjectOrNull()?.toMap().orEmpty(),
 )
 
-private fun TrackingMediaKind.toSimklMediaType(): SimklMediaType = when (this) {
+internal fun TrackingMediaKind.toSimklMediaType(): SimklMediaType = when (this) {
     TrackingMediaKind.MOVIE -> SimklMediaType.MOVIES
     TrackingMediaKind.SHOW -> SimklMediaType.SHOWS
     TrackingMediaKind.ANIME -> SimklMediaType.ANIME

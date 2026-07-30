@@ -215,6 +215,28 @@ object SimklSyncRepository : TrackingProfileStore {
         }
     }
 
+    internal suspend fun commitMutation(receipt: SimklMutationReceipt) {
+        ensureLoaded()
+        val generation = profileGeneration
+        val profileId = ProfileRepository.activeProfileId
+        snapshotMutex.withLock {
+            if (generation != profileGeneration || profileId != ProfileRepository.activeProfileId) {
+                return@withLock
+            }
+            val current = _state.value
+            val snapshot = current.snapshot.applyMutationReceipt(
+                receipt = receipt,
+                committedAtEpochMs = SimklPlatformClock.nowEpochMs(),
+            )
+            if (snapshot == current.snapshot) return@withLock
+            SimklSyncStorage.savePayload(json.encodeToString(snapshot))
+            if (generation == profileGeneration && profileId == ProfileRepository.activeProfileId) {
+                _state.value = current.copy(snapshot = snapshot)
+                SimklWatchDiagnostics.logSnapshot(stage = "mutation-commit", snapshot = snapshot)
+            }
+        }
+    }
+
     override fun onProfileChanged() {
         profileGeneration += 1L
         hasLoaded = false

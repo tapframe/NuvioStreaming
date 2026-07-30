@@ -130,7 +130,6 @@ object SimklLibraryRepository {
                     )
                 }
         }
-        refresh(TrackingRefreshIntent.INVALIDATED)
         return resolution
     }
 

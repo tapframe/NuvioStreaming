@@ -191,12 +191,6 @@ object SimklProgressRepository {
             }
         }
         SimklSyncRepository.commitPlaybackRemoval(removed)
-        if (removed.isNotEmpty()) {
-            SimklSyncRepository.refreshAsync(
-                intent = TrackingRefreshIntent.INVALIDATED,
-                origin = SimklRefreshOrigin.PLAYBACK_REMOVAL,
-            )
-        }
     }
 
     private fun publish(syncState: SimklSyncUiState) {
