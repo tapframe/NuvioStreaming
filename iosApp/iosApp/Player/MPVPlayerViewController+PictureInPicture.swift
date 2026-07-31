@@ -65,7 +65,7 @@ extension MPVPlayerViewController {
         checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
         checkError(mpv_set_option_string(mpv, "volume-max", "200"))
         checkError(mpv_set_option_string(mpv, "volume", "100"))
-        checkError(mpv_set_option_string(mpv, "volume-gain-max", "6.1"))
+        checkError(mpv_set_option_string(mpv, "volume-gain-max", "12"))
         checkError(mpv_set_option_string(mpv, "volume-gain", "0"))
         checkError(mpv_set_option_string(mpv, "video-rotate", "no"))
         checkError(mpv_set_option_string(mpv, "subs-match-os-language", "yes"))
