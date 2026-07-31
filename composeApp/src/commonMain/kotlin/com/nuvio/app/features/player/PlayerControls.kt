@@ -68,6 +68,7 @@ import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.nuvioTypeScale
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.abs
 import kotlin.math.roundToLong
 
 @Composable
@@ -553,6 +554,7 @@ private fun ProgressControls(
                 .graphicsLayer(scaleY = metrics.sliderScaleY)
                 .tapToSeekOnTimeline(
                     durationMs = playbackSnapshot.durationMs,
+                    currentPositionMs = { displayedPositionMs },
                     onSeek = { positionMs ->
                         val targetPositionMs = positionMs.coerceIn(0L, durationMs)
                         onScrubChange(targetPositionMs)
@@ -656,15 +658,22 @@ private fun ProgressControls(
     }
 }
 
+private val PlayerTimelineThumbInset = 2.dp
+
+private const val PlayerTimelineTapDedupePx = 12f
+
 private fun Modifier.tapToSeekOnTimeline(
     durationMs: Long,
+    currentPositionMs: () -> Long,
     onSeek: (Long) -> Unit,
 ): Modifier {
     if (durationMs <= 0L) return this
 
     return pointerInput(durationMs) {
+        val thumbInsetPx = PlayerTimelineThumbInset.toPx()
         awaitEachGesture {
-            val width = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
+            val trackWidth = (size.width.toFloat() - thumbInsetPx * 2f)
+                .takeIf { it > 0f } ?: return@awaitEachGesture
             val down = awaitFirstDown(
                 requireUnconsumed = false,
                 pass = PointerEventPass.Initial,
@@ -681,10 +690,15 @@ private fun Modifier.tapToSeekOnTimeline(
                 if (!change.pressed) break
             }
 
-            if (maxDistance <= viewConfiguration.touchSlop) {
-                val targetFraction = (lastPosition.x / width).coerceIn(0f, 1f)
-                onSeek((durationMs * targetFraction).roundToLong().coerceIn(0L, durationMs))
-            }
+            if (maxDistance > viewConfiguration.touchSlop) return@awaitEachGesture
+
+            val targetFraction = ((lastPosition.x - thumbInsetPx) / trackWidth).coerceIn(0f, 1f)
+            val targetPositionMs = (durationMs * targetFraction).roundToLong().coerceIn(0L, durationMs)
+
+            val toleranceMs = (durationMs * (PlayerTimelineTapDedupePx / trackWidth)).roundToLong()
+            if (abs(targetPositionMs - currentPositionMs()) <= toleranceMs) return@awaitEachGesture
+
+            onSeek(targetPositionMs)
         }
     }
 }
