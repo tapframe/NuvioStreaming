@@ -838,6 +838,11 @@ object WatchedRepository {
         return itemsForSource(activeSource).containsKey(watchedItemKey(type, id, season, episode))
     }
 
+    fun isFullyWatchedSeries(id: String, type: String): Boolean {
+        val key = watchedItemKey(type, id)
+        return _fullyWatchedSeriesKeys.value.contains(key)
+    }
+
     fun reconcileSeriesWatchedState(
         meta: MetaDetails,
         todayIsoDate: String,
