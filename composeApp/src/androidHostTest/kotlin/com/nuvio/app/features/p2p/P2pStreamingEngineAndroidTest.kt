@@ -89,4 +89,53 @@ class P2pStreamingEngineAndroidTest {
             ),
         )
     }
+
+    @Test
+    fun globalCachePressureDoesNotBecomeTerminalError() {
+        assertNull(
+            unexpectedTorrentError(
+                requestId = 0L,
+                eventTorrentId = null,
+                currentTorrentId = "torrent",
+                message = "disk cache budget is exceeded by protected torrent data",
+                fallbackMessage = "unknown",
+            )
+        )
+    }
+
+    @Test
+    fun matchingUnsolicitedTorrentFailureBecomesTerminalError() {
+        assertEquals(
+            P2pStreamingState.Error("file write failed"),
+            unexpectedTorrentError(
+                requestId = 0L,
+                eventTorrentId = "torrent",
+                currentTorrentId = "torrent",
+                message = "file write failed",
+                fallbackMessage = "unknown",
+            ),
+        )
+    }
+
+    @Test
+    fun commandAndStaleTorrentFailuresAreIgnored() {
+        assertNull(
+            unexpectedTorrentError(
+                requestId = 9L,
+                eventTorrentId = "torrent",
+                currentTorrentId = "torrent",
+                message = "failed",
+                fallbackMessage = "unknown",
+            )
+        )
+        assertNull(
+            unexpectedTorrentError(
+                requestId = 0L,
+                eventTorrentId = "old-torrent",
+                currentTorrentId = "torrent",
+                message = "failed",
+                fallbackMessage = "unknown",
+            )
+        )
+    }
 }
