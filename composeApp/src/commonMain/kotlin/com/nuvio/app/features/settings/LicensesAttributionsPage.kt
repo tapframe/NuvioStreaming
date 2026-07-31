@@ -45,7 +45,7 @@ private const val TraktUrl = "https://trakt.tv"
 private const val PremiumizeUrl = "https://www.premiumize.me"
 private const val TorboxUrl = "https://torbox.app"
 private const val MdbListUrl = "https://mdblist.com"
-private const val IntroDbUrl = "https://introdb.app/"
+private const val SkipDbUrl = "https://skipdb.tv/"
 private const val NuvioRepositoryUrl = "https://github.com/NuvioMedia/NuvioMobile"
 private const val MpvKitUrl = "https://github.com/mpvkit/MPVKit"
 private const val ApacheLicenseUrl = "https://www.apache.org/licenses/LICENSE-2.0"
@@ -351,10 +351,10 @@ private fun attributionItems(): List<AttributionItem> = listOf(
         link = MdbListUrl,
     ),
     AttributionItem(
-        titleRes = Res.string.settings_licenses_attributions_introdb_title,
-        bodyRes = Res.string.settings_licenses_attributions_introdb_body,
-        logo = IntegrationLogo.IntroDb,
-        link = IntroDbUrl,
+        titleRes = Res.string.settings_licenses_attributions_skipdb_title,
+        bodyRes = Res.string.settings_licenses_attributions_skipdb_body,
+        logo = IntegrationLogo.SkipDb,
+        link = SkipDbUrl,
     ),
     AttributionItem(
         titleRes = Res.string.settings_licenses_attributions_imdb_title,

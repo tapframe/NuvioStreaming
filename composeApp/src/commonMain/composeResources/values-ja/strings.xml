@@ -485,8 +485,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvioはアカウント認証、クラウドライブラリアクセス、キャッシュ確認、クラウド再生機能のためにTorBoxと連携しています。NuvioはTorBoxと提携・承認されたものではありません。</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">NuvioはMDBListを使用して評価と外部スコアプロバイダーデータを取得しています。NuvioはMDBListと提携・承認されたものではありません。</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">NuvioはIntroDB APIを使用して、スキップコントロールに使用するイントロ・振り返り・エンドクレジット・プレビューのタイムスタンプ（コミュニティ提供）を取得しています。NuvioはIntroDBと提携・承認されたものではありません。</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">NuvioはSkipDB APIを使用して、スキップコントロールに使用するイントロ・振り返り・エンドクレジット・プレビューのタイムスタンプ（コミュニティ提供）を取得しています。NuvioはSkipDBと提携・承認されたものではありません。</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">iOSビルドの再生に使用。</string>
     <string name="settings_licenses_attributions_mpvkit_license">MPVKit単体はLGPL v3.0でライセンスされています。libmpvおよびFFmpegライブラリを含むMPVKitバンドルも同様にLGPL v3.0でライセンスされています。</string>
@@ -833,8 +833,8 @@
     <string name="settings_playback_anime_skip_client_id_description">AnimeSkip APIのクライアントIDを入力してください。anime-skip.comで取得できます。</string>
     <string name="settings_playback_intro_submit_enabled">イントロ投稿を有効にする</string>
     <string name="settings_playback_intro_submit_enabled_description">イントロ・アウトロのタイムスタンプをコミュニティデータベースに投稿するボタンを表示します。</string>
-    <string name="settings_playback_introdb_api_key">IntroDB APIキー</string>
-    <string name="settings_playback_introdb_api_key_description">タイムスタンプを投稿するためのIntroDB APIキーを入力してください。投稿に必要です。</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB APIキー</string>
+    <string name="settings_playback_skipdb_api_key_description">タイムスタンプを投稿するためのSkipDB APIキーを入力してください。投稿に必要です。</string>
     <string name="settings_playback_anime_skip_description">スキップタイムスタンプをAnimeSkipでも検索します（クライアントIDが必要）。</string>
     <string name="settings_playback_auto_play_next_episode">次のエピソードを自動再生</string>
     <string name="settings_playback_auto_play_next_episode_description">プロンプトが表示されたら自動的に次のエピソードを開始します。</string>
@@ -957,7 +957,7 @@
     <string name="settings_playback_subtitle_use_forced_description">字幕言語の設定に一致する場合、強制字幕を優先します。</string>
     <string name="settings_playback_subtitle_vertical_offset">垂直オフセット</string>
     <string name="settings_playback_skip_intro_outro_recap">イントロをスキップ</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">introdb.appを使用してイントロと振り返りを検出します。</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">skipdb.tvを使用してイントロと振り返りを検出します。</string>
     <string name="settings_playback_source_scope">自動再生のソース範囲</string>
     <string name="settings_playback_source_scope_all_addons">インストール済みのすべてのアドオン</string>
     <string name="settings_playback_source_scope_all_addons_description">自動再生はインストール済みアドオンのストリームのみを対象とします。</string>
@@ -1764,8 +1764,8 @@
     <string name="collections_editor_media_series_suffix">シリーズ</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">クラウドライブラリが無効です。</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">APIキーが無効か接続に失敗しました</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">APIキーが無効か接続に失敗しました</string>
     <string name="addons_manifest_missing_field">マニフェストに「%1$s」がありません</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDBコレクション %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">TMDB監督 %1$s</string>
@@ -1867,7 +1867,7 @@
     <string name="plugins_test_results_count">テスト結果 (%1$d 件)</string>
     <string name="plugins_tmdb_required_message">プラグインプロバイダーにはTMDB APIキーが必要です。TMDB画面でAPIキーを設定しないと、プラグインプロバイダーが正常に動作しない場合があります。</string>
     <string name="search_error_no_results_for_catalog">%1$s の検索結果が返されませんでした。</string>
-    <string name="settings_playback_introdb_invalid_key">APIキーが無効か接続に失敗しました</string>
+    <string name="settings_playback_skipdb_invalid_key">APIキーが無効か接続に失敗しました</string>
     <string name="streams_plugin_repository_fallback">プラグインリポジトリ</string>
     <string name="submit_intro_action">イントロを投稿</string>
     <string name="submit_intro_button_submit">投稿</string>

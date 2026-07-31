@@ -475,8 +475,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio sa pripája k TorBox pre autentifikáciu účtu, prístup ku cloudovej knižnici, kontroly vyrovnávacej pamäte a funkcie cloudového prehrávania. Nuvio nie je pridružený k TorBox ani ním schválený.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio používa MDBList pre hodnotenia a dáta externých poskytovateľov skóre. Nuvio nie je pridružený k MDBList ani ním schválený.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio používa API IntroDB pre komunitou poskytované časové pečiatky intro, rekapitulácie, kreditov a náhľadov používaných ovládacími prvkami preskočenia. Nuvio nie je pridružený k IntroDB ani ním schválený.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio používa API SkipDB pre komunitou poskytované časové pečiatky intro, rekapitulácie, kreditov a náhľadov používaných ovládacími prvkami preskočenia. Nuvio nie je pridružený k SkipDB ani ním schválený.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Používa sa na prehrávanie v zostavách iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Samotný zdrojový kód MPVKit je licencovaný pod LGPL v3.0. Balíky MPVKit vrátane knižníc libmpv a FFmpeg sú tiež licencované pod LGPL v3.0.</string>
@@ -821,8 +821,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Zadajte ID klienta API AnimeSkip. Získajte ho na anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Povoliť odosielanie intro</string>
     <string name="settings_playback_intro_submit_enabled_description">Zobraziť tlačidlo na odosielanie časových pečiatok intro/outro do komunitnej databázy.</string>
-    <string name="settings_playback_introdb_api_key">API kľúč IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Zadajte váš API kľúč IntroDB na odosielanie časových pečiatok. Vyžaduje sa na odosielanie.</string>
+    <string name="settings_playback_skipdb_api_key">API kľúč SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Zadajte váš API kľúč SkipDB na odosielanie časových pečiatok. Vyžaduje sa na odosielanie.</string>
     <string name="settings_playback_anime_skip_description">Tiež vyhľadávať v AnimeSkip časové pečiatky preskočenia (vyžaduje ID klienta).</string>
     <string name="settings_playback_auto_play_next_episode">Automaticky prehrať ďalšiu epizódu</string>
     <string name="settings_playback_auto_play_next_episode_description">Spustiť ďalšiu epizódu automaticky, keď sa zobrazí výzva.</string>
@@ -933,7 +933,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Uprednostniť vynútené titulky pri zhode s nastaveniami jazyka titulkov.</string>
     <string name="settings_playback_subtitle_vertical_offset">Vertikálny posun</string>
     <string name="settings_playback_skip_intro_outro_recap">Preskočiť intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Použiť introdb.app na detekciu intro a rekapitulácií.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Použiť skipdb.tv na detekciu intro a rekapitulácií.</string>
     <string name="settings_playback_source_scope">Rozsah zdrojov automatického prehrávania</string>
     <string name="settings_playback_source_scope_all_addons">Všetky nainštalované doplnky</string>
     <string name="settings_playback_source_scope_all_addons_description">Automatické prehrávanie zohľadňuje iba streamy z vašich nainštalovaných doplnkov.</string>
@@ -1740,8 +1740,8 @@
     <string name="collections_editor_media_series_suffix">Seriály</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">Cloudová knižnica je vypnutá.</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">Neplatný API kľúč alebo zlyhalo pripojenie</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">Neplatný API kľúč alebo zlyhalo pripojenie</string>
     <string name="addons_manifest_missing_field">V manifeste chýba \"%1$s\"</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDB Kolekcia %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">TMDB Režisér %1$s</string>
@@ -1843,7 +1843,7 @@
     <string name="plugins_test_results_count">Výsledky testu (%1$d)</string>
     <string name="plugins_tmdb_required_message">Pluginy poskytovateľov vyžadujú TMDB API kľúč. Nastavte ho na obrazovke TMDB, inak pluginy poskytovateľov nebudú fungovať správne.</string>
     <string name="search_error_no_results_for_catalog">Žiadne výsledky vyhľadávania pre %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Neplatný API kľúč alebo zlyhalo pripojenie</string>
+    <string name="settings_playback_skipdb_invalid_key">Neplatný API kľúč alebo zlyhalo pripojenie</string>
     <string name="streams_plugin_repository_fallback">Repozitár pluginov</string>
     <string name="submit_intro_action">Odoslať Intro</string>
     <string name="submit_intro_button_submit">Odoslať</string>

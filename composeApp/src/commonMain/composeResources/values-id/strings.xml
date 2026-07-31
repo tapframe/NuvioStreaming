@@ -451,8 +451,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio menhubungi TorBox untuk autentikasi akun, akses pustaka cloud, pemeriksaan cache,dan fitur pemutaran cloud. Nuvio tidak berafiliasi dengan atau diendorse oleh TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio menggunakan MDBList untuk rating dan data penyedia skor eksternal. Nuvio tidak berafiliasi atau didukung oleh MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio menggunakan API IntroDB untuk intro, rekap, kredit, dan pratinjau cap waktu yang disediakan komunitas yang digunakan oleh kontrol lewati. Nuvio tidak berafiliasi atau didukung oleh IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio menggunakan API SkipDB untuk intro, rekap, kredit, dan pratinjau cap waktu yang disediakan komunitas yang digunakan oleh kontrol lewati. Nuvio tidak berafiliasi atau didukung oleh SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Digunakan untuk pemutaran pada build iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Sumber MPVKit saja dilisensikan di bawah LGPL v3.0. Bundle MPVKit, termasuk libmpv dan pustaka FFmpeg, juga dilisensikan di bawah LGPL v3.0.</string>
@@ -758,8 +758,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Masukkan ID klien API AnimeSkip Anda. Dapatkan di anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Aktifkan Pengiriman Intro</string>
     <string name="settings_playback_intro_submit_enabled_description">Tampilkan tombol untuk mengirim cap waktu intro/outro ke database komunitas.</string>
-    <string name="settings_playback_introdb_api_key">Kunci API IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Masukkan kunci API IntroDB Anda untuk mengirim cap waktu. Diperlukan untuk pengiriman.</string>
+    <string name="settings_playback_skipdb_api_key">Kunci API SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Masukkan kunci API SkipDB Anda untuk mengirim cap waktu. Diperlukan untuk pengiriman.</string>
     <string name="settings_playback_anime_skip_description">Juga cari AnimeSkip untuk cap waktu lewati (memerlukan ID klien).</string>
     <string name="settings_playback_auto_play_next_episode">Putar Otomatis Episode Berikutnya</string>
     <string name="settings_playback_auto_play_next_episode_description">Mulai episode berikutnya secara otomatis ketika prompt muncul.</string>
@@ -862,7 +862,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Utamakan forced subtitles ketika mencocokkan pengaturan bahasa terjemahan.</string>
     <string name="settings_playback_subtitle_vertical_offset">Batas Vertikal</string>
     <string name="settings_playback_skip_intro_outro_recap">Lewati Intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Gunakan introdb.app untuk mendeteksi intro dan rekap.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Gunakan skipdb.tv untuk mendeteksi intro dan rekap.</string>
     <string name="settings_playback_source_scope">Cakupan Sumber Putar Otomatis</string>
     <string name="settings_playback_source_scope_all_addons">Semua addon terpasang</string>
     <string name="settings_playback_source_scope_all_addons_description">Putar otomatis hanya mempertimbangkan stream dari addon yang terpasang.</string>

@@ -27,39 +27,44 @@ enum class NextEpisodeThresholdMode {
     MINUTES_BEFORE_END,
 }
 
-// --- IntroDb API response models ---
+// --- SkipDB API response models ---
 
 @Serializable
-data class IntroDbSegmentsResponse(
+data class SkipDbSegmentsResponse(
     @SerialName("imdb_id") val imdbId: String? = null,
     @SerialName("season") val season: Int? = null,
     @SerialName("episode") val episode: Int? = null,
-    @SerialName("intro") val intro: IntroDbSegment? = null,
-    @SerialName("recap") val recap: IntroDbSegment? = null,
-    @SerialName("outro") val outro: IntroDbSegment? = null,
+    @SerialName("segments") val segments: SkipDbSegments? = null,
+    @SerialName("intro_length_estimate_ms") val introLengthEstimateMs: Long? = null,
 )
 
 @Serializable
-data class IntroDbSegment(
-    @SerialName("start_sec") val startSec: Double? = null,
-    @SerialName("end_sec") val endSec: Double? = null,
+data class SkipDbSegments(
+    @SerialName("intro") val intro: SkipDbSegment? = null,
+    @SerialName("recap") val recap: SkipDbSegment? = null,
+    @SerialName("outro") val outro: SkipDbSegment? = null,
+    @SerialName("preview") val preview: SkipDbSegment? = null,
+)
+
+@Serializable
+data class SkipDbSegment(
     @SerialName("start_ms") val startMs: Long? = null,
     @SerialName("end_ms") val endMs: Long? = null,
+    @SerialName("match") val match: String? = null,
+    @SerialName("adjusted") val adjusted: Boolean? = null,
+    @SerialName("offset_ms") val offsetMs: Long? = null,
     @SerialName("confidence") val confidence: Double? = null,
-    @SerialName("submission_count") val submissionCount: Int? = null,
-    @SerialName("updated_at") val updatedAt: String? = null,
 )
 
 @Serializable
-data class SubmitIntroRequest(
+data class SubmitSegmentRequest(
     @SerialName("imdb_id") val imdbId: String,
     @SerialName("season") val season: Int,
     @SerialName("episode") val episode: Int,
-    @SerialName("start_sec") val startSec: Double,
-    @SerialName("end_sec") val endSec: Double,
     @SerialName("start_ms") val startMs: Long,
     @SerialName("end_ms") val endMs: Long,
     @SerialName("segment_type") val segmentType: String,
+    @SerialName("duration_ms") val durationMs: Long? = null,
 )
 
 // --- AniSkip API response models ---

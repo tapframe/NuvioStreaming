@@ -501,8 +501,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio maakt verbinding met TorBox voor accountauthenticatie, toegang tot cloudbibliotheek, cachecontroles en cloud-afspeelfuncties. Nuvio is niet gelieerd aan of goedgekeurd door TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio gebruikt MDBList voor beoordelingen en gegevens van externe scoreproviders. Nuvio is niet gelieerd aan of goedgekeurd door MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio gebruikt de IntroDB API voor door de community aangeleverde tijdstempels van intro, samenvatting, aftiteling en preview die worden gebruikt door de overslaanbediening. Nuvio is niet gelieerd aan of goedgekeurd door IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio gebruikt de SkipDB API voor door de community aangeleverde tijdstempels van intro, samenvatting, aftiteling en preview die worden gebruikt door de overslaanbediening. Nuvio is niet gelieerd aan of goedgekeurd door SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Gebruikt voor afspelen op iOS-builds.</string>
     <string name="settings_licenses_attributions_mpvkit_license">De MPVKit-broncode zelf is gelicentieerd onder LGPL v3.0. MPVKit-bundels, inclusief libmpv- en FFmpeg-bibliotheken, zijn eveneens gelicentieerd onder LGPL v3.0.</string>
@@ -859,8 +859,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Voer je AnimeSkip API-clientID in. Verkrijg er een op anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Intro-inzending inschakelen</string>
     <string name="settings_playback_intro_submit_enabled_description">Toon een knop om intro-/outrotijdstempels naar de communitydatabase te versturen.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB API-sleutel</string>
-    <string name="settings_playback_introdb_api_key_description">Voer je IntroDB API-sleutel in om tijdstempels in te dienen. Vereist voor inzending.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB API-sleutel</string>
+    <string name="settings_playback_skipdb_api_key_description">Voer je SkipDB API-sleutel in om tijdstempels in te dienen. Vereist voor inzending.</string>
     <string name="settings_playback_anime_skip_description">Zoek ook op AnimeSkip naar overslaantijdstempels (vereist clientID).</string>
     <string name="settings_playback_auto_play_next_episode">Volgende aflevering automatisch afspelen</string>
     <string name="settings_playback_auto_play_next_episode_description">Start de volgende aflevering automatisch wanneer de prompt verschijnt.</string>
@@ -985,7 +985,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Geef de voorkeur aan geforceerde ondertitels bij het matchen van je taalinstellingen voor ondertiteling.</string>
     <string name="settings_playback_subtitle_vertical_offset">Verticale offset</string>
     <string name="settings_playback_skip_intro_outro_recap">Intro overslaan</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Gebruik introdb.app om intro's en samenvattingen te detecteren.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Gebruik skipdb.tv om intro's en samenvattingen te detecteren.</string>
     <string name="settings_playback_source_scope">Bronbereik voor automatisch afspelen</string>
     <string name="settings_playback_source_scope_all_addons">Alle geïnstalleerde addons</string>
     <string name="settings_playback_source_scope_all_addons_description">Automatisch afspelen houdt alleen rekening met streams van je geïnstalleerde addons.</string>
@@ -1795,8 +1795,8 @@
     <string name="collections_editor_media_series_suffix">Series</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">Cloudbibliotheek is uitgeschakeld.</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">Ongeldige API-sleutel of verbinding mislukt</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">Ongeldige API-sleutel of verbinding mislukt</string>
     <string name="addons_manifest_missing_field">Manifest mist \"%1$s\"</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDB-collectie %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">TMDB-regisseur %1$s</string>
@@ -1898,7 +1898,7 @@
     <string name="plugins_test_results_count">Testresultaten (%1$d)</string>
     <string name="plugins_tmdb_required_message">Providerplug-ins vereisen een TMDB API-sleutel. Stel deze in op het TMDB-scherm, anders werken providerplug-ins niet correct.</string>
     <string name="search_error_no_results_for_catalog">Geen zoekresultaten voor %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Ongeldige API-sleutel of verbinding mislukt</string>
+    <string name="settings_playback_skipdb_invalid_key">Ongeldige API-sleutel of verbinding mislukt</string>
     <string name="streams_plugin_repository_fallback">Plug-inrepository</string>
     <string name="submit_intro_action">Intro indienen</string>
     <string name="submit_intro_button_submit">Indienen</string>

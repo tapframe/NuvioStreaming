@@ -485,8 +485,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio se conecta a TorBox para autenticación de cuentas, acceso a la biblioteca en la nube, comprobaciones de caché y funciones de reproducción en la nube. Nuvio no está afiliado ni respaldado por TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">Lista MDBL</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio utiliza MDBList para calificaciones y datos de proveedores de puntuaciones externos. Nuvio no está afiliado ni respaldado por MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroducciónDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio utiliza la API IntroDB para la introducción, el resumen, los créditos y las marcas de tiempo de vista previa proporcionadas por la comunidad utilizadas por los controles de omisión. Nuvio no está afiliado ni respaldado por IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">IntroducciónDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio utiliza la API SkipDB para la introducción, el resumen, los créditos y las marcas de tiempo de vista previa proporcionadas por la comunidad utilizadas por los controles de omisión. Nuvio no está afiliado ni respaldado por SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Se utiliza para la reproducción en compilaciones de iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">La fuente MPVKit por sí sola tiene licencia LGPL v3.0. Los paquetes MPVKit, incluidas las bibliotecas libmpv y FFmpeg, también tienen licencia LGPL v3.0.</string>
@@ -833,8 +833,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Introduce tu ID de cliente API de AnimeSkip. Obtén uno en anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Habilitar envío de introducción</string>
     <string name="settings_playback_intro_submit_enabled_description">Muestre un botón para enviar marcas de tiempo de introducción/final a la base de datos de la comunidad.</string>
-    <string name="settings_playback_introdb_api_key">Clave API de introducción a DB</string>
-    <string name="settings_playback_introdb_api_key_description">Ingrese su clave API de IntroDB para enviar marcas de tiempo. Requerido para la presentación.</string>
+    <string name="settings_playback_skipdb_api_key">Clave API de introducción a DB</string>
+    <string name="settings_playback_skipdb_api_key_description">Ingrese su clave API de SkipDB para enviar marcas de tiempo. Requerido para la presentación.</string>
     <string name="settings_playback_anime_skip_description">Buscar también marcas de salto en AnimeSkip (requiere ID de cliente).</string>
     <string name="settings_playback_auto_play_next_episode">Reproducción automática del siguiente episodio</string>
     <string name="settings_playback_auto_play_next_episode_description">Buscar y reproducir automáticamente el siguiente episodio cuando se alcance el umbral.</string>
@@ -1769,8 +1769,8 @@
     <string name="collections_editor_media_series_suffix">Serie</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">La biblioteca en la nube está deshabilitada.</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">Clave API no válida o error de conexión</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">Clave API no válida o error de conexión</string>
     <string name="addons_manifest_missing_field">Falta el manifiesto \\"%1$s\\"</string>
     <string name="collections_editor_tmdb_collection_title_format">Colección TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">Director de TMDB %1$s</string>
@@ -1872,7 +1872,7 @@
     <string name="plugins_test_results_count">Resultados de la prueba (%1$d)</string>
     <string name="plugins_tmdb_required_message">Los proveedores de complementos requieren una clave API de TMDB. Configúrelo en la pantalla TMDB o los proveedores de complementos no funcionarán correctamente.</string>
     <string name="search_error_no_results_for_catalog">No se obtuvieron resultados de búsqueda para %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Clave API no válida o error de conexión</string>
+    <string name="settings_playback_skipdb_invalid_key">Clave API no válida o error de conexión</string>
     <string name="streams_plugin_repository_fallback">Repositorio de complementos</string>
     <string name="submit_intro_action">Enviar introducción</string>
     <string name="submit_intro_button_submit">Entregar</string>

@@ -480,8 +480,8 @@
     <string name="settings_licenses_attributions_torbox_body">O Nuvio liga-se ao TorBox para autenticação de conta, acesso à biblioteca na nuvem, verificações de cache e funcionalidades de reprodução na nuvem. O Nuvio não é afiliado ao TorBox nem apoiado por ele.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">O Nuvio utiliza o MDBList para classificações e dados de fornecedores de pontuações externas. O Nuvio não é afiliado ao MDBList nem apoiado por ele.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">O Nuvio utiliza a API do IntroDB para marcas de tempo de introduções, resumos, créditos e antevisões fornecidas pela comunidade, utilizadas pelos controlos de salto. O Nuvio não é afiliado ao IntroDB nem apoiado por ele.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">O Nuvio utiliza a API do SkipDB para marcas de tempo de introduções, resumos, créditos e antevisões fornecidas pela comunidade, utilizadas pelos controlos de salto. O Nuvio não é afiliado ao SkipDB nem apoiado por ele.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Utilizado para a reprodução em versões iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">O código-fonte do MPVKit, por si só, está licenciado sob a LGPL v3.0. Os pacotes do MPVKit, incluindo as bibliotecas libmpv e FFmpeg, também estão licenciados sob a LGPL v3.0.</string>
@@ -819,8 +819,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Introduz o teu ID de cliente da API do AnimeSkip. Obtém um em anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Ativar envio de introduções</string>
     <string name="settings_playback_intro_submit_enabled_description">Mostra um botão para enviares marcas de tempo de introduções/finais para a base de dados da comunidade.</string>
-    <string name="settings_playback_introdb_api_key">Chave API do IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Introduz a tua chave API do IntroDB para enviares marcas de tempo. Obrigatório para a submissão.</string>
+    <string name="settings_playback_skipdb_api_key">Chave API do SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Introduz a tua chave API do SkipDB para enviares marcas de tempo. Obrigatório para a submissão.</string>
     <string name="settings_playback_anime_skip_description">Pesquisa também no AnimeSkip por marcas de tempo para saltar conteúdo (requer ID de cliente).</string>
     <string name="settings_playback_auto_play_next_episode">Reproduzir automaticamente o próximo episódio</string>
     <string name="settings_playback_auto_play_next_episode_description">Inicia o próximo episódio automaticamente assim que o aviso aparecer.</string>
@@ -931,7 +931,7 @@
     <string name="settings_playback_subtitle_use_forced_description">Dá preferência a legendas forçadas quando corresponderem às definições de idioma das legendas.</string>
     <string name="settings_playback_subtitle_vertical_offset">Afastamento vertical</string>
     <string name="settings_playback_skip_intro_outro_recap">Saltar introdução</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Utiliza o introdb.app para detetar introduções e resumos.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Utiliza o skipdb.tv para detetar introduções e resumos.</string>
     <string name="settings_playback_source_scope">Âmbito da reprodução automática</string>
     <string name="settings_playback_source_scope_all_addons">Todos os addons instalados</string>
     <string name="settings_playback_source_scope_all_addons_description">A reprodução automática apenas considera streams provenientes dos teus addons instalados.</string>
@@ -1700,7 +1700,7 @@
     <string name="collections_editor_media_movies_suffix">Filmes</string>
     <string name="collections_editor_media_series_suffix">Séries</string>
     <string name="cloud_library_playback_disabled">A biblioteca na nuvem está desativada.</string>
-    <string name="settings_playback_introdb_invalid_api_key">Chave API inválida ou falha na ligação</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Chave API inválida ou falha na ligação</string>
     <string name="addons_manifest_missing_field">Campo em falta no manifesto: \"%1$s\"</string>
     <string name="collections_editor_tmdb_collection_title_format">Coleção TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">Realização TMDB %1$s</string>
@@ -1802,7 +1802,7 @@
     <string name="plugins_test_results_count">Resultados do teste (%1$d)</string>
     <string name="plugins_tmdb_required_message">Os fornecedores de plugins precisam de uma chave API do TMDB. Define-a na página do TMDB; caso contrário, podem não funcionar corretamente.</string>
     <string name="search_error_no_results_for_catalog">Nenhum resultado de pesquisa devolvido por %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Chave API inválida ou falha na ligação</string>
+    <string name="settings_playback_skipdb_invalid_key">Chave API inválida ou falha na ligação</string>
     <string name="streams_plugin_repository_fallback">Repositório de plugins</string>
     <string name="submit_intro_action">Enviar introdução</string>
     <string name="submit_intro_button_submit">Enviar</string>

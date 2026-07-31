@@ -493,8 +493,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio se connecte à TorBox pour l’authentification du compte, l’accès à la cloud library, les vérifications de cache et les fonctionnalités de lecture cloud. Nuvio n’est ni affilié ni approuvé par TorBox.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio utilise MDBList pour les notes et les données de scores externes. Nuvio n’est ni affilié ni approuvé par MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio utilise l’API IntroDB pour les timestamps d’intro, de récap, de générique et d’aperçu fournis par la communauté et utilisés par les contrôles de saut. Nuvio n’est ni affilié ni approuvé par IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio utilise l’API SkipDB pour les timestamps d’intro, de récap, de générique et d’aperçu fournis par la communauté et utilisés par les contrôles de saut. Nuvio n’est ni affilié ni approuvé par SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Utilisé pour la lecture sur les builds iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Le code source MPVKit seul est distribué sous LGPL v3.0. Les bundles MPVKit, y compris les bibliothèques libmpv et FFmpeg, sont également distribués sous LGPL v3.0.</string>
@@ -851,8 +851,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Saisissez votre ID client API AnimeSkip. Obtenez-en un sur anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Activer la soumission d’intro</string>
     <string name="settings_playback_intro_submit_enabled_description">Affiche un bouton pour soumettre des timestamps d’intro/outro à la base de données communautaire.</string>
-    <string name="settings_playback_introdb_api_key">Clé API IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Saisissez votre clé API IntroDB pour soumettre des timestamps. Requise pour la soumission.</string>
+    <string name="settings_playback_skipdb_api_key">Clé API SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Saisissez votre clé API SkipDB pour soumettre des timestamps. Requise pour la soumission.</string>
     <string name="settings_playback_anime_skip_description">Rechercher également des marqueurs de saut sur AnimeSkip (nécessite un ID client).</string>
     <string name="settings_playback_auto_play_next_episode">Lecture automatique de l’épisode suivant</string>
     <string name="settings_playback_auto_play_next_episode_description">Rechercher et lire automatiquement l’épisode suivant lorsque le seuil est atteint.</string>
@@ -1782,8 +1782,8 @@
     <string name="collections_editor_media_series_suffix">Séries</string>
     <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">La cloud library est désactivée.</string>
-    <!-- IntroDB settings -->
-    <string name="settings_playback_introdb_invalid_api_key">Clé API invalide ou échec de connexion</string>
+    <!-- SkipDB settings -->
+    <string name="settings_playback_skipdb_invalid_api_key">Clé API invalide ou échec de connexion</string>
     <!-- TMDB placeholders & trakt status (restored after cherry-pick) -->
     <string name="collections_editor_tmdb_country_placeholder">US, KR, JP, IN</string>
     <string name="collections_editor_tmdb_date_from_placeholder">2020-01-01</string>
@@ -1899,7 +1899,7 @@
     <string name="plugins_test_results_count">Résultats du test (%1$d)</string>
     <string name="plugins_tmdb_required_message">Les fournisseurs de plugins nécessitent une clé API TMDB. Configurez-la dans l’écran TMDB, sinon les fournisseurs ne fonctionneront pas correctement.</string>
     <string name="search_error_no_results_for_catalog">Aucun résultat de recherche pour %1$s.</string>
-    <string name="settings_playback_introdb_invalid_key">Clé API invalide ou échec de connexion</string>
+    <string name="settings_playback_skipdb_invalid_key">Clé API invalide ou échec de connexion</string>
     <string name="streams_plugin_repository_fallback">Dépôt de plugin</string>
     <string name="submit_intro_action">Soumettre l’intro</string>
     <string name="submit_intro_button_submit">Soumettre</string>

@@ -1303,8 +1303,8 @@
   <string name="settings_licenses_attributions_torbox_body">Nuvio si connette a TorBox per l'autenticazione dell'account, l'accesso alla libreria cloud, i controlli della cache e le funzioni di riproduzione in cloud. Nuvio non è affiliato né approvato da TorBox.</string>
   <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
   <string name="settings_licenses_attributions_mdblist_body">Nuvio utilizza MDBList per valutazioni e dati di fornitori di punteggi esterni. Nuvio non è affiliato né approvato da MDBList.</string>
-  <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-  <string name="settings_licenses_attributions_introdb_body">Nuvio utilizza l'API di IntroDB per i timestamp di intro, riassunti, titoli di coda e anteprime forniti dalla community e utilizzati dai controlli di salto. Nuvio non è affiliato né approvato da IntroDB.</string>
+  <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+  <string name="settings_licenses_attributions_skipdb_body">Nuvio utilizza l'API di SkipDB per i timestamp di intro, riassunti, titoli di coda e anteprime forniti dalla community e utilizzati dai controlli di salto. Nuvio non è affiliato né approvato da SkipDB.</string>
   <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
   <string name="settings_licenses_attributions_mpvkit_body">Utilizzato per la riproduzione sulle build iOS.</string>
   <string name="settings_licenses_attributions_mpvkit_license">Il solo sorgente di MPVKit è rilasciato sotto licenza LGPL v3.0. Anche i pacchetti di MPVKit, incluse le librerie libmpv e FFmpeg, sono rilasciati sotto licenza LGPL v3.0.</string>
@@ -1406,8 +1406,8 @@
   <string name="settings_meta_blur_unwatched_episodes_description">Sfoca le miniature degli episodi finché non vengono visti per evitare spoiler.</string>
   <string name="settings_playback_intro_submit_enabled">Abilita invio intro</string>
   <string name="settings_playback_intro_submit_enabled_description">Mostra un pulsante per inviare i timestamp di intro/sigle finali al database della community.</string>
-  <string name="settings_playback_introdb_api_key">Chiave API IntroDB</string>
-  <string name="settings_playback_introdb_api_key_description">Inserisci la tua chiave API IntroDB per inviare i timestamp. Richiesta per l'invio.</string>
+  <string name="settings_playback_skipdb_api_key">Chiave API SkipDB</string>
+  <string name="settings_playback_skipdb_api_key_description">Inserisci la tua chiave API SkipDB per inviare i timestamp. Richiesta per l'invio.</string>
   <string name="settings_playback_external_player">Lettore esterno</string>
   <string name="settings_playback_external_player_app">App lettore esterno</string>
   <string name="settings_playback_external_player_description_android">Apri la nuova riproduzione con l'app video predefinita di Android o con il selettore di sistema.</string>
@@ -1807,7 +1807,7 @@
   <string name="collections_editor_media_movies_suffix">Film</string>
   <string name="collections_editor_media_series_suffix">Serie</string>
   <string name="cloud_library_playback_disabled">La libreria cloud è disabilitata.</string>
-  <string name="settings_playback_introdb_invalid_api_key">Chiave API non valida o connessione non riuscita</string>
+  <string name="settings_playback_skipdb_invalid_api_key">Chiave API non valida o connessione non riuscita</string>
   <string name="addons_manifest_missing_field">Nel manifest manca "%1$s"</string>
   <string name="collections_editor_tmdb_collection_title_format">Collezione TMDB %1$s</string>
   <string name="collections_editor_tmdb_director_title_format">Regista TMDB %1$s</string>
@@ -1905,7 +1905,7 @@
   <string name="plugins_test_results_count">Risultati del test (%1$d)</string>
   <string name="plugins_tmdb_required_message">I provider dei plugin richiedono una chiave API TMDB. Impostala nella schermata TMDB, altrimenti i provider non funzioneranno correttamente.</string>
   <string name="search_error_no_results_for_catalog">Nessun risultato di ricerca restituito per %1$s.</string>
-  <string name="settings_playback_introdb_invalid_key">Chiave API non valida o connessione non riuscita</string>
+  <string name="settings_playback_skipdb_invalid_key">Chiave API non valida o connessione non riuscita</string>
   <string name="streams_plugin_repository_fallback">Repository di plugin</string>
   <string name="submit_intro_action">Invia intro</string>
   <string name="submit_intro_button_submit">Invia</string>

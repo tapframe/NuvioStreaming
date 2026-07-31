@@ -436,8 +436,8 @@
     <string name="settings_licenses_attributions_trakt_body">O Nuvio conecta-se ao Trakt para autenticação de conta, histórico de assistidos, sincronização de progresso, dados da biblioteca, classificações, listas e comentários. O Nuvio não é afiliado ou endossado pelo Trakt.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">O Nuvio usa o MDBList para classificações e dados de provedores externos de pontuação. O Nuvio não é afiliado ou endossado pelo MDBList.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">O Nuvio usa a API do IntroDB para timestamps de intro, recapitulação, créditos e prévia fornecidos pela comunidade, usados pelos controles de pular. O Nuvio não é afiliado ou endossado pelo IntroDB.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">O Nuvio usa a API do SkipDB para timestamps de intro, recapitulação, créditos e prévia fornecidos pela comunidade, usados pelos controles de pular. O Nuvio não é afiliado ou endossado pelo SkipDB.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Usado para reprodução em builds para iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">O código-fonte do MPVKit isolado é licenciado sob LGPL v3.0. Os bundles do MPVKit, incluindo bibliotecas libmpv e FFmpeg, também são licenciados sob LGPL v3.0.</string>
@@ -725,8 +725,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Insira seu client ID da API do AnimeSkip. Obtenha um em anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Ativar Envio de Intro</string>
     <string name="settings_playback_intro_submit_enabled_description">Mostrar um botão para enviar timestamps de intro/outro para o banco de dados da comunidade.</string>
-    <string name="settings_playback_introdb_api_key">Chave de API do IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Insira sua chave de API do IntroDB para enviar timestamps. Necessário para envio.</string>
+    <string name="settings_playback_skipdb_api_key">Chave de API do SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Insira sua chave de API do SkipDB para enviar timestamps. Necessário para envio.</string>
     <string name="settings_playback_anime_skip_description">Também buscar no AnimeSkip por timestamps de pular (requer client ID).</string>
     <string name="settings_playback_auto_play_next_episode">Reproduzir Próximo Episódio Automaticamente</string>
     <string name="settings_playback_auto_play_next_episode_description">Iniciar próximo episódio automaticamente quando o prompt aparecer.</string>
@@ -808,7 +808,7 @@
     <string name="settings_playback_show_loading_overlay">Overlay de Carregamento</string>
     <string name="settings_playback_show_loading_overlay_description">Mostrar tela de carregamento até o primeiro quadro de vídeo aparecer.</string>
     <string name="settings_playback_skip_intro_outro_recap">Pular Intro</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Usar introdb.app para detectar intros e recapitulações.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Usar skipdb.tv para detectar intros e recapitulações.</string>
     <string name="settings_playback_source_scope">Escopo de Fonte para Reprodução Automática</string>
     <string name="settings_playback_source_scope_all_addons">Todos os addons instalados</string>
     <string name="settings_playback_source_scope_all_addons_description">Reprodução automática considera apenas streams vindas de seus addons instalados.</string>

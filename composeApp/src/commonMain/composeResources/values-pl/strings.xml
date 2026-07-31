@@ -451,8 +451,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio łączy się z TorBox w celu uwierzytelniania konta, dostępu do biblioteki w chmurze, sprawdzania pamięci podręcznej i odtwarzania z chmury. Nuvio nie jest powiązane z TorBox ani przez nie wspierane.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio korzysta z MDBList do ocen i danych zewnętrznych dostawców ocen. Nuvio nie jest powiązane z MDBList ani przez nie wspierane.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio korzysta z API IntroDB do dostarczanych przez społeczność znaczników intro, podsumowań, napisów końcowych i podglądów używanych przez kontrolki pomijania. Nuvio nie jest powiązane z IntroDB ani przez nie wspierane.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio korzysta z API SkipDB do dostarczanych przez społeczność znaczników intro, podsumowań, napisów końcowych i podglądów używanych przez kontrolki pomijania. Nuvio nie jest powiązane z SkipDB ani przez nie wspierane.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Używany do odtwarzania w wersjach na iOS.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Kod źródłowy MPVKit jest licencjonowany na podstawie LGPL v3.0. Pakiety MPVKit, w tym biblioteki libmpv i FFmpeg, są również licencjonowane na podstawie LGPL v3.0.</string>
@@ -762,8 +762,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Wprowadź ID klienta API AnimeSkip. Pobierz je na anime-skip.com.</string>
     <string name="settings_playback_intro_submit_enabled">Włącz przesyłanie intro</string>
     <string name="settings_playback_intro_submit_enabled_description">Pokaż przycisk do przesyłania znaczników intro/outro do bazy społeczności.</string>
-    <string name="settings_playback_introdb_api_key">Klucz API IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Wprowadź klucz API IntroDB, aby przesyłać znaczniki czasowe. Wymagany do przesyłania.</string>
+    <string name="settings_playback_skipdb_api_key">Klucz API SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Wprowadź klucz API SkipDB, aby przesyłać znaczniki czasowe. Wymagany do przesyłania.</string>
     <string name="settings_playback_anime_skip_description">Wyszukuj również w AnimeSkip znaczniki pomijania (wymaga ID klienta).</string>
     <string name="settings_playback_auto_play_next_episode">Automatyczne odtwarzanie następnego odcinka</string>
     <string name="settings_playback_auto_play_next_episode_description">Automatycznie znajdź i odtwórz następny odcinek po osiągnięciu progu.</string>
@@ -1771,8 +1771,8 @@
     <string name="settings_p2p_subtitle">Zezwalaj na strumienie peer-to-peer (torrent)</string>
     <string name="settings_p2p_title">Strumieniowanie P2P</string>
     <string name="settings_playback_section_p2p">STRUMIENIOWANIE P2P</string>
-    <string name="settings_playback_introdb_invalid_api_key">Nieprawidłowy klucz API lub błąd połączenia</string>
-    <string name="settings_playback_introdb_invalid_key">Nieprawidłowy klucz API lub błąd połączenia</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Nieprawidłowy klucz API lub błąd połączenia</string>
+    <string name="settings_playback_skipdb_invalid_key">Nieprawidłowy klucz API lub błąd połączenia</string>
     <string name="settings_playback_ios_audio_output">Wyjście audio</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Użyj starszego wyjścia AudioUnit.</string>
     <string name="settings_playback_ios_audio_output_auto_desc">Użyj AudioUnit, gdy wyjście AVFoundation jest tymczasowo wyłączone.</string>

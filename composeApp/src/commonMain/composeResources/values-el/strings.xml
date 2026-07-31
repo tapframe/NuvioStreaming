@@ -1729,8 +1729,8 @@
     <string name="settings_licenses_attributions_exoplayer_title">AndroidX Media3 ExoPlayer 1.8.0</string>
     <string name="settings_licenses_attributions_imdb_body">Το Nuvio χρησιμοποιεί τα IMDb Non-Commercial Datasets, συμπεριλαμβανομένου του title.ratings.tsv.gz, για βαθμολογίες και αριθμό ψήφων IMDb. Πληροφορίες με ευγενική παραχώρηση του IMDb (https://www.imdb.com). Χρησιμοποιείται κατόπιν άδειας. Τα δεδομένα IMDb προορίζονται για προσωπική και μη εμπορική χρήση σύμφωνα με τους όρους του IMDb.</string>
     <string name="settings_licenses_attributions_imdb_title">IMDb Non-Commercial Datasets</string>
-    <string name="settings_licenses_attributions_introdb_body">Το Nuvio χρησιμοποιεί το API του IntroDB για δεδομένα intro, ανακεφαλαίωσης, τίτλων τέλους και προεπισκόπησης χρονοσημάνσεων από την κοινότητα, τα οποία χρησιμοποιούνται από τα χειριστήρια παράλειψης. Το Nuvio δεν σχετίζεται με το IntroDB ούτε έχει την υποστήριξή του.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Το Nuvio χρησιμοποιεί το API του SkipDB για δεδομένα intro, ανακεφαλαίωσης, τίτλων τέλους και προεπισκόπησης χρονοσημάνσεων από την κοινότητα, τα οποία χρησιμοποιούνται από τα χειριστήρια παράλειψης. Το Nuvio δεν σχετίζεται με το SkipDB ούτε έχει την υποστήριξή του.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
     <string name="settings_licenses_attributions_mdblist_body">Το Nuvio χρησιμοποιεί το MDBList για βαθμολογίες και δεδομένα από εξωτερικούς παρόχους βαθμολόγησης. Το Nuvio δεν σχετίζεται με το MDBList ούτε έχει την υποστήριξή του.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mpvkit_body">Χρησιμοποιείται για αναπαραγωγή σε εκδόσεις iOS.</string>
@@ -1789,10 +1789,10 @@
     <string name="settings_playback_external_player_send_skip_segments_description">Προώθηση των επιλυμένων χρονοσημάνσεων intro και outro στον εξωτερικό player για αυτόματη παράλειψη. Λειτουργεί μόνο σε players που το υποστηρίζουν· άλλοι players το αγνοούν.</string>
     <string name="settings_playback_intro_submit_enabled">Ενεργοποίηση υποβολής intro</string>
     <string name="settings_playback_intro_submit_enabled_description">Εμφάνιση κουμπιού για υποβολή χρονοσημάνσεων intro/outro στη βάση δεδομένων της κοινότητας.</string>
-    <string name="settings_playback_introdb_api_key">Κλειδί API IntroDB</string>
-    <string name="settings_playback_introdb_api_key_description">Εισαγάγετε το κλειδί API του IntroDB για να υποβάλλετε χρονοσημάνσεις. Απαιτείται για υποβολή.</string>
-    <string name="settings_playback_introdb_invalid_api_key">Μη έγκυρο κλειδί API ή η σύνδεση απέτυχε</string>
-    <string name="settings_playback_introdb_invalid_key">Μη έγκυρο κλειδί API ή η σύνδεση απέτυχε</string>
+    <string name="settings_playback_skipdb_api_key">Κλειδί API SkipDB</string>
+    <string name="settings_playback_skipdb_api_key_description">Εισαγάγετε το κλειδί API του SkipDB για να υποβάλλετε χρονοσημάνσεις. Απαιτείται για υποβολή.</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Μη έγκυρο κλειδί API ή η σύνδεση απέτυχε</string>
+    <string name="settings_playback_skipdb_invalid_key">Μη έγκυρο κλειδί API ή η σύνδεση απέτυχε</string>
     <string name="settings_playback_ios_audio_output">Ήχος output</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Χρήση της παλαιότερης εξόδου AudioUnit.</string>
     <string name="settings_playback_ios_audio_output_auto_desc">Χρήση AudioUnit ενώ η έξοδος AVFoundation είναι προσωρινά απενεργοποιημένη.</string>

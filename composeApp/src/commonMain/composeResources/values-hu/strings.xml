@@ -429,8 +429,8 @@
     <string name="settings_licenses_attributions_trakt_body">A Nuvio a Trakthoz kapcsolódik a fiókhitelesítés, a megtekintési előzmények, a folyamat-szinkronizálás, a könyvtáradatok, az értékelések, a listák és a hozzászólások kezeléséhez. A Nuvio nem áll kapcsolatban a Trakttal, és a Trakt nem támogatja azt.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">A Nuvio az MDBList-et használja az értékelésekhez és a külső pontszám-szolgáltatók adataihoz. A Nuvio nem áll kapcsolatban az MDBListtel, és az MDBList nem támogatja azt.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">A Nuvio az IntroDB API-t használja a közösség által beküldött intró, összefoglaló (recap), stáblista és előzetes időbélyegekhez, amelyeket a kihagyás vezérlők használnak. A Nuvio nem áll kapcsolatban az IntroDB-vel, és az IntroDB nem támogatja azt.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">A Nuvio az SkipDB API-t használja a közösség által beküldött intró, összefoglaló (recap), stáblista és előzetes időbélyegekhez, amelyeket a kihagyás vezérlők használnak. A Nuvio nem áll kapcsolatban az SkipDB-vel, és az SkipDB nem támogatja azt.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">Lejátszáshoz használatos az iOS buildjelemeken.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Az MPVKit forráskódja önmagában az LGPL v3.0 szerint licencelt. Az MPVKit csomagok, beleértve a libmpv és FFmpeg könyvtárakat, szintén az LGPL v3.0 szerint licenceltek.</string>
@@ -715,8 +715,8 @@
     <string name="settings_playback_anime_skip_client_id_description">Add meg az AnimeSkip API ügyfél-azonosítódat (Client ID). Az anime-skip.com oldalon igényelhetsz egyet.</string>
     <string name="settings_playback_intro_submit_enabled">Intró beküldés engedélyezése</string>
     <string name="settings_playback_intro_submit_enabled_description">Gomb megjelenítése az intró/outró időbélyegek közösségi adatbázisba történő beküldéséhez.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB API-kulcs</string>
-    <string name="settings_playback_introdb_api_key_description">Add meg az IntroDB API-kulcsodat az időbélyegek beküldéséhez. A beküldéshez kötelező.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB API-kulcs</string>
+    <string name="settings_playback_skipdb_api_key_description">Add meg az SkipDB API-kulcsodat az időbélyegek beküldéséhez. A beküldéshez kötelező.</string>
     <string name="settings_playback_anime_skip_description">Keresés az AnimeSkip adatbázisában is a kihagyási időbélyegekért (ügyfél-azonosító szükséges).</string>
     <string name="settings_playback_auto_play_next_episode">Következő epizód automatikus lejátszása</string>
     <string name="settings_playback_auto_play_next_episode_description">A következő epizód automatikus indítása, amikor a felhívás megjelenik.</string>
@@ -796,7 +796,7 @@
     <string name="settings_playback_show_loading_overlay">Töltőképernyő megjelenítése</string>
     <string name="settings_playback_show_loading_overlay_description">Töltőképernyő mutatása az első videokocka megjelenéséig.</string>
     <string name="settings_playback_skip_intro_outro_recap">Intró kihagyása</string>
-    <string name="settings_playback_skip_intro_outro_recap_description">Az introdb.app használata az intrók és összefoglalók felismeréséhez.</string>
+    <string name="settings_playback_skip_intro_outro_recap_description">Az skipdb.tv használata az intrók és összefoglalók felismeréséhez.</string>
     <string name="settings_playback_source_scope">Automatikus lejátszás forrásköre</string>
     <string name="settings_playback_source_scope_all_addons">Minden telepített kiegészítő</string>
     <string name="settings_playback_source_scope_all_addons_description">Az automatikus lejátszás csak a telepített kiegészítőkből származó streameket veszi figyelembe.</string>
@@ -1752,7 +1752,7 @@
     <string name="collections_editor_media_movies_suffix">Filmek</string>
     <string name="collections_editor_media_series_suffix">Sorozatok</string>
     <string name="cloud_library_playback_disabled">A Felhő könyvtár le van tiltva.</string>
-    <string name="settings_playback_introdb_invalid_api_key">Érvénytelen API kulcs vagy a kapcsolódás meghiúsult</string>
+    <string name="settings_playback_skipdb_invalid_api_key">Érvénytelen API kulcs vagy a kapcsolódás meghiúsult</string>
     <string name="addons_manifest_missing_field">A manifestből hiányzik a(z) „%1$s” mező</string>
     <string name="collections_editor_tmdb_collection_title_format">%1$s. TMDB gyűjtemény</string>
     <string name="collections_editor_tmdb_director_title_format">%1$s. TMDB rendező</string>
@@ -1854,7 +1854,7 @@
     <string name="plugins_test_results_count">Teszt eredmények (%1$d)</string>
     <string name="plugins_tmdb_required_message">A szolgáltatói bővítményekhez TMDB API kulcs szükséges. Állítsd be a TMDB képernyőn, különben a bővítmények nem fognak megfelelően működni.</string>
     <string name="search_error_no_results_for_catalog">Nincs találat a(z) %1$s katalógusban.</string>
-    <string name="settings_playback_introdb_invalid_key">Érvénytelen API kulcs vagy a kapcsolódás meghiúsult</string>
+    <string name="settings_playback_skipdb_invalid_key">Érvénytelen API kulcs vagy a kapcsolódás meghiúsult</string>
     <string name="streams_plugin_repository_fallback">Bővítmény-tároló</string>
     <string name="submit_intro_action">Időbélyegek beküldése</string>
     <string name="submit_intro_button_submit">Beküldés</string>

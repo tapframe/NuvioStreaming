@@ -441,8 +441,8 @@
     <string name="settings_licenses_attributions_torbox_body">Nuvio; hesap doğrulama, bulut kitaplığı erişimi, önbellek kontrolleri ve bulut oynatma özellikleri için TorBox'a bağlanır. Nuvio'nun TorBox ile hiçbir bağı yoktur ve TorBox tarafından onaylanmamıştır.</string>
     <string name="settings_licenses_attributions_mdblist_title">MDBList</string>
     <string name="settings_licenses_attributions_mdblist_body">Nuvio; puanlar ve dış kaynak puan verileri için MDBList'i kullanır. Nuvio'nun MDBList ile hiçbir bağı yoktur ve MDBList tarafından onaylanmamıştır.</string>
-    <string name="settings_licenses_attributions_introdb_title">IntroDB</string>
-    <string name="settings_licenses_attributions_introdb_body">Nuvio; jenerik ve geçme kontrolleri tarafından kullanılan, topluluk tarafından sağlanan giriş, özet ve önizleme zaman damgaları için IntroDB API'sini kullanır. Nuvio'nun IntroDB ile hiçbir bağı yoktur ve IntroDB tarafından onaylanmamıştır.</string>
+    <string name="settings_licenses_attributions_skipdb_title">SkipDB</string>
+    <string name="settings_licenses_attributions_skipdb_body">Nuvio; jenerik ve geçme kontrolleri tarafından kullanılan, topluluk tarafından sağlanan giriş, özet ve önizleme zaman damgaları için SkipDB API'sini kullanır. Nuvio'nun SkipDB ile hiçbir bağı yoktur ve SkipDB tarafından onaylanmamıştır.</string>
     <string name="settings_licenses_attributions_mpvkit_title">MPVKit</string>
     <string name="settings_licenses_attributions_mpvkit_body">iOS sürümlerinde oynatma için kullanılır.</string>
     <string name="settings_licenses_attributions_mpvkit_license">Sadece MPVKit kaynak kodu LGPL v3.0 kapsamında lisanslanmıştır. libmpv ve FFmpeg kütüphanelerini içeren MPVKit paketleri de LGPL v3.0 kapsamında lisanslanmıştır.</string>
@@ -748,8 +748,8 @@
     <string name="settings_playback_anime_skip_client_id_description">AnimeSkip API client ID'ni gir. anime-skip.com üzerinden alabilirsin.</string>
     <string name="settings_playback_intro_submit_enabled">Giriş Geçme Gönderimini Aç</string>
     <string name="settings_playback_intro_submit_enabled_description">Giriş/jenerik zaman damgalarını topluluk veritabanına göndermek için bir buton göster.</string>
-    <string name="settings_playback_introdb_api_key">IntroDB API Anahtarı</string>
-    <string name="settings_playback_introdb_api_key_description">Zaman damgası göndermek için IntroDB API anahtarını gir. Gönderim için zorunludur.</string>
+    <string name="settings_playback_skipdb_api_key">SkipDB API Anahtarı</string>
+    <string name="settings_playback_skipdb_api_key_description">Zaman damgası göndermek için SkipDB API anahtarını gir. Gönderim için zorunludur.</string>
     <string name="settings_playback_anime_skip_description">Geçme zamanları için AnimeSkip'te de ara (client ID gerekir).</string>
     <string name="settings_playback_auto_play_next_episode">Sonraki bölümü otomatik oynat</string>
     <string name="settings_playback_auto_play_next_episode_description">Eşik değere ulaşılınca sonraki bölümü otomatik bulup oynat.</string>

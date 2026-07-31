@@ -7,7 +7,7 @@ internal enum class IntegrationLogo {
     Tmdb,
     Trakt,
     MdbList,
-    IntroDb,
+    SkipDb,
 }
 
 @Composable
