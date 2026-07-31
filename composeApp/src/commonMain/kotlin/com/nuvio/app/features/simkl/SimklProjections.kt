@@ -142,6 +142,26 @@ internal fun SimklSyncSnapshot.animeAlternateWatchedKeys(): Set<String> {
     return extraKeys
 }
 
+/**
+ * Builds watched keys under alternate content IDs for completed/watched movies.
+ * This allows entity browsers showing movies under tmdb: IDs to display watched badges
+ * even though the primary watched key uses an IMDB ID.
+ */
+internal fun SimklSyncSnapshot.movieAlternateWatchedKeys(): Set<String> {
+    val extraKeys = linkedSetOf<String>()
+    entries.forEach { entry ->
+        if (entry.mediaType != SimklMediaType.MOVIES) return@forEach
+        if (entry.lastWatchedAt == null && entry.status != SimklListStatus.COMPLETED) return@forEach
+        val media = entry.media ?: return@forEach
+        val contentId = media.canonicalContentId() ?: return@forEach
+        val alternateIds = media.alternateContentIds() - contentId
+        alternateIds.forEach { altId ->
+            extraKeys += watchedItemKey("movie", altId)
+        }
+    }
+    return extraKeys
+}
+
 internal fun SimklSyncSnapshot.toSimklProgressEntries(): List<WatchProgressEntry> =
     playback
         .mapNotNull(SimklPlaybackSession::toWatchProgressEntry)
