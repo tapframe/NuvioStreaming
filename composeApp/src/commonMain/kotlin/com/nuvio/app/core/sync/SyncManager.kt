@@ -142,21 +142,13 @@ internal enum class ProfileSyncRequestResult {
 }
 
 internal class ProfileSyncRequestGate {
-    private data class PendingRequest(
-        val scope: CoroutineScope,
-        val profileId: Int,
-        val block: suspend () -> Unit,
-    )
-
     private val lock = SynchronizedObject()
     private var activeProfileId: Int? = null
     private var activeJob: Job? = null
-    private var pendingRequest: PendingRequest? = null
 
     fun launch(
         scope: CoroutineScope,
         profileId: Int,
-        queueIfCoalesced: Boolean = false,
         block: suspend () -> Unit,
     ): ProfileSyncRequestResult {
         lateinit var newJob: Job
@@ -164,14 +156,10 @@ internal class ProfileSyncRequestGate {
         val result = synchronized(lock) {
             val active = activeJob?.takeUnless(Job::isCompleted)
             if (active != null && activeProfileId == profileId) {
-                if (queueIfCoalesced) {
-                    pendingRequest = PendingRequest(scope = scope, profileId = profileId, block = block)
-                }
                 return ProfileSyncRequestResult.Coalesced
             }
 
             previousJob = active
-            pendingRequest = null
             val requestResult = if (active == null) {
                 ProfileSyncRequestResult.Started
             } else {
@@ -184,22 +172,11 @@ internal class ProfileSyncRequestGate {
             activeProfileId = profileId
             activeJob = newJob
             newJob.invokeOnCompletion {
-                var pending: PendingRequest? = null
                 synchronized(lock) {
                     if (activeJob === newJob) {
                         activeJob = null
                         activeProfileId = null
-                        pending = pendingRequest
-                        pendingRequest = null
                     }
-                }
-                pending?.let { request ->
-                    launch(
-                        scope = request.scope,
-                        profileId = request.profileId,
-                        queueIfCoalesced = false,
-                        block = request.block,
-                    )
                 }
             }
             requestResult
@@ -215,7 +192,6 @@ internal class ProfileSyncRequestGate {
             activeJob.also {
                 activeJob = null
                 activeProfileId = null
-                pendingRequest = null
             }
         }
         job?.cancel()
@@ -363,7 +339,6 @@ object SyncManager {
     private fun startFullProfilePull(
         profileId: Int,
         reason: String,
-        queueIfCoalesced: Boolean = false,
     ) {
         val authState = AuthRepository.state.value
         if (authState !is AuthState.Authenticated || authState.isAnonymous) return
@@ -372,7 +347,6 @@ object SyncManager {
         val result = fullSyncRequestGate.launch(
             scope = accountScopeSnapshot(),
             profileId = profileId,
-            queueIfCoalesced = queueIfCoalesced,
         ) {
             val currentAuthState = AuthRepository.state.value
             if (currentAuthState !is AuthState.Authenticated || currentAuthState.isAnonymous) return@launch
@@ -481,49 +455,4 @@ object SyncManager {
         periodicNuvioSyncProfileId = null
     }
 
-    fun requestRealtimeSurfacePull(profileId: Int, surface: String) {
-        val authState = AuthRepository.state.value
-        if (authState !is AuthState.Authenticated || authState.isAnonymous) return
-
-        accountScopeSnapshot().launch {
-            log.i { "requestRealtimeSurfacePull($profileId, $surface)" }
-            when (surface) {
-                "addons" -> {
-                    runCatching { AddonRepository.pullFromServer(profileId) }
-                        .onFailure { log.e(it) { "Realtime addons pull failed" } }
-                }
-                "plugins" -> {
-                    if (AppFeaturePolicy.pluginsEnabled) {
-                        runCatching { PluginRepository.pullFromServer(profileId) }
-                            .onFailure { log.e(it) { "Realtime plugins pull failed" } }
-                    }
-                }
-                "library" -> {
-                    runCatching { LibraryRepository.pullFromServer(profileId) }
-                        .onFailure { log.e(it) { "Realtime library pull failed" } }
-                }
-                "watch_progress", "watched_items" -> {
-                    runCatching {
-                        WatchProgressSourceCoordinator.refreshActiveSource(profileId = profileId, force = false)
-                    }.onFailure { log.e(it) { "Realtime active watch source pull failed" } }
-                }
-                "profile_settings" -> {
-                    runCatching { ProfileSettingsSync.pull(profileId) }
-                        .onFailure { log.e(it) { "Realtime profile settings pull failed" } }
-                }
-                "collections" -> {
-                    runCatching { CollectionSyncService.pullFromServer(profileId) }
-                        .onFailure { log.e(it) { "Realtime collections pull failed" } }
-                }
-                "home_catalog_settings" -> {
-                    runCatching { HomeCatalogSettingsSyncService.pullFromServer(profileId) }
-                        .onFailure { log.e(it) { "Realtime home catalog settings pull failed" } }
-                }
-                "profiles" -> {
-                    runCatching { ProfileRepository.pullProfiles() }
-                        .onFailure { log.e(it) { "Realtime profiles pull failed" } }
-                }
-            }
-        }
-    }
 }
