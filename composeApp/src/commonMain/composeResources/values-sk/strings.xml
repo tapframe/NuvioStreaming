@@ -1556,12 +1556,12 @@
     <string name="notifications_episode_release_body_title">%1$s je teraz dostupný</string>
     <string name="notifications_channel_episode_releases_name">Vydania epizód</string>
     <string name="parental_alcohol">Alkohol/Drogy</string>
-    <string name="parental_frightening">Desivé</string>
+    <string name="parental_frightening">Strašidelnosť</string>
     <string name="parental_nudity">Nahota</string>
     <string name="parental_profanity">Vulgárny jazyk</string>
-    <string name="parental_severity_mild">Mierny</string>
-    <string name="parental_severity_moderate">Stredný</string>
-    <string name="parental_severity_severe">Závažný</string>
+    <string name="parental_severity_mild">Nízke</string>
+    <string name="parental_severity_moderate">Mierne</string>
+    <string name="parental_severity_severe">Intenzívne</string>
     <string name="parental_violence">Násilie</string>
     <string name="person_role_creator">Tvorca</string>
     <string name="person_role_director">Režisér</string>
