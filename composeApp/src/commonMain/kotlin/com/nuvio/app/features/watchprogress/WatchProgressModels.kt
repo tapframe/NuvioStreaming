@@ -3,15 +3,17 @@ package com.nuvio.app.features.watchprogress
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryProviderPosterUrl
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.tracking.TrackingAttributedItem
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.Serializable
 
 internal const val WatchProgressCompletionPercentThreshold = 90f
-internal const val WatchProgressTraktPlaybackNextUpSeedPercentThreshold = 95f
 internal const val WatchProgressSourceLocal = "local"
 internal const val WatchProgressSourceTraktPlayback = "trakt_playback"
 internal const val WatchProgressSourceTraktHistory = "trakt_history"
 internal const val WatchProgressSourceTraktShowProgress = "trakt_show_progress"
+internal const val WatchProgressSourceSimklPlayback = "simkl_playback"
 
 @Serializable
 enum class ContinueWatchingSectionStyle {
@@ -53,9 +55,15 @@ data class WatchProgressEntry(
     val isCompleted: Boolean = false,
     val progressPercent: Float? = null,
     val source: String = WatchProgressSourceLocal,
+    override val trackingProviderId: String? = null,
+    override val trackingProviderItemId: String? = null,
+    override val trackingSourceUrl: String? = null,
     /** Stable server/storage identity. [videoId] remains the playback identity. */
     val progressKey: String? = null,
-) {
+) : TrackingAttributedItem {
+    override val trackingContentId: String
+        get() = parentMetaId
+
     val normalizedProgressPercent: Float?
         get() = progressPercent?.coerceIn(0f, 100f)
 
@@ -124,7 +132,9 @@ data class WatchProgressEntry(
 }
 
 data class WatchProgressUiState(
+    val source: WatchProgressSource = WatchProgressSource.NUVIO_SYNC,
     val entries: List<WatchProgressEntry> = emptyList(),
+    val hiddenContentIds: Set<String> = emptySet(),
     val hasLoadedRemoteProgress: Boolean = false,
 ) {
     val byProgressKey: Map<String, WatchProgressEntry>

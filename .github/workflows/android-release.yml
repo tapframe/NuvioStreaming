@@ -1,0 +1,193 @@
+name: Build Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Build only, create a draft, or publish the release
+        required: true
+        type: choice
+        options:
+          - dry-run
+          - draft
+          - publish
+        default: dry-run
+      exclude_commits:
+        description: Optional comma-separated commit hashes to omit from the notes
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: ${{ inputs.mode }} Android release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read release metadata
+        id: release
+        run: ./scripts/release-metadata.sh "${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate release state
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          CURRENT_BUMP: ${{ steps.release.outputs.current_bump }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.release_commit }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_MODE: ${{ inputs.mode }}
+        run: |
+          if [[ "${RELEASE_REF_TYPE}" != "branch" ]]; then
+            echo "Releases must be dispatched from a branch, not ${RELEASE_REF_TYPE}." >&2
+            exit 1
+          fi
+
+          if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            echo "Tag ${RELEASE_TAG} already exists." >&2
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
+            exit 1
+          fi
+
+          unexpected_changes="$(
+            git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
+              | grep -Ev '^(\.github/workflows/android-release\.yml|scripts/(generate-release-notes|release-metadata)\.sh)$' \
+              || true
+          )"
+          if [[ -n "${unexpected_changes}" ]]; then
+            echo "The version bump must be the final application change before release." >&2
+            echo "Unexpected files changed after the bump:" >&2
+            echo "${unexpected_changes}" >&2
+            exit 1
+          fi
+
+          if [[ "${RELEASE_MODE}" != "dry-run" ]]; then
+            required_secrets=(
+              RELEASE_PROPERTIES_BASE64
+              RELEASE_KEYSTORE_BASE64
+            )
+            missing=()
+            for secret_name in "${required_secrets[@]}"; do
+              if [[ -z "${!secret_name}" ]]; then
+                missing+=("${secret_name}")
+              fi
+            done
+            if (( ${#missing[@]} > 0 )); then
+              printf 'Missing required release secrets: %s\n' "${missing[*]}" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Generate release notes
+        env:
+          PREVIOUS_BUMP: ${{ steps.release.outputs.previous_bump }}
+          CURRENT_BUMP: ${{ steps.release.outputs.current_bump }}
+          EXCLUDE_COMMITS: ${{ inputs.exclude_commits }}
+        run: |
+          ./scripts/generate-release-notes.sh \
+            --from "${PREVIOUS_BUMP}" \
+            --to "${CURRENT_BUMP}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --exclude "${EXCLUDE_COMMITS}" \
+            > release-notes.md
+
+          if [[ ! -s release-notes.md ]]; then
+            echo "No release-note commits were found." >&2
+            exit 1
+          fi
+
+          {
+            echo "## ${{ steps.release.outputs.version }} release notes"
+            echo
+            cat release-notes.md
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Set up Java
+        if: inputs.mode != 'dry-run'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        if: inputs.mode != 'dry-run'
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Configure release properties
+        if: inputs.mode != 'dry-run'
+        run: |
+          keystore_path="${RUNNER_TEMP}/nuvio-release.jks"
+          printf '%s' "${RELEASE_KEYSTORE_BASE64}" | base64 --decode > "${keystore_path}"
+          printf '%s' "${RELEASE_PROPERTIES_BASE64}" | base64 --decode > local.properties
+
+          # These paths only apply to the machine where local.properties was encoded.
+          sed -i -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          printf '\nNUVIO_RELEASE_STORE_FILE=%s\n' "${keystore_path}" >> local.properties
+
+          required_properties=(
+            NUVIO_RELEASE_STORE_PASSWORD
+            NUVIO_RELEASE_KEY_ALIAS
+            NUVIO_RELEASE_KEY_PASSWORD
+            TRAKT_CLIENT_ID
+            TRAKT_CLIENT_SECRET
+          )
+          for property_name in "${required_properties[@]}"; do
+            if ! grep -Eq "^${property_name}=.+" local.properties; then
+              echo "Missing required property: ${property_name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build full release APKs
+        if: inputs.mode != 'dry-run'
+        run: ./gradlew :androidApp:assembleFullRelease --stacktrace
+
+      - name: Upload build artifacts
+        if: inputs.mode != 'dry-run'
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuvio-${{ steps.release.outputs.version }}-full-release
+          path: androidApp/build/outputs/apk/full/release/*.apk
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: inputs.mode != 'dry-run'
+        env:
+          RELEASE_MODE: ${{ inputs.mode }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          mapfile -t release_apks < <(find androidApp/build/outputs/apk/full/release -maxdepth 1 -type f -name '*.apk' -print | sort)
+          if (( ${#release_apks[@]} == 0 )); then
+            echo "No release APKs were produced." >&2
+            exit 1
+          fi
+
+          release_args=(
+            "${RELEASE_TAG}"
+            --target "${RELEASE_BRANCH}"
+            --title "${RELEASE_VERSION}"
+            --notes-file release-notes.md
+          )
+          if [[ "${RELEASE_MODE}" == "draft" ]]; then
+            release_args+=(--draft)
+          fi
+          gh release create "${release_args[@]}" "${release_apks[@]}"

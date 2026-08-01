@@ -16,7 +16,7 @@ import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.TraktRelatedRepository
-import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.trakt.shouldUseTraktMoreLikeThis
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CancellationException
@@ -408,15 +408,15 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         fallbackItemType: String,
     ): MetaDetails {
-        TraktSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
         TraktAuthRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
 
-        val traktSettings = TraktSettingsRepository.uiState.value
+        val trackingSettings = TrackingSettingsRepository.uiState.value
         val isTraktAuthenticated = TraktAuthRepository.uiState.value.mode == TraktConnectionMode.CONNECTED
         val shouldUseTrakt = shouldUseTraktMoreLikeThis(
             isAuthenticated = isTraktAuthenticated,
-            source = traktSettings.moreLikeThisSource,
+            source = trackingSettings.moreLikeThisSource,
         ) && supportsMoreLikeThis(meta, fallbackItemType)
 
         if (shouldUseTrakt) {
@@ -466,32 +466,32 @@ object MetaDetailsRepository {
     }
 
     private fun shouldApplyMoreLikeThisSource(meta: MetaDetails): Boolean {
-        TraktSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
         TraktAuthRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
 
-        val traktSettings = TraktSettingsRepository.uiState.value
+        val trackingSettings = TrackingSettingsRepository.uiState.value
         val isTraktAuthenticated = TraktAuthRepository.uiState.value.mode == TraktConnectionMode.CONNECTED
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         return shouldUseTraktMoreLikeThis(
             isAuthenticated = isTraktAuthenticated,
-            source = traktSettings.moreLikeThisSource,
+            source = trackingSettings.moreLikeThisSource,
         ) || !tmdbSettings.enabled || !tmdbSettings.useMoreLikeThis || meta.moreLikeThisSource == null && meta.moreLikeThis.isNotEmpty()
     }
 
     private fun buildMetaScreenSettingsFingerprint(
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
     ): String {
-        TraktSettingsRepository.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
         TraktAuthRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
         val providers = settings.enabledProvidersInPriorityOrder().joinToString(",")
-        val traktSettings = TraktSettingsRepository.uiState.value
+        val trackingSettings = TrackingSettingsRepository.uiState.value
         val traktAuthMode = TraktAuthRepository.uiState.value.mode
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         return buildString {
             append("${settings.enabled}:${settings.apiKey.trim()}:$providers")
-            append("|more_like=${traktSettings.moreLikeThisSource}:$traktAuthMode")
+            append("|more_like=${trackingSettings.moreLikeThisSource}:$traktAuthMode")
             append("|tmdb=${tmdbSettings.enabled}:${tmdbSettings.useMoreLikeThis}:${tmdbSettings.hasApiKey}:${tmdbSettings.language}")
         }
     }

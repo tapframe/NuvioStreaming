@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -318,7 +317,6 @@ fun SearchScreen(
                         items(2) {
                             HomeSkeletonRow(
                                 modifier = Modifier.padding(horizontal = homeSectionPadding),
-                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
                             )
                         }
                     }
@@ -327,7 +325,6 @@ fun SearchScreen(
                         items(2) {
                             HomeSkeletonRow(
                                 modifier = Modifier.padding(horizontal = homeSectionPadding),
-                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
                             )
                         }
                     }
@@ -371,7 +368,6 @@ fun SearchScreen(
                             item(key = "search_loading_more") {
                                 HomeSkeletonRow(
                                     modifier = Modifier.padding(horizontal = homeSectionPadding),
-                                    showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
                                 )
                             }
                         }
@@ -481,21 +477,6 @@ private fun SearchRecentRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(999.dp),
-                )
-                .padding(8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.History,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         Text(
             text = query,
             modifier = Modifier.weight(1f),

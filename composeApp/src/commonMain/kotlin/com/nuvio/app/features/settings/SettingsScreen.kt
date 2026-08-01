@@ -71,11 +71,13 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.AndroidLibmpvVideoOutput
 import com.nuvio.app.features.player.AndroidPlaybackEngine
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.simkl.SimklAuthRepository
+import com.nuvio.app.features.simkl.SimklAuthUiState
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
-import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.TraktSettingsUiState
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
+import com.nuvio.app.features.tracking.TrackingSettingsUiState
 import com.nuvio.app.features.tmdb.TmdbSettings
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
@@ -172,13 +174,17 @@ fun SettingsScreen(
             TraktAuthRepository.ensureLoaded()
             TraktAuthRepository.uiState
         }.collectAsStateWithLifecycle()
+        val simklAuthUiState by remember {
+            SimklAuthRepository.ensureLoaded()
+            SimklAuthRepository.uiState
+        }.collectAsStateWithLifecycle()
         val traktCommentsEnabled by remember {
             TraktCommentsSettings.ensureLoaded()
             TraktCommentsSettings.enabled
         }.collectAsStateWithLifecycle()
-        val traktSettingsUiState by remember {
-            TraktSettingsRepository.ensureLoaded()
-            TraktSettingsRepository.uiState
+        val trackingSettingsUiState by remember {
+            TrackingSettingsRepository.ensureLoaded()
+            TrackingSettingsRepository.uiState
         }.collectAsStateWithLifecycle()
         val addonsUiState by remember {
             AddonRepository.initialize()
@@ -400,12 +406,12 @@ fun SettingsScreen(
                 mdbListSettings = mdbListSettings,
                 debridSettings = debridSettings,
                 traktAuthUiState = traktAuthUiState,
+                simklAuthUiState = simklAuthUiState,
                 traktCommentsEnabled = traktCommentsEnabled,
-                traktSettingsUiState = traktSettingsUiState,
+                trackingSettingsUiState = trackingSettingsUiState,
                 homescreenHeroEnabled = homescreenSettingsUiState.heroEnabled,
                 homescreenShowCatalogType = homescreenSettingsUiState.showCatalogType,
                 homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
-                homescreenHideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
                 homescreenItems = homescreenSettingsUiState.items,
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
@@ -461,12 +467,12 @@ fun SettingsScreen(
                 mdbListSettings = mdbListSettings,
                 debridSettings = debridSettings,
                 traktAuthUiState = traktAuthUiState,
+                simklAuthUiState = simklAuthUiState,
                 traktCommentsEnabled = traktCommentsEnabled,
-                traktSettingsUiState = traktSettingsUiState,
+                trackingSettingsUiState = trackingSettingsUiState,
                 homescreenHeroEnabled = homescreenSettingsUiState.heroEnabled,
                 homescreenShowCatalogType = homescreenSettingsUiState.showCatalogType,
                 homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
-                homescreenHideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
                 homescreenItems = homescreenSettingsUiState.items,
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
@@ -532,12 +538,12 @@ private fun MobileSettingsScreen(
     mdbListSettings: MdbListSettings,
     debridSettings: DebridSettings,
     traktAuthUiState: TraktAuthUiState,
+    simklAuthUiState: SimklAuthUiState,
     traktCommentsEnabled: Boolean,
-    traktSettingsUiState: TraktSettingsUiState,
+    trackingSettingsUiState: TrackingSettingsUiState,
     homescreenHeroEnabled: Boolean,
     homescreenShowCatalogType: Boolean,
     homescreenHideUnreleasedContent: Boolean,
-    homescreenHideCatalogUnderline: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
@@ -664,7 +670,7 @@ private fun MobileSettingsScreen(
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
                             onContentDiscoveryClick = { onPageChange(SettingsPage.ContentDiscovery) },
                             onIntegrationsClick = { onPageChange(SettingsPage.Integrations) },
-                            onTraktClick = { onPageChange(SettingsPage.TraktAuthentication) },
+                            onTrackingClick = { onPageChange(SettingsPage.TraktAuthentication) },
                             onSupportersContributorsClick = onSupportersContributorsClick,
                             onLicensesAttributionsClick = onLicensesAttributionsClick,
                             onCheckForUpdatesClick = onCheckForUpdatesClick,
@@ -768,7 +774,6 @@ private fun MobileSettingsScreen(
                     heroEnabled = homescreenHeroEnabled,
                     showCatalogType = homescreenShowCatalogType,
                     hideUnreleasedContent = homescreenHideUnreleasedContent,
-                    hideCatalogUnderline = homescreenHideCatalogUnderline,
                     items = homescreenItems,
                 )
                 SettingsPage.MetaScreen -> metaScreenSettingsContent(
@@ -793,10 +798,11 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     settings = debridSettings,
                 )
-                SettingsPage.TraktAuthentication -> traktSettingsContent(
+                SettingsPage.TraktAuthentication -> trackingSettingsContent(
                     isTablet = false,
-                    uiState = traktAuthUiState,
-                    settingsUiState = traktSettingsUiState,
+                    traktUiState = traktAuthUiState,
+                    simklUiState = simklAuthUiState,
+                    settingsUiState = trackingSettingsUiState,
                     commentsEnabled = traktCommentsEnabled,
                     onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
                 )
@@ -890,12 +896,12 @@ private fun TabletSettingsScreen(
     mdbListSettings: MdbListSettings,
     debridSettings: DebridSettings,
     traktAuthUiState: TraktAuthUiState,
+    simklAuthUiState: SimklAuthUiState,
     traktCommentsEnabled: Boolean,
-    traktSettingsUiState: TraktSettingsUiState,
+    trackingSettingsUiState: TrackingSettingsUiState,
     homescreenHeroEnabled: Boolean,
     homescreenShowCatalogType: Boolean,
     homescreenHideUnreleasedContent: Boolean,
-    homescreenHideCatalogUnderline: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
@@ -1074,7 +1080,7 @@ private fun TabletSettingsScreen(
                                 onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
                                 onContentDiscoveryClick = { openInlinePage(SettingsPage.ContentDiscovery) },
                                 onIntegrationsClick = { openInlinePage(SettingsPage.Integrations) },
-                                onTraktClick = { openInlinePage(SettingsPage.TraktAuthentication) },
+                                onTrackingClick = { openInlinePage(SettingsPage.TraktAuthentication) },
                                 onSupportersContributorsClick = { openInlinePage(SettingsPage.SupportersContributors) },
                                 onLicensesAttributionsClick = { openInlinePage(SettingsPage.LicensesAttributions) },
                                 onCheckForUpdatesClick = onCheckForUpdatesClick,
@@ -1182,7 +1188,6 @@ private fun TabletSettingsScreen(
                         heroEnabled = homescreenHeroEnabled,
                         showCatalogType = homescreenShowCatalogType,
                         hideUnreleasedContent = homescreenHideUnreleasedContent,
-                        hideCatalogUnderline = homescreenHideCatalogUnderline,
                         items = homescreenItems,
                     )
                     SettingsPage.MetaScreen -> metaScreenSettingsContent(
@@ -1207,10 +1212,11 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         settings = debridSettings,
                     )
-                    SettingsPage.TraktAuthentication -> traktSettingsContent(
+                    SettingsPage.TraktAuthentication -> trackingSettingsContent(
                         isTablet = true,
-                        uiState = traktAuthUiState,
-                        settingsUiState = traktSettingsUiState,
+                        traktUiState = traktAuthUiState,
+                        simklUiState = simklAuthUiState,
+                        settingsUiState = trackingSettingsUiState,
                         commentsEnabled = traktCommentsEnabled,
                         onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
                     )

@@ -80,6 +80,15 @@ fun ProfileSelectionScreen(
     val titleAlpha = remember { Animatable(0f) }
     val titleOffset = remember { Animatable(20f) }
     val manageAlpha = remember { Animatable(0f) }
+    val onProfileClick: (NuvioProfile) -> Unit = { profile ->
+        routeProfileSelection(
+            profile = profile,
+            isEditMode = isEditMode,
+            onEditProfile = onEditProfile,
+            onPinRequired = { pinDialogProfile = it },
+            onProfileSelected = onProfileSelected,
+        )
+    }
 
     LaunchedEffect(Unit) {
         AvatarRepository.fetchAvatars()
@@ -168,14 +177,7 @@ fun ProfileSelectionScreen(
                                     isEditMode = isEditMode,
                                     animDelay = currentIndex * 80,
                                     onClick = {
-                                        if (isEditMode) {
-                                            onEditProfile(profile)
-                                        } else if (profile.pinEnabled) {
-                                            pinDialogProfile = profile
-                                        } else {
-                                            ProfileRepository.selectProfile(profile.profileIndex)
-                                            onProfileSelected(profile)
-                                        }
+                                        onProfileClick(profile)
                                     },
                                 )
                             } else {
@@ -209,14 +211,7 @@ fun ProfileSelectionScreen(
                                             isEditMode = isEditMode,
                                             animDelay = currentIndex * 80,
                                             onClick = {
-                                                if (isEditMode) {
-                                                    onEditProfile(profile)
-                                                } else if (profile.pinEnabled) {
-                                                    pinDialogProfile = profile
-                                                } else {
-                                                    ProfileRepository.selectProfile(profile.profileIndex)
-                                                    onProfileSelected(profile)
-                                                }
+                                                onProfileClick(profile)
                                             },
                                         )
                                     } else {
@@ -279,7 +274,6 @@ fun ProfileSelectionScreen(
             onVerify = { pin -> ProfileRepository.verifyPin(profile.profileIndex, pin) },
             onVerified = {
                 pinDialogProfile = null
-                ProfileRepository.selectProfile(profile.profileIndex)
                 onProfileSelected(profile)
             },
             onDismiss = { pinDialogProfile = null },

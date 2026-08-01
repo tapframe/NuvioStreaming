@@ -568,8 +568,6 @@
     <string name="settings_homescreen_show_hero_description">Prikaži glavni vrtuljak na vrhu početnog zaslona.</string>
     <string name="layout_hide_unreleased">Sakrij neobjavljeni sadržaj</string>
     <string name="layout_hide_unreleased_sub">Sakrij filmove i serije koji još nisu objavljeni.</string>
-    <string name="settings_homescreen_hide_catalog_underline">Sakrij podcrtavanje u katalogu</string>
-    <string name="settings_homescreen_hide_catalog_underline_description">Uklonite istaknutu liniju ispod naziva kataloga i zbirki u cijeloj aplikaciji.</string>
     <string name="settings_homescreen_summary">%1$d od %2$d vidljivih kataloga • Odabrano %3$d izvora za glavni odjeljak</string>
     <string name="settings_homescreen_summary_hint">Otvorite katalog samo kada ga trebate preimenovati ili promijeniti njegov redoslijed.</string>
     <string name="settings_homescreen_visible">Vidljivo</string>

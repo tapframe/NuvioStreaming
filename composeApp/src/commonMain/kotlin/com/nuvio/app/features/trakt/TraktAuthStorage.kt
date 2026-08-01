@@ -1,6 +1,7 @@
 package com.nuvio.app.features.trakt
 
 internal expect object TraktAuthStorage {
-    fun loadPayload(): String?
-    fun savePayload(payload: String)
+    fun loadPayload(profileId: Int): String?
+    fun savePayload(profileId: Int, payload: String)
+    fun removeProfile(profileId: Int)
 }

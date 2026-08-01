@@ -4,6 +4,14 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.build.AppVersionConfig
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.tracking.TrackingMediaKind
+import com.nuvio.app.features.tracking.TrackingMediaReference
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingScrobbleAction
+import com.nuvio.app.features.tracking.TrackingScrobbleEvent
+import com.nuvio.app.features.tracking.TrackingScrobbler
+import com.nuvio.app.features.tracking.TrackingSeekScrobblePolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
@@ -39,7 +47,38 @@ internal sealed interface TraktScrobbleItem {
     }
 }
 
-internal object TraktScrobbleRepository {
+internal data class TraktEpisodeMappingInput(
+    val contentId: String,
+    val contentType: String,
+    val videoId: String?,
+    val season: Int,
+    val episode: Int,
+    val episodeTitle: String?,
+)
+
+internal fun TrackingMediaReference.toTraktEpisodeMappingInput(): TraktEpisodeMappingInput? {
+    val episodeReference = episode ?: return null
+    val season = episodeReference.season ?: return null
+    val contentId = catalog?.contentId?.takeIf(String::isNotBlank)
+        ?: ids.imdb?.takeIf(String::isNotBlank)
+        ?: ids.tmdb?.let { value -> "tmdb:$value" }
+        ?: ids.trakt?.let { value -> "trakt:$value" }
+        ?: return null
+    return TraktEpisodeMappingInput(
+        contentId = contentId,
+        contentType = catalog?.contentType?.takeIf(String::isNotBlank) ?: "series",
+        videoId = catalog?.videoId?.takeIf(String::isNotBlank),
+        season = season,
+        episode = episodeReference.number,
+        episodeTitle = episodeReference.title,
+    )
+}
+
+internal object TraktScrobbleRepository : TrackingScrobbler {
+    override val providerId: TrackingProviderId = TrackingProviderId.TRAKT
+    override val seekScrobblePolicy: TrackingSeekScrobblePolicy =
+        TrackingSeekScrobblePolicy.STOP_AND_RESTART
+
     private data class ScrobbleStamp(
         val profileId: Int,
         val action: String,
@@ -61,6 +100,26 @@ internal object TraktScrobbleRepository {
     private val maxStopRetries = 2
     private val retryDelayMs = 1_500L
     private val serverOverloadedRetryDelayMs = 5_000L
+
+    init {
+        TrackingProviderRegistry.registerScrobbler(this)
+    }
+
+    fun ensureRegistered() = Unit
+
+    override suspend fun scrobble(
+        profileId: Int,
+        action: TrackingScrobbleAction,
+        event: TrackingScrobbleEvent,
+    ) {
+        val item = buildItem(event.media) ?: return
+        sendScrobble(
+            profileId = profileId,
+            action = action.wireValue,
+            item = item,
+            progressPercent = event.progressPercent.toFloat(),
+        )
+    }
 
     suspend fun scrobbleStart(profileId: Int, item: TraktScrobbleItem, progressPercent: Float) {
         sendScrobble(profileId = profileId, action = "start", item = item, progressPercent = progressPercent)
@@ -124,6 +183,40 @@ internal object TraktScrobbleRepository {
                 ids = ids,
             )
         }
+    }
+
+    private suspend fun buildItem(media: TrackingMediaReference): TraktScrobbleItem? {
+        val ids = TraktExternalIds(
+            trakt = media.ids.trakt?.toTraktIntOrNull(),
+            imdb = media.ids.imdb?.takeIf(String::isNotBlank),
+            tmdb = media.ids.tmdb?.toTraktIntOrNull(),
+        )
+        if (!ids.hasAnyId()) return null
+        if (media.kind == TrackingMediaKind.MOVIE) {
+            return TraktScrobbleItem.Movie(
+                title = media.title,
+                year = media.year,
+                ids = ids,
+            )
+        }
+
+        val mappingInput = media.toTraktEpisodeMappingInput() ?: return null
+        val mappedEpisode = TraktEpisodeMappingService.resolveEpisodeMapping(
+            contentId = mappingInput.contentId,
+            contentType = mappingInput.contentType,
+            videoId = mappingInput.videoId,
+            season = mappingInput.season,
+            episode = mappingInput.episode,
+            episodeTitle = mappingInput.episodeTitle,
+        )
+        return TraktScrobbleItem.Episode(
+            showTitle = media.title,
+            showYear = media.year,
+            showIds = ids,
+            season = mappedEpisode?.season ?: mappingInput.season,
+            number = mappedEpisode?.episode ?: mappingInput.episode,
+            episodeTitle = mappingInput.episodeTitle,
+        )
     }
 
     private suspend fun sendScrobble(
@@ -324,6 +417,8 @@ internal object TraktScrobbleRepository {
         )
     }
 }
+
+private fun Long.toTraktIntOrNull(): Int? = takeIf { value -> value in 1L..Int.MAX_VALUE.toLong() }?.toInt()
 
 @Serializable
 private data class TraktScrobbleRequest(

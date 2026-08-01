@@ -28,9 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -47,7 +46,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
@@ -56,13 +54,14 @@ import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
+import com.nuvio.app.core.ui.ScopedDisintegrationTracker
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
-import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
@@ -87,13 +86,8 @@ internal fun continueWatchingSectionHeightEstimate(
     style: ContinueWatchingSectionStyle,
     layout: ContinueWatchingLayout,
     basePosterWidthDp: Int,
-    showHeaderAccent: Boolean,
 ): Dp {
-    val headerHeight = NuvioTokens.Space.s40 + if (showHeaderAccent) {
-        NuvioTokens.Space.s6 + NuvioTokens.Space.s4
-    } else {
-        0.dp
-    }
+    val headerHeight = NuvioTokens.Space.s40
     val headerToRowGap = NuvioTokens.Space.s8 + NuvioTokens.Space.s2
     val rowHeight = when (style) {
         ContinueWatchingSectionStyle.Card -> continueWatchingLandscapeCardHeight(basePosterWidthDp)
@@ -107,7 +101,6 @@ internal fun continueWatchingHeroViewportReserveHeight(
     style: ContinueWatchingSectionStyle,
     layout: ContinueWatchingLayout,
     basePosterWidthDp: Int,
-    showHeaderAccent: Boolean,
 ): Dp {
     val bottomNavigationClearance = when (style) {
         ContinueWatchingSectionStyle.Card,
@@ -118,7 +111,6 @@ internal fun continueWatchingHeroViewportReserveHeight(
         style = style,
         layout = layout,
         basePosterWidthDp = basePosterWidthDp,
-        showHeaderAccent = showHeaderAccent,
     ) + bottomNavigationClearance
 }
 
@@ -232,6 +224,7 @@ private fun firstNonBlank(vararg values: String?): String? =
 internal fun HomeContinueWatchingSection(
     items: List<ContinueWatchingItem>,
     style: ContinueWatchingSectionStyle,
+    dataSourceKey: WatchProgressSource,
     useEpisodeThumbnails: Boolean = true,
     blurNextUp: Boolean = false,
     modifier: Modifier = Modifier,
@@ -247,6 +240,7 @@ internal fun HomeContinueWatchingSection(
     if (sectionPadding != null && layout != null) {
         HomeContinueWatchingSectionContent(
             items = items,
+            dataSourceKey = dataSourceKey,
             style = style,
             useEpisodeThumbnails = useEpisodeThumbnails,
             blurNextUp = blurNextUp,
@@ -262,6 +256,7 @@ internal fun HomeContinueWatchingSection(
         BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
             HomeContinueWatchingSectionContent(
                 items = items,
+                dataSourceKey = dataSourceKey,
                 style = style,
                 useEpisodeThumbnails = useEpisodeThumbnails,
                 blurNextUp = blurNextUp,
@@ -280,6 +275,7 @@ internal fun HomeContinueWatchingSection(
 @Composable
 private fun HomeContinueWatchingSectionContent(
     items: List<ContinueWatchingItem>,
+    dataSourceKey: WatchProgressSource,
     style: ContinueWatchingSectionStyle,
     useEpisodeThumbnails: Boolean,
     blurNextUp: Boolean,
@@ -291,106 +287,59 @@ private fun HomeContinueWatchingSectionContent(
     onItemClick: ((ContinueWatchingItem) -> Unit)?,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)?,
 ) {
-    val homeCatalogSettings by remember {
-        HomeCatalogSettingsRepository.snapshot()
-        HomeCatalogSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
+    key(dataSourceKey) {
+        val disintegration = remember {
+            ScopedDisintegrationTracker<WatchProgressSource, String, ContinueWatchingItem>(
+                itemKey = ContinueWatchingItem::videoId,
+            )
+        }
+        val displayEntries = disintegration.sync(dataSourceKey, items)
 
-    val disintegration = remember { ContinueWatchingDisintegrationHolder() }
-    val displayEntries = disintegration.sync(items)
-
-    NuvioShelfSection(
-        title = title ?: stringResource(Res.string.compose_settings_page_continue_watching),
-        entries = displayEntries,
-        modifier = modifier,
-        headerHorizontalPadding = sectionPadding,
-        rowContentPadding = PaddingValues(horizontal = sectionPadding),
-        itemSpacing = layout.itemGap,
-        showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
-        key = { entry -> entry.videoId },
-        animatePlacement = true,
-        state = listState,
-    ) { entry ->
-        val item = entry.item
-        val onClick = if (entry.exiting) null else onItemClick?.let { { it(item) } }
-        val onLongClick = if (entry.exiting) null else onItemLongPress?.let { { it(item) } }
-        DisintegratingContainer(
-            disintegrating = entry.exiting,
-            onDisintegrated = { disintegration.onExited(entry.videoId) },
-        ) {
-            when (style) {
-                ContinueWatchingSectionStyle.Card -> ContinueWatchingCard(
-                    item = item,
-                    useEpisodeThumbnails = useEpisodeThumbnails,
-                    blurNextUp = blurNextUp,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                )
-                ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
-                    item = item,
-                    layout = layout,
-                    useEpisodeThumbnails = useEpisodeThumbnails,
-                    blurNextUp = blurNextUp,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                )
-                ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
-                    item = item,
-                    layout = layout,
-                    useEpisodeThumbnails = useEpisodeThumbnails,
-                    blurNextUp = blurNextUp,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                )
+        NuvioShelfSection(
+            title = title ?: stringResource(Res.string.compose_settings_page_continue_watching),
+            entries = displayEntries,
+            modifier = modifier,
+            headerHorizontalPadding = sectionPadding,
+            rowContentPadding = PaddingValues(horizontal = sectionPadding),
+            itemSpacing = layout.itemGap,
+            key = { entry -> entry.key },
+            animatePlacement = true,
+            state = listState,
+        ) { entry ->
+            val item = entry.item
+            val onClick = if (entry.exiting) null else onItemClick?.let { { it(item) } }
+            val onLongClick = if (entry.exiting) null else onItemLongPress?.let { { it(item) } }
+            DisintegratingContainer(
+                disintegrating = entry.exiting,
+                onDisintegrated = { disintegration.onDisintegrated(entry.key) },
+            ) {
+                when (style) {
+                    ContinueWatchingSectionStyle.Card -> ContinueWatchingCard(
+                        item = item,
+                        useEpisodeThumbnails = useEpisodeThumbnails,
+                        blurNextUp = blurNextUp,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    )
+                    ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
+                        item = item,
+                        layout = layout,
+                        useEpisodeThumbnails = useEpisodeThumbnails,
+                        blurNextUp = blurNextUp,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    )
+                    ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
+                        item = item,
+                        layout = layout,
+                        useEpisodeThumbnails = useEpisodeThumbnails,
+                        blurNextUp = blurNextUp,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    )
+                }
             }
         }
-    }
-}
-
-private data class ContinueWatchingDisplayEntry(
-    val videoId: String,
-    val item: ContinueWatchingItem,
-    val exiting: Boolean,
-)
-
-private class ContinueWatchingDisintegrationHolder {
-    private val exiting = LinkedHashMap<String, Pair<ContinueWatchingItem, Int>>()
-    private var previous = LinkedHashMap<String, Pair<ContinueWatchingItem, Int>>()
-    private var invalidations by mutableStateOf(0)
-
-    fun onExited(videoId: String) {
-        if (exiting.remove(videoId) != null) invalidations++
-    }
-
-    fun sync(items: List<ContinueWatchingItem>): List<ContinueWatchingDisplayEntry> {
-        @Suppress("UNUSED_EXPRESSION")
-        invalidations
-
-        val current = LinkedHashMap<String, Pair<ContinueWatchingItem, Int>>()
-        items.forEachIndexed { index, item -> current[item.videoId] = item to index }
-
-        for ((videoId, info) in previous) {
-            if (videoId !in current && videoId !in exiting) {
-                exiting[videoId] = info
-            }
-        }
-        for (videoId in current.keys) {
-            exiting.remove(videoId)
-        }
-        previous = current
-
-        val entries = ArrayList<ContinueWatchingDisplayEntry>(items.size + exiting.size)
-        items.forEach { item ->
-            entries += ContinueWatchingDisplayEntry(item.videoId, item, exiting = false)
-        }
-        exiting.entries
-            .sortedBy { it.value.second }
-            .forEach { (videoId, info) ->
-                val insertAt = info.second.coerceIn(0, entries.size)
-                entries.add(insertAt, ContinueWatchingDisplayEntry(videoId, info.first, exiting = true))
-            }
-
-        return entries
     }
 }
 

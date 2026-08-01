@@ -15,6 +15,7 @@ import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.hasLikelyExpiringPlaybackCredentials
+import com.nuvio.app.features.tracking.TrackingScrobbleAction
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -68,7 +69,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         initialLoadCompleted = false
         lastProgressPersistEpochMs = 0L
         previousIsPlaying = false
-        pendingScrobbleStartAfterSeek = false
+        pendingSeekScrobbleRestart = false
         seekProgressSyncJob?.cancel()
         seekProgressSyncJob = null
         accumulatedSeekResetJob?.cancel()
@@ -99,6 +100,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
             return@LaunchedEffect
         }
         if (!P2pSettingsRepository.isVisible || !p2pSettingsUiState.p2pEnabled) {
+            p2pResolvedSourceUrl = null
+            P2pStreamingEngine.stopStream()
             return@LaunchedEffect
         }
 
@@ -142,6 +145,11 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     LaunchedEffect(p2pStreamingState, activeTorrentInfoHash) {
         val state = p2pStreamingState
         if (activeTorrentInfoHash != null && state is P2pStreamingState.Error) {
+            p2pResolvedSourceUrl = null
+            playerController = null
+            playerControllerSourceUrl = null
+            playbackSnapshot = PlayerPlaybackSnapshot()
+            initialLoadCompleted = true
             errorMessage = getString(Res.string.player_error_torrent, state.message)
             controlsVisible = !playerControlsLocked
         }
@@ -326,22 +334,26 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
         playbackSnapshot.durationMs,
     ) {
         if (playbackSnapshot.isEnded) {
-            flushWatchProgress()
+            flushWatchProgress(TrackingScrobbleAction.STOP)
             previousIsPlaying = false
-            pendingScrobbleStartAfterSeek = false
+            pendingSeekScrobbleRestart = false
             return@LaunchedEffect
         }
 
         if (previousIsPlaying && !playbackSnapshot.isPlaying && !playbackSnapshot.isLoading) {
-            pendingScrobbleStartAfterSeek = false
-            flushWatchProgress()
+            pendingSeekScrobbleRestart = false
+            flushWatchProgress(TrackingScrobbleAction.PAUSE)
         }
 
-        if (playbackSnapshot.isPlaying && pendingScrobbleStartAfterSeek) {
-            pendingScrobbleStartAfterSeek = false
-            emitTraktScrobbleStart()
+        if (playbackSnapshot.isPlaying && pendingSeekScrobbleRestart) {
+            pendingSeekScrobbleRestart = false
+            if (hasRequestedScrobbleStartForCurrentItem) {
+                emitTrackingSeekScrobbleStart()
+            } else {
+                emitTrackingScrobbleStart()
+            }
         } else if (!previousIsPlaying && playbackSnapshot.isPlaying) {
-            emitTraktScrobbleStart()
+            emitTrackingScrobbleStart()
         }
 
         if (!playbackSnapshot.isLoading) {

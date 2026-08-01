@@ -19,6 +19,7 @@ object MdbListSettingsRepository {
     private var useTrakt = true
     private var useLetterboxd = true
     private var useAudience = true
+    private var useMal = true
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -88,6 +89,10 @@ object MdbListSettingsRepository {
                 useAudience = value
                 MdbListSettingsStorage.saveUseAudience(value)
             } else return
+            MdbListMetadataService.PROVIDER_MAL -> if (useMal != value) {
+                useMal = value
+                MdbListSettingsStorage.saveUseMal(value)
+            } else return
             else -> return
         }
         publish()
@@ -105,6 +110,7 @@ object MdbListSettingsRepository {
         useTrakt = MdbListSettingsStorage.loadUseTrakt() ?: true
         useLetterboxd = MdbListSettingsStorage.loadUseLetterboxd() ?: true
         useAudience = MdbListSettingsStorage.loadUseAudience() ?: true
+        useMal = MdbListSettingsStorage.loadUseMal() ?: true
         publish()
     }
 
@@ -119,6 +125,7 @@ object MdbListSettingsRepository {
             useTrakt = useTrakt,
             useLetterboxd = useLetterboxd,
             useAudience = useAudience,
+            useMal = useMal,
         )
     }
 }
