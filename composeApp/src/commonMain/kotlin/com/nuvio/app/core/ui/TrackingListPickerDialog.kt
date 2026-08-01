@@ -25,20 +25,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.nuvio.app.features.trakt.TraktListTab
+import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.trackingMembershipDestinations
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.action_save
-import nuvio.composeapp.generated.resources.compose_trakt_list_picker_loading
-import nuvio.composeapp.generated.resources.compose_trakt_list_picker_subtitle
+import nuvio.composeapp.generated.resources.compose_tracking_list_picker_loading
+import nuvio.composeapp.generated.resources.compose_tracking_list_picker_subtitle
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TraktListPickerDialog(
+fun TrackingListPickerDialog(
     visible: Boolean,
     title: String,
-    tabs: List<TraktListTab>,
+    tabs: List<TrackingLibraryTab>,
     membership: Map<String, Boolean>,
     isPending: Boolean,
     errorMessage: String?,
@@ -48,6 +49,7 @@ fun TraktListPickerDialog(
 ) {
     if (!visible) return
     val tokens = MaterialTheme.nuvio
+    val destinations = trackingMembershipDestinations(tabs)
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
@@ -67,7 +69,7 @@ fun TraktListPickerDialog(
                     color = tokens.colors.textPrimary,
                 )
                 Text(
-                    text = stringResource(Res.string.compose_trakt_list_picker_subtitle),
+                    text = stringResource(Res.string.compose_tracking_list_picker_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = tokens.colors.textMuted,
                 )
@@ -80,7 +82,7 @@ fun TraktListPickerDialog(
                     )
                 }
 
-                if (isPending && tabs.isEmpty()) {
+                if (isPending && destinations.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -95,7 +97,7 @@ fun TraktListPickerDialog(
                                 modifier = Modifier.size(tokens.icons.lg),
                             )
                             Text(
-                                text = stringResource(Res.string.compose_trakt_list_picker_loading),
+                                text = stringResource(Res.string.compose_tracking_list_picker_loading),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = tokens.colors.textMuted,
                             )
@@ -108,7 +110,7 @@ fun TraktListPickerDialog(
                             .height(NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s40),
                         verticalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
                     ) {
-                        items(items = tabs, key = { it.key }) { tab ->
+                        items(items = destinations, key = { it.key }) { tab ->
                             val selected = membership[tab.key] == true
                             Row(
                                 modifier = Modifier

@@ -27,7 +27,7 @@ import nuvio.composeapp.generated.resources.library_sort_added_asc
 import nuvio.composeapp.generated.resources.library_sort_added_desc
 import nuvio.composeapp.generated.resources.library_sort_title_asc
 import nuvio.composeapp.generated.resources.library_sort_title_desc
-import nuvio.composeapp.generated.resources.library_sort_trakt_order
+import nuvio.composeapp.generated.resources.library_sort_provider_order
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -48,7 +48,7 @@ internal fun LibrarySavedControls(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (layoutMode == LibraryLayoutMode.VERTICAL && sourceMode == LibrarySourceMode.TRAKT) {
+        if (layoutMode == LibraryLayoutMode.VERTICAL && sourceMode.isRemoteTrackingSource) {
             val selectedSection = verticalProjection.availableSections
                 .firstOrNull { section -> section.type == verticalProjection.selectedSectionKey }
             NuvioDropdownChip(
@@ -158,7 +158,7 @@ internal fun LazyItemScope.libraryContentTransitionModifier(): Modifier =
 @Composable
 private fun librarySortOptionLabel(option: LibrarySortOption): String =
     when (option) {
-        LibrarySortOption.DEFAULT -> stringResource(Res.string.library_sort_trakt_order)
+        LibrarySortOption.DEFAULT -> stringResource(Res.string.library_sort_provider_order)
         LibrarySortOption.ADDED_DESC -> stringResource(Res.string.library_sort_added_desc)
         LibrarySortOption.ADDED_ASC -> stringResource(Res.string.library_sort_added_asc)
         LibrarySortOption.TITLE_ASC -> stringResource(Res.string.library_sort_title_asc)

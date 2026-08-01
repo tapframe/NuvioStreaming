@@ -3,6 +3,7 @@ package com.nuvio.app.features.watchprogress
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.AddonsUiState
@@ -11,13 +12,14 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.player.PlayerPlaybackSnapshot
 import com.nuvio.app.features.profiles.ProfileRepository
-import com.nuvio.app.features.trakt.TraktAuthRepository
-import com.nuvio.app.features.trakt.TraktProgressRepository
-import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.WatchProgressSource
-import com.nuvio.app.features.trakt.effectiveWatchProgressSource
-import com.nuvio.app.features.trakt.isTraktCompatibleId
-import com.nuvio.app.features.trakt.resolveEffectiveContentId
+import com.nuvio.app.features.tracking.TrackingProgressProvider
+import com.nuvio.app.features.tracking.TrackingProgressSnapshot
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
+import com.nuvio.app.features.tracking.WatchProgressSource
+import com.nuvio.app.features.tracking.effectiveWatchProgressSource
+import com.nuvio.app.features.tracking.providerId
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.sync.ProgressDeltaEvent
 import com.nuvio.app.features.watching.sync.ProgressSyncRecord
@@ -53,6 +55,7 @@ private const val WATCH_PROGRESS_DELTA_OPERATION_UPSERT = "upsert"
 private const val WATCH_PROGRESS_DELTA_OPERATION_DELETE = "delete"
 
 private data class RemoteMetadataResolutionResult(
+    val key: WatchProgressMetadataKey,
     val entries: List<WatchProgressEntry>,
     val meta: MetaDetails?,
 )
@@ -176,36 +179,6 @@ internal data class WatchProgressDeltaDecision(
     val clearsDirtyProgress: Boolean = false,
 )
 
-internal fun enrichWatchProgressEntry(
-    current: WatchProgressEntry,
-    meta: MetaDetails,
-): WatchProgressEntry {
-    val episodeVideo = if (current.seasonNumber != null && current.episodeNumber != null) {
-        meta.videos.firstOrNull { video ->
-            video.season == current.seasonNumber && video.episode == current.episodeNumber
-        }
-    } else {
-        null
-    }
-    return current.copy(
-        title = meta.name.takeIf(String::isNotBlank) ?: current.title,
-        poster = meta.poster?.takeIf(String::isNotBlank) ?: current.poster,
-        background = meta.background?.takeIf(String::isNotBlank) ?: current.background,
-        logo = meta.logo?.takeIf(String::isNotBlank) ?: current.logo,
-        episodeTitle = episodeVideo?.title?.takeIf(String::isNotBlank) ?: current.episodeTitle,
-        episodeThumbnail = episodeVideo?.thumbnail?.takeIf(String::isNotBlank) ?: current.episodeThumbnail,
-        pauseDescription = episodeVideo?.overview?.takeIf(String::isNotBlank)
-            ?: meta.description?.takeIf(String::isNotBlank)
-            ?: current.pauseDescription,
-    )
-}
-
-internal fun WatchProgressEntry.needsRemoteMetadataEnrichment(): Boolean =
-    title.isBlank() ||
-        title.equals(parentMetaId, ignoreCase = true) ||
-        poster.isNullOrBlank() ||
-        background.isNullOrBlank()
-
 object WatchProgressRepository {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val accountScopeLock = SynchronizedObject()
@@ -228,6 +201,7 @@ object WatchProgressRepository {
     private var dirtyProgressKeys: MutableSet<String> = mutableSetOf()
     private var metadataResolutionJob: Job? = null
     private val metadataResolutionRetryCoordinator = MetadataResolutionRetryCoordinator()
+    private val providerMetadataOverlay = ProviderProgressMetadataOverlay()
     private val nuvioPullMutex = Mutex()
     private var lastSuccessfulPushEpochMs = 0L
     private var deltaCursorEventId = 0L
@@ -235,10 +209,16 @@ object WatchProgressRepository {
     internal var syncAdapter: ProgressSyncAdapter = SupabaseProgressSyncAdapter
 
     init {
-        syncScope.launch {
-            TraktProgressRepository.uiState.collectLatest {
-                if (shouldUseTraktProgress()) {
-                    publish()
+        ensureTrackingProvidersRegistered()
+        TrackingProviderRegistry.progressProviders().forEach { provider ->
+            syncScope.launch {
+                provider.changes.collectLatest {
+                    if (activeSource.providerId == provider.providerId) {
+                        publish()
+                        if (hasLoaded && !provider.providesCompleteMetadata) {
+                            resolveRemoteMetadata()
+                        }
+                    }
                 }
             }
         }
@@ -252,14 +232,15 @@ object WatchProgressRepository {
     }
 
     fun ensureLoaded() {
-        TraktAuthRepository.ensureLoaded()
-        TraktSettingsRepository.ensureLoaded()
-        TraktProgressRepository.ensureLoaded()
+        ensureTrackingProvidersRegistered()
+        TrackingProviderRegistry.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
+        TrackingProviderRegistry.progressProviders().forEach(TrackingProgressProvider::ensureLoaded)
         if (!hasLoaded) {
             updateActiveSource(
                 effectiveWatchProgressSource(
-                    isTraktAuthenticated = TraktAuthRepository.isAuthenticated.value,
-                    requestedSource = TraktSettingsRepository.uiState.value.watchProgressSource,
+                    requestedSource = TrackingSettingsRepository.uiState.value.watchProgressSource,
+                    isProviderAuthenticated = ::isProgressProviderAvailable,
                 ),
             )
             loadFromDisk(ProfileRepository.activeProfileId)
@@ -268,15 +249,14 @@ object WatchProgressRepository {
 
     fun onProfileChanged(profileId: Int) {
         if (profileId == currentProfileId && hasLoaded) return
-        TraktSettingsRepository.onProfileChanged()
         updateActiveSource(
             effectiveWatchProgressSource(
-                isTraktAuthenticated = TraktAuthRepository.isAuthenticated.value,
-                requestedSource = TraktSettingsRepository.uiState.value.watchProgressSource,
+                requestedSource = TrackingSettingsRepository.uiState.value.watchProgressSource,
+                isProviderAuthenticated = ::isProgressProviderAvailable,
             ),
         )
         loadFromDisk(profileId)
-        TraktProgressRepository.onProfileChanged()
+        TrackingProviderRegistry.progressProviders().forEach(TrackingProgressProvider::onProfileChanged)
     }
 
     fun clearLocalState() {
@@ -293,12 +273,12 @@ object WatchProgressRepository {
         currentProfileId = 1
         profileGeneration += 1L
         updateActiveSource(WatchProgressSource.NUVIO_SYNC)
+        providerMetadataOverlay.clear()
         clearLocalEntries()
         lastSuccessfulPushEpochMs = 0L
         deltaCursorEventId = 0L
         deltaInitialized = false
-        TraktProgressRepository.clearLocalState()
-        TraktSettingsRepository.clearLocalState()
+        TrackingProviderRegistry.progressProviders().forEach(TrackingProgressProvider::clearLocalState)
         _uiState.value = WatchProgressUiState()
     }
 
@@ -308,6 +288,7 @@ object WatchProgressRepository {
         profileGeneration += 1L
         hasLoaded = true
         hasLoadedNuvioRemoteProgress = false
+        providerMetadataOverlay.clear()
         clearLocalEntries()
 
         val payload = WatchProgressStorage.loadPayload(profileId).orEmpty().trim()
@@ -344,6 +325,12 @@ object WatchProgressRepository {
             profileGeneration == generation &&
             ProfileRepository.activeProfileId == profileId
 
+    private fun isActiveMetadataTarget(
+        profileId: Int,
+        generation: Long,
+        source: WatchProgressSource,
+    ): Boolean = isActiveOperation(profileId, generation) && activeSource == source
+
     suspend fun pullFromServer(profileId: Int) {
         refreshForSource(
             profileId = profileId,
@@ -372,9 +359,9 @@ object WatchProgressRepository {
     }
 
     internal fun activateSource(source: WatchProgressSource) {
-        TraktAuthRepository.ensureLoaded()
-        TraktSettingsRepository.ensureLoaded()
-        TraktProgressRepository.ensureLoaded()
+        TrackingProviderRegistry.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
+        TrackingProviderRegistry.progressProviders().forEach(TrackingProgressProvider::ensureLoaded)
         if (!hasLoaded) {
             loadFromDisk(ProfileRepository.activeProfileId)
         }
@@ -385,13 +372,10 @@ object WatchProgressRepository {
 
         updateActiveSource(source)
         cancelMetadataResolution(resetProviderHistory = false)
-        if (source == WatchProgressSource.TRAKT) {
-            TraktProgressRepository.clearLocalState()
-        } else {
-            hasLoadedNuvioRemoteProgress = false
-        }
+        providerMetadataOverlay.clear()
+        activeProgressProvider()?.onActivated() ?: run { hasLoadedNuvioRemoteProgress = false }
         publish()
-        if (source == WatchProgressSource.NUVIO_SYNC) {
+        if (activeProgressProvider()?.providesCompleteMetadata != true) {
             resolveRemoteMetadata()
         }
     }
@@ -412,49 +396,76 @@ object WatchProgressRepository {
         }
 
         activateSource(source)
-        return when (source) {
-            WatchProgressSource.TRAKT -> refreshTraktSource(
+        activeProgressProvider()?.let { provider ->
+            return refreshProviderSource(
+                provider = provider,
                 profileId = profileId,
                 operationGeneration = operationGeneration,
                 sourceChanged = sourceChanged,
                 force = force,
             )
-
-            WatchProgressSource.NUVIO_SYNC -> refreshNuvioSource(
-                profileId = profileId,
-                operationGeneration = operationGeneration,
-                force = force,
-            )
         }
+        return refreshNuvioSource(
+            profileId = profileId,
+            operationGeneration = operationGeneration,
+            force = force,
+        )
     }
 
-    private suspend fun refreshTraktSource(
+    private suspend fun refreshProviderSource(
+        provider: TrackingProgressProvider,
         profileId: Int,
         operationGeneration: Long,
         sourceChanged: Boolean,
         force: Boolean,
     ): Boolean {
-        if (!TraktAuthRepository.isAuthenticated.value) {
-            log.d { "Skipping Trakt progress refresh because Trakt is not authenticated" }
+        if (!isProgressProviderAvailable(provider.providerId)) {
+            log.d { "Skipping ${provider.providerId.storageId} progress refresh because it is unavailable" }
             return false
         }
-
+        log.i {
+            "Tracking progress refresh request profile=$profileId provider=${provider.providerId.storageId} " +
+                "source=$activeSource sourceChanged=$sourceChanged force=$force " +
+                "generation=$operationGeneration"
+        }
         return try {
-            if (force || sourceChanged) {
-                TraktProgressRepository.invalidateAndRefresh()
-            } else {
-                TraktProgressRepository.refreshNow()
-            }
-            if (isActiveOperation(profileId, operationGeneration) && activeSource == WatchProgressSource.TRAKT) {
+            provider.refresh(force = force, sourceChanged = sourceChanged)
+            if (
+                isActiveOperation(profileId, operationGeneration) &&
+                activeSource.providerId == provider.providerId
+            ) {
                 publish()
             }
-            val state = TraktProgressRepository.uiState.value
+            val state = provider.snapshot()
             state.hasLoadedRemoteProgress && state.errorMessage == null
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            log.e(error) { "Failed to refresh Trakt watch progress" }
+            log.e(error) { "Failed to refresh ${provider.providerId.storageId} watch progress" }
             false
+        }
+    }
+
+    private fun activeProgressProvider(): TrackingProgressProvider? =
+        activeSource.providerId?.let(TrackingProviderRegistry::progressProvider)
+
+    private fun isProgressProviderAvailable(providerId: TrackingProviderId): Boolean =
+        TrackingProviderRegistry.progressProvider(providerId) != null &&
+            TrackingProviderRegistry.isAuthenticated(providerId)
+
+    private suspend fun removeProviderProgress(
+        provider: TrackingProgressProvider,
+        entries: Collection<WatchProgressEntry>,
+        reason: String,
+    ) {
+        try {
+            provider.removeProgress(entries)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            log.e(error) {
+                "Failed to $reason from ${provider.providerId.storageId}"
+            }
         }
     }
 
@@ -887,7 +898,7 @@ object WatchProgressRepository {
     }
 
     private fun retryMetadataResolutionWhenAddonMetaProvidersReady(state: AddonsUiState) {
-        if (!hasLoaded || shouldUseTraktProgress()) return
+        if (!hasLoaded || activeProgressProvider()?.providesCompleteMetadata == true) return
 
         val readiness = state.metadataProviderReadiness()
         if (!readiness.isReady) return
@@ -910,13 +921,14 @@ object WatchProgressRepository {
     private fun resolveRemoteMetadata() {
         val targetProfileId = currentProfileId
         val targetGeneration = profileGeneration
-        val missingMetadataEntries = localEntriesSnapshot()
+        val targetSource = activeSource
+        val missingMetadataEntries = currentEntries()
             .filter(WatchProgressEntry::needsRemoteMetadataEnrichment)
         val entriesToResolve = missingMetadataEntries.continueWatchingEntries(
             limit = WATCH_PROGRESS_METADATA_RESOLUTION_LIMIT,
         )
         val needsResolution = entriesToResolve
-            .groupBy { it.parentMetaId to it.contentType }
+            .groupBy(WatchProgressEntry::metadataKey)
 
         if (needsResolution.isEmpty()) return
 
@@ -927,7 +939,7 @@ object WatchProgressRepository {
         metadataResolutionJob?.cancel()
         metadataResolutionJob = syncScope.launch(start = CoroutineStart.LAZY) {
             try {
-                if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
+                if (!isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)) return@launch
                 AddonRepository.initialize()
                 val providerReadiness = AddonRepository.uiState.value.metadataProviderReadiness()
                 if (providerReadiness.isReady) {
@@ -951,30 +963,41 @@ object WatchProgressRepository {
                 repeat(needsResolution.size) {
                     val result = resolutionResults.receive()
                     ensureActive()
-                    if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
+                    if (!isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)) return@launch
                     val meta = result.meta
                     if (meta == null) {
                         return@repeat
                     }
 
-                    var appliedEntries = 0
-                    for (entry in result.entries) {
-                        val current = localEntry(entry.resolvedProgressKey()) ?: continue
-                        val enriched = enrichWatchProgressEntry(current = current, meta = meta)
-                        if (enriched == current) continue
-                        upsertLocalEntry(enriched)
-                        appliedEntries += 1
+                    val appliedEntries = if (targetSource.providerId == null) {
+                        var appliedLocalEntries = 0
+                        for (entry in result.entries) {
+                            val current = localEntry(entry.resolvedProgressKey()) ?: continue
+                            val enriched = enrichWatchProgressEntry(current = current, meta = meta)
+                            if (enriched == current) continue
+                            upsertLocalEntry(enriched)
+                            appliedLocalEntries += 1
+                        }
+                        appliedLocalEntries
+                    } else if (providerMetadataOverlay.put(targetSource, result.key, meta)) {
+                        result.entries.size
+                    } else {
+                        0
                     }
                     if (appliedEntries == 0) return@repeat
 
                     resolvedEntries += appliedEntries
 
-                    if (isActiveOperation(targetProfileId, targetGeneration)) {
+                    if (isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)) {
                         publish()
                     }
                 }
                 resolutionResults.close()
-                if (resolvedEntries > 0 && isActiveOperation(targetProfileId, targetGeneration)) {
+                if (
+                    targetSource.providerId == null &&
+                    resolvedEntries > 0 &&
+                    isActiveMetadataTarget(targetProfileId, targetGeneration, targetSource)
+                ) {
                     persist()
                 }
             } finally {
@@ -983,7 +1006,7 @@ object WatchProgressRepository {
                     resolutionGeneration = resolutionGeneration,
                     currentProviderFingerprint = currentReadiness.fingerprint.takeIf { currentReadiness.isReady },
                 )
-                if (shouldRetry && hasLoaded && !shouldUseTraktProgress()) {
+                if (shouldRetry && hasLoaded && activeProgressProvider()?.providesCompleteMetadata != true) {
                     resolveRemoteMetadata()
                 }
             }
@@ -992,10 +1015,9 @@ object WatchProgressRepository {
     }
 
     private suspend fun fetchRemoteMetadataGroup(
-        key: Pair<String, String>,
+        key: WatchProgressMetadataKey,
         entries: List<WatchProgressEntry>,
     ): RemoteMetadataResolutionResult {
-        val (metaId, metaType) = key
         var meta: MetaDetails? = null
         for (attempt in 1..WATCH_PROGRESS_METADATA_FETCH_ATTEMPTS) {
             if (attempt > 1) {
@@ -1004,7 +1026,7 @@ object WatchProgressRepository {
                 delay(retryDelayMs)
             }
             meta = try {
-                MetaDetailsRepository.fetch(metaType, metaId)
+                MetaDetailsRepository.fetch(key.metaType, key.metaId)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -1013,6 +1035,7 @@ object WatchProgressRepository {
             if (meta != null) break
         }
         return RemoteMetadataResolutionResult(
+            key = key,
             entries = entries,
             meta = meta,
         )
@@ -1047,47 +1070,18 @@ object WatchProgressRepository {
         ensureLoaded()
         if (videoIds.isEmpty()) return
 
-        val useTraktProgress = shouldUseTraktProgress()
-        if (useTraktProgress) {
+        activeProgressProvider()?.let { provider ->
             val entriesToRemove = currentEntries().filter { entry ->
                 entry.videoId in videoIds &&
                     (parentMetaId == null || entry.parentMetaId == parentMetaId)
             }
             val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
-            if (parentMetaId == null) {
-                videoIds.forEach(TraktProgressRepository::applyOptimisticRemoval)
-            } else {
-                entriesToRemove
-                    .distinctBy { entry ->
-                        Triple(entry.parentMetaId, entry.seasonNumber, entry.episodeNumber)
-                    }
-                    .forEach { entry ->
-                        TraktProgressRepository.applyOptimisticRemoval(
-                            contentId = entry.parentMetaId,
-                            seasonNumber = entry.seasonNumber,
-                            episodeNumber = entry.episodeNumber,
-                        )
-                    }
-            }
-            if (locallyRemovedEntries.isNotEmpty()) {
-                persist()
-            }
+            provider.applyOptimisticRemoval(entriesToRemove)
+            if (locallyRemovedEntries.isNotEmpty()) persist()
             publish()
-            val traktEntriesToRemove = entriesToRemove.filter { entry -> entry.shouldAttemptTraktPlaybackDelete() }
-            if (traktEntriesToRemove.isNotEmpty()) {
+            if (entriesToRemove.isNotEmpty()) {
                 syncScope.launch {
-                    traktEntriesToRemove.forEach { entry ->
-                        runCatching {
-                            TraktProgressRepository.removeProgress(
-                                contentId = entry.parentMetaId,
-                                seasonNumber = entry.seasonNumber,
-                                episodeNumber = entry.episodeNumber,
-                            )
-                        }.onFailure { error ->
-                            if (error is CancellationException) throw error
-                            log.e(error) { "Failed to clear Trakt playback progress for ${entry.videoId}" }
-                        }
-                    }
+                    removeProviderProgress(provider, entriesToRemove, "clear playback progress")
                 }
             }
             return
@@ -1113,7 +1107,6 @@ object WatchProgressRepository {
         val normalizedContentId = contentId.trim()
         if (normalizedContentId.isBlank()) return
 
-        val useTraktProgress = shouldUseTraktProgress()
         val entriesToRemove = currentEntries().filter { entry ->
             if (entry.parentMetaId != normalizedContentId) {
                 false
@@ -1125,32 +1118,13 @@ object WatchProgressRepository {
         }
         if (entriesToRemove.isEmpty()) return
 
-        if (useTraktProgress) {
+        activeProgressProvider()?.let { provider ->
             val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
-            TraktProgressRepository.applyOptimisticRemoval(
-                contentId = normalizedContentId,
-                seasonNumber = seasonNumber,
-                episodeNumber = episodeNumber,
-            )
-            if (locallyRemovedEntries.isNotEmpty()) {
-                persist()
-            }
+            provider.applyOptimisticRemoval(entriesToRemove)
+            if (locallyRemovedEntries.isNotEmpty()) persist()
             publish()
-            val shouldAttemptTraktDelete = entriesToRemove.any { entry -> entry.shouldAttemptTraktPlaybackDelete() }
-            if (!shouldAttemptTraktDelete) {
-                return
-            }
             syncScope.launch {
-                runCatching {
-                    TraktProgressRepository.removeProgress(
-                        contentId = normalizedContentId,
-                        seasonNumber = seasonNumber,
-                        episodeNumber = episodeNumber,
-                    )
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                    log.e(error) { "Failed to remove Trakt watch progress" }
-                }
+                removeProviderProgress(provider, entriesToRemove, "remove playback progress")
             }
             return
         }
@@ -1170,11 +1144,7 @@ object WatchProgressRepository {
         episodeNumber: Int? = null,
     ): WatchProgressEntry? {
         ensureLoaded()
-        return if (shouldUseTraktProgress()) {
-            TraktProgressRepository.uiState.value.entries
-        } else {
-            localEntriesSnapshot()
-        }.resolveProgressForVideo(
+        return currentEntries().resolveProgressForVideo(
             videoId = videoId,
             parentMetaId = parentMetaId,
             seasonNumber = seasonNumber,
@@ -1194,16 +1164,19 @@ object WatchProgressRepository {
 
     fun refreshEpisodeProgress(contentId: String, forceRefresh: Boolean = false) {
         ensureLoaded()
-        if (!shouldUseTraktProgress()) return
+        val provider = activeProgressProvider() ?: return
         syncScope.launch {
             runCatching {
-                TraktProgressRepository.refreshEpisodeProgress(
+                provider.refreshEpisodeProgress(
                     contentId = contentId,
                     forceRefresh = forceRefresh,
                 )
             }.onFailure { error ->
                 if (error is CancellationException) throw error
-                log.w { "Failed to refresh Trakt episode progress for $contentId: ${error.message}" }
+                log.w {
+                    "Failed to refresh ${provider.providerId.storageId} episode progress " +
+                        "for $contentId: ${error.message}"
+                }
             }
         }
     }
@@ -1226,16 +1199,11 @@ object WatchProgressRepository {
             return
         }
 
-        val useTraktProgress = shouldUseTraktProgress()
-
-        // If Trakt is the active CW source and parentMetaId is not Trakt-resolvable
-        // but videoId contains a valid IMDB/TMDB, use the resolved ID to avoid
-        // duplicate CW entries (one local with garbage ID, one from Trakt with real ID).
-        val effectiveParentMetaId = if (useTraktProgress) {
-            resolveEffectiveContentId(session.parentMetaId, session.videoId)
-        } else {
-            session.parentMetaId
-        }
+        val progressProvider = activeProgressProvider()
+        val effectiveParentMetaId = progressProvider?.normalizeParentContentId(
+            parentContentId = session.parentMetaId,
+            videoId = session.videoId,
+        ) ?: session.parentMetaId
 
         val candidateEntry = WatchProgressEntry(
             contentType = session.contentType,
@@ -1282,9 +1250,7 @@ object WatchProgressRepository {
 
         upsertLocalEntry(entry)
         markProgressDirty(entry)
-        if (useTraktProgress) {
-            TraktProgressRepository.applyOptimisticProgress(entry)
-        }
+        progressProvider?.applyOptimisticProgress(entry)
         publish()
         if (persist) persist()
         if (entry.needsRemoteMetadataEnrichment()) {
@@ -1293,7 +1259,12 @@ object WatchProgressRepository {
         if (syncRemote) {
             pushScrobbleToServer(entry = entry, profileId = targetProfileId)
         }
-        if (shouldCascadeCompletedProgressToWatchedHistory(entry, useTraktProgress)) {
+        if (
+            shouldCascadeCompletedProgressToWatchedHistory(
+                entry = entry,
+                providerOwnsCompletedHistory = progressProvider?.ownsCompletedHistoryProjection == true,
+            )
+        ) {
             WatchingActions.onProgressEntryUpdated(entry, syncRemote = syncRemote)
         }
     }
@@ -1355,7 +1326,7 @@ object WatchProgressRepository {
     }
 
     private fun pushDeleteToServer(entries: Collection<WatchProgressEntry>) {
-        if (shouldUseTraktProgress()) return
+        if (activeSource.providerId != null) return
         val profileId = currentProfileId
         accountScopeSnapshot().launch {
             runCatching {
@@ -1370,14 +1341,12 @@ object WatchProgressRepository {
     private fun publish() {
         val entries = currentEntries()
         val sortedEntries = entries.sortedByDescending { it.lastUpdatedEpochMs }
-        val hasLoadedRemoteProgress = if (shouldUseTraktProgress()) {
-            TraktProgressRepository.uiState.value.hasLoadedRemoteProgress
-        } else {
-            hasLoadedNuvioRemoteProgress
-        }
-        _uiState.value = WatchProgressUiState(
+        val providerSnapshot = activeProgressProvider()?.snapshot()
+        _uiState.value = projectWatchProgressUiState(
+            source = activeSource,
             entries = sortedEntries,
-            hasLoadedRemoteProgress = hasLoadedRemoteProgress,
+            providerSnapshot = providerSnapshot,
+            hasLoadedNuvioRemoteProgress = hasLoadedNuvioRemoteProgress,
         )
     }
 
@@ -1466,9 +1435,6 @@ object WatchProgressRepository {
         )
     }
 
-    private fun shouldUseTraktProgress(): Boolean =
-        activeSource == WatchProgressSource.TRAKT
-
     private fun accountScopeSnapshot(): CoroutineScope = synchronized(accountScopeLock) {
         accountScope
     }
@@ -1477,9 +1443,6 @@ object WatchProgressRepository {
         activeSource = source
         _activeSourceState.value = source
     }
-
-    private fun WatchProgressEntry.shouldAttemptTraktPlaybackDelete(): Boolean =
-        isTraktCompatibleId(parentMetaId)
 
     private fun removeStoredLocalEntries(entries: Collection<WatchProgressEntry>): List<WatchProgressEntry> =
         synchronized(entriesLock) {
@@ -1499,28 +1462,19 @@ object WatchProgressRepository {
         }
 
     private fun currentEntries(): List<WatchProgressEntry> {
-        return if (shouldUseTraktProgress()) {
-            // Merge Trakt remote progress with local-only entries that use
-            // non-Trakt-compatible IDs (kitsu:, mal:, anilist:, etc.).
-            // Trakt will never return these IDs, so they must come from local storage.
-            val traktItems = TraktProgressRepository.uiState.value.entries
-            val localNonTraktItems = localEntriesSnapshot().filter {
-                !isTraktCompatibleId(it.parentMetaId)
-            }
-            if (localNonTraktItems.isEmpty()) {
-                traktItems
-            } else {
-                val traktKeys = traktItems.mapTo(mutableSetOf()) { entry -> entry.resolvedProgressKey() }
-                val merged = traktItems.toMutableList()
-                localNonTraktItems.forEach { localItem ->
-                    if (localItem.resolvedProgressKey() !in traktKeys) {
-                        merged.add(localItem)
-                    }
-                }
-                merged
-            }
+        val providerEntries = activeProgressProvider()
+            ?.snapshot()
+            ?.entries
+            .orEmpty()
+        val projectedEntries = projectWatchProgressSourceEntries(
+            source = activeSource,
+            nuvioEntries = localEntriesSnapshot(),
+            providerEntries = providerEntries,
+        )
+        return if (activeSource.providerId == null) {
+            projectedEntries
         } else {
-            localEntriesSnapshot()
+            providerMetadataOverlay.project(source = activeSource, entries = projectedEntries)
         }
     }
 
@@ -1652,8 +1606,27 @@ object WatchProgressRepository {
         }
 
     fun isDroppedShow(contentId: String): Boolean {
-        return shouldUseTraktProgress() && TraktProgressRepository.isShowHiddenFromProgress(contentId)
+        return activeProgressProvider()?.isHiddenFromProgress(contentId) == true
     }
+
+    fun activeProviderOwnsCompletedHistoryProjection(): Boolean =
+        activeProgressProvider()?.ownsCompletedHistoryProjection == true
+
+    fun activeProviderContinueWatchingCutoffEpochMs(
+        daysCap: Int,
+        nowEpochMs: Long,
+    ): Long? = activeProgressProvider()?.continueWatchingCutoffEpochMs(daysCap, nowEpochMs)
+
+    fun shouldUseAsNextUpSeed(entry: WatchProgressEntry, nowEpochMs: Long): Boolean =
+        activeProgressProvider()?.shouldUseAsNextUpSeed(entry, nowEpochMs)
+            ?: entry.shouldUseAsCompletedSeedForContinueWatching()
+
+    suspend fun prepareNextUpProgressEntries(
+        entries: List<WatchProgressEntry>,
+        contentId: String,
+    ): List<WatchProgressEntry> = activeProgressProvider()
+        ?.prepareNextUpProgressEntries(entries, contentId)
+        ?: entries
 
     private fun AddonsUiState.metadataProviderReadiness(): MetadataProviderReadiness {
         val enabled = addons.enabledAddons()
@@ -1669,3 +1642,16 @@ object WatchProgressRepository {
         resources.any { resource -> resource.name == "meta" }
 
 }
+
+internal fun projectWatchProgressUiState(
+    source: WatchProgressSource,
+    entries: List<WatchProgressEntry>,
+    providerSnapshot: TrackingProgressSnapshot?,
+    hasLoadedNuvioRemoteProgress: Boolean,
+): WatchProgressUiState = WatchProgressUiState(
+    source = source,
+    entries = entries,
+    hiddenContentIds = providerSnapshot?.hiddenContentIds.orEmpty(),
+    hasLoadedRemoteProgress =
+        providerSnapshot?.hasLoadedRemoteProgress ?: hasLoadedNuvioRemoteProgress,
+)

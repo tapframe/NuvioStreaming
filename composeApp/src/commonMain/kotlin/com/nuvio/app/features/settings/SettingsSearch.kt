@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -92,7 +93,7 @@ internal fun settingsSearchEntries(
     val advancedCategory = stringResource(SettingsCategory.Advanced.labelRes)
 
     val accountPage = stringResource(Res.string.compose_settings_page_account)
-    val traktPage = stringResource(Res.string.compose_settings_page_trakt)
+    val trackingPage = stringResource(Res.string.compose_settings_page_tracking)
     val layoutPage = stringResource(Res.string.compose_settings_page_appearance)
     val advancedPage = stringResource(Res.string.compose_settings_page_advanced)
     val contentDiscoveryPage = stringResource(Res.string.compose_settings_page_content_discovery)
@@ -200,11 +201,11 @@ internal fun settingsSearchEntries(
     )
     addPage(
         page = SettingsPage.TraktAuthentication,
-        key = "trakt",
-        title = traktPage,
-        description = stringResource(Res.string.compose_settings_root_trakt_description),
+        key = "tracking",
+        title = trackingPage,
+        description = stringResource(Res.string.compose_settings_root_tracking_description),
         category = accountCategory,
-        icon = Icons.Rounded.Link,
+        icon = Icons.Default.Sync,
     )
     addPage(
         page = SettingsPage.Appearance,
@@ -286,6 +287,7 @@ internal fun settingsSearchEntries(
         PlaybackSearchRow("nuvio-license", stringResource(Res.string.settings_licenses_attributions_nuvio_title), stringResource(Res.string.settings_licenses_attributions_nuvio_license)),
         PlaybackSearchRow("tmdb-attribution", stringResource(Res.string.settings_licenses_attributions_tmdb_title), stringResource(Res.string.settings_licenses_attributions_tmdb_body)),
         PlaybackSearchRow("trakt-attribution", stringResource(Res.string.settings_licenses_attributions_trakt_title), stringResource(Res.string.settings_licenses_attributions_trakt_body)),
+        PlaybackSearchRow("simkl-attribution", stringResource(Res.string.settings_licenses_attributions_simkl_title), stringResource(Res.string.settings_licenses_attributions_simkl_body)),
         PlaybackSearchRow("premiumize-attribution", stringResource(Res.string.settings_licenses_attributions_premiumize_title), stringResource(Res.string.settings_licenses_attributions_premiumize_body)),
         PlaybackSearchRow("torbox-attribution", stringResource(Res.string.settings_licenses_attributions_torbox_title), stringResource(Res.string.settings_licenses_attributions_torbox_body)),
         PlaybackSearchRow("mdblist-attribution", stringResource(Res.string.settings_licenses_attributions_mdblist_title), stringResource(Res.string.settings_licenses_attributions_mdblist_body)),
@@ -873,10 +875,20 @@ internal fun settingsSearchEntries(
     addRow(
         page = SettingsPage.TraktAuthentication,
         key = "trakt-authentication",
-        title = stringResource(Res.string.settings_trakt_authentication),
+        title = stringResource(Res.string.trakt_library_source_trakt),
         description = stringResource(Res.string.settings_trakt_intro_description),
-        pageLabel = traktPage,
-        section = stringResource(Res.string.settings_trakt_authentication),
+        pageLabel = trackingPage,
+        section = stringResource(Res.string.settings_tracking_services),
+        category = accountCategory,
+        icon = Icons.Rounded.Link,
+    )
+    addRow(
+        page = SettingsPage.TraktAuthentication,
+        key = "simkl-authentication",
+        title = stringResource(Res.string.tracking_source_simkl),
+        description = stringResource(Res.string.settings_simkl_sign_in_description),
+        pageLabel = trackingPage,
+        section = stringResource(Res.string.settings_tracking_services),
         category = accountCategory,
         icon = Icons.Rounded.Link,
     )
@@ -892,8 +904,8 @@ internal fun settingsSearchEntries(
             key = row.key,
             title = row.title,
             description = row.description,
-            pageLabel = traktPage,
-            section = stringResource(Res.string.settings_trakt_features),
+            pageLabel = trackingPage,
+            section = stringResource(Res.string.settings_tracking_features),
             category = accountCategory,
             icon = Icons.Rounded.Link,
         )

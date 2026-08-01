@@ -132,6 +132,39 @@ class SyncManagerTest {
     }
 
     @Test
+    fun `failed profile sync does not advance foreground freshness`() {
+        val previous = ProfilePullFreshness(
+            profileId = 3,
+            completedAtEpochMs = 1_000L,
+        )
+        val failed = previous.recordIfSuccessful(
+            profileId = 3,
+            completedAtEpochMs = 2_000L,
+            result = ProfileSyncResult(setOf(ProfileSyncStep.ActiveWatchSource)),
+        )
+        val succeeded = previous.recordIfSuccessful(
+            profileId = 3,
+            completedAtEpochMs = 2_000L,
+            result = ProfileSyncResult(emptySet()),
+        )
+
+        assertEquals(previous, failed)
+        assertEquals(2_000L, succeeded.completedAtEpochMs)
+        assertFalse(
+            ProfilePullFreshness()
+                .recordIfSuccessful(
+                    profileId = 3,
+                    completedAtEpochMs = 2_000L,
+                    result = ProfileSyncResult(setOf(ProfileSyncStep.ActiveWatchSource)),
+                )
+                .isRecent(profileId = 3, nowEpochMs = 2_001L, minIntervalMs = 1_000L),
+        )
+        assertTrue(
+            succeeded.isRecent(profileId = 3, nowEpochMs = 2_001L, minIntervalMs = 1_000L),
+        )
+    }
+
+    @Test
     fun `realtime invalidation queued during active sync runs once afterwards`() = runBlocking {
         val gate = ProfileSyncRequestGate()
         val firstStarted = CompletableDeferred<Unit>()
