@@ -429,6 +429,7 @@ fun LibraryScreen(
                             LibraryLayoutMode.HORIZONTAL -> librarySections(
                                 displaySections = librarySectionsDisplay,
                                 watchedKeys = watchedUiState.watchedKeys,
+                                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 sortOption = effectiveSortOption,
                                 onPosterClick = onPosterClick,
                                 onSectionViewAllClick = onSectionViewAllClick,
@@ -1179,6 +1180,7 @@ private enum class LibraryViewMode {
 private fun LazyListScope.librarySections(
     displaySections: List<LibraryDisplaySection>,
     watchedKeys: Set<String>,
+    fullyWatchedSeriesKeys: Set<String>,
     sortOption: LibrarySortOption,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)?,
@@ -1214,6 +1216,7 @@ private fun LazyListScope.librarySections(
                     isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedKeys,
                         item = posterItem,
+                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     ),
                     onClick = if (entry.exiting) null else onPosterClick?.let { { it(item) } },
                     onLongClick = if (entry.exiting || entrySource == null) {

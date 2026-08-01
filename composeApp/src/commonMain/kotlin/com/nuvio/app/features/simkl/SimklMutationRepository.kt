@@ -64,11 +64,12 @@ internal class SimklMutationService(
             }
         }
         if (candidates.isEmpty()) return TrackingMutationResult(attemptedCount = 0)
+        val body = buildSimklHistoryMutationBody(candidates, json)
         val response = client.execute(
             SimklApiRequest(
                 method = SimklHttpMethod.POST,
                 path = "/sync/history",
-                body = buildSimklHistoryMutationBody(candidates, json),
+                body = body,
                 retryPolicy = SimklRetryPolicy.SYNC_WRITE,
             ),
         )

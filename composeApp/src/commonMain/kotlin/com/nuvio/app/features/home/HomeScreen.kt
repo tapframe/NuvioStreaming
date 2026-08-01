@@ -54,6 +54,7 @@ import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.episodePlaybackId
+import com.nuvio.app.features.watched.resolveWatchedBadgesBulk
 import com.nuvio.app.features.watched.watchedItemKey
 import com.nuvio.app.features.watchprogress.CachedInProgressItem
 import com.nuvio.app.features.watchprogress.CachedNextUpItem
@@ -832,21 +833,11 @@ fun HomeScreen(
     val keyedEnabledHomeItems = remember(enabledHomeItems) {
         enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)
     }
-    val visibleSeriesPosterTargets = remember(enabledHomeItems, sectionsMap) {
-        enabledHomeItems
-            .filterNot { it.isCollection }
-            .mapNotNull { settingsItem -> sectionsMap[settingsItem.key] }
-            .flatMap { section -> section.items.take(HOME_CATALOG_PREVIEW_LIMIT) }
-            .filter { item -> item.type.isHomeSeriesLikeType() }
-            .distinctBy { item -> watchedItemKey(item.type, item.id) }
-    }
     LaunchedEffect(
-        visibleSeriesPosterTargets,
         watchedUiState.items,
         watchProgressUiState.entries,
     ) {
-        reconcileVisibleSeriesPosterBadges(
-            items = visibleSeriesPosterTargets,
+        resolveWatchedBadgesBulk(
             watchedItems = watchedUiState.items,
             progressEntries = watchProgressUiState.entries,
         )
@@ -1117,53 +1108,6 @@ internal const val HomeNextUpInitialResolutionLimit = 32
 private const val NEXT_UP_RESOLUTION_CONCURRENCY = 4
 private const val MAX_NEXT_UP_RESOLUTION_RETRIES = 3
 private const val NEXT_UP_RESOLUTION_RETRY_BASE_DELAY_MS = 1_500L
-
-private suspend fun reconcileVisibleSeriesPosterBadges(
-    items: List<MetaPreview>,
-    watchedItems: List<WatchedItem>,
-    progressEntries: List<WatchProgressEntry>,
-) {
-    if (items.isEmpty()) return
-    val watchedKeys = watchedItems.mapTo(linkedSetOf()) { item ->
-        watchedItemKey(item.type, item.id, item.season, item.episode)
-    }
-    val touchedSeriesIds = buildSet {
-        watchedItems.forEach { item ->
-            if (item.type.isHomeSeriesLikeType() && item.season != null && item.episode != null) {
-                add(item.id)
-            }
-        }
-        progressEntries.forEach { entry ->
-            if (entry.parentMetaType.isHomeSeriesLikeType() && entry.isEpisode && entry.isEffectivelyCompleted) {
-                add(entry.parentMetaId)
-            }
-        }
-    }
-    if (touchedSeriesIds.isEmpty()) return
-    val todayIsoDate = CurrentDateProvider.todayIsoDate()
-    withContext(Dispatchers.Default) {
-        items
-            .filter { item -> item.id in touchedSeriesIds }
-            .forEach { item ->
-                val meta = runCatching {
-                    MetaDetailsRepository.fetch(type = item.type, id = item.id)
-                }.getOrNull() ?: return@forEach
-                WatchedRepository.reconcileFullyWatchedSeriesState(
-                    meta = meta,
-                    todayIsoDate = todayIsoDate,
-                    isEpisodeWatched = { episode ->
-                        watchedItemKey(meta.type, meta.id, episode.season, episode.episode) in watchedKeys
-                    },
-                    isEpisodeCompleted = { episode ->
-                        val playbackId = meta.episodePlaybackId(episode)
-                        progressEntries.any { entry ->
-                            entry.videoId == playbackId && entry.isEffectivelyCompleted
-                        }
-                    },
-                )
-            }
-    }
-}
 
 private fun String.isHomeSeriesLikeType(): Boolean =
     trim().lowercase() in setOf("series", "show", "tv", "tvshow")

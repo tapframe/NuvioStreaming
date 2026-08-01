@@ -102,7 +102,7 @@ private fun SimklLibraryEntry.toLibraryItem(
     val simklId = media.ids.simklIdValue()?.toLongOrNull()
     val entryType = when (mediaType) {
         SimklMediaType.MOVIES -> "movie"
-        SimklMediaType.ANIME -> "anime"
+        SimklMediaType.ANIME -> if (animeType == "movie") "movie" else "series"
         SimklMediaType.SHOWS -> "series"
     }
     return LibraryItem(

@@ -109,6 +109,8 @@ object TraktProgressRepository {
     private var showIdToTraktPathId: Map<String, String> = emptyMap()
     private var showIdSiblingsMap: Map<String, Set<String>> = emptyMap()
 
+    fun getShowIdSiblings(): Map<String, Set<String>> = showIdSiblingsMap
+
     init {
         scope.launch {
             while (true) {

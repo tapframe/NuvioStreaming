@@ -1144,6 +1144,17 @@
     <string name="settings_tracking_simkl_progress_description">Resume with playback progress from Simkl.</string>
     <string name="settings_tracking_tmdb_recommendations_description">Use TMDB recommendations on details pages.</string>
     <string name="settings_tracking_trakt_recommendations_description">Use personalized related titles from Trakt.</string>
+    <string name="settings_tracking_anime_id_title">Anime ID preference</string>
+    <string name="settings_tracking_anime_id_subtitle">Choose which external ID is used as the primary identifier for anime entries.</string>
+    <string name="settings_tracking_anime_id_dialog_title">Anime ID preference</string>
+    <string name="settings_tracking_anime_id_dialog_subtitle">This controls how anime series are identified. Choosing MAL or Kitsu gives each season its own entry instead of grouping under one IMDB ID.</string>
+    <string name="settings_tracking_anime_id_imdb">Prefer IMDB</string>
+    <string name="settings_tracking_anime_id_imdb_description">Group anime seasons under a shared IMDB ID (default behavior).</string>
+    <string name="settings_tracking_anime_id_mal">Prefer MyAnimeList</string>
+    <string name="settings_tracking_anime_id_mal_description">Each anime season gets its own MAL ID as the primary identifier.</string>
+    <string name="settings_tracking_anime_id_kitsu">Prefer Kitsu</string>
+    <string name="settings_tracking_anime_id_kitsu_description">Each anime season gets its own Kitsu ID as the primary identifier.</string>
+    <string name="settings_tracking_anime_section">Simkl features</string>
     <string name="settings_simkl_connect">Connect Simkl</string>
     <string name="settings_simkl_connected_as">Connected as %1$s</string>
     <string name="settings_simkl_default_user">Simkl user</string>

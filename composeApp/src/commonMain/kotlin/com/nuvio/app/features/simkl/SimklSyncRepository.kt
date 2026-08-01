@@ -251,6 +251,16 @@ object SimklSyncRepository : TrackingProfileStore {
         SimklSyncStorage.savePayload("")
     }
 
+    /**
+     * Bumps the projection version to force downstream collectors (CW, library, watched badges)
+     * to recompute their projections without re-fetching from the network.
+     * Call this when a setting that affects projection output changes (e.g. anime ID preference).
+     */
+    fun invalidateProjections() {
+        val current = _state.value
+        _state.value = current.copy(projectionVersion = current.projectionVersion + 1L)
+    }
+
     override fun removeStoredProfile(profileId: Int) {
         SimklSyncStorage.removeProfile(profileId)
     }

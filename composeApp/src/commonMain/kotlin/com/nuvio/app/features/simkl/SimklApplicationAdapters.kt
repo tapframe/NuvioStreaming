@@ -63,14 +63,15 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
             intent = TrackingRefreshIntent.AUTOMATIC,
             origin = SimklRefreshOrigin.WATCHED_ITEMS,
         )
-        return SimklSyncRepository.state.value.snapshot.animeAlternateWatchedKeys()
+        val snapshot = SimklSyncRepository.state.value.snapshot
+        return snapshot.animeAlternateWatchedKeys() + snapshot.movieAlternateWatchedKeys()
     }
 
     override fun observeExtraWatchedKeys(profileId: Int): kotlinx.coroutines.flow.Flow<Set<String>> =
         SimklSyncRepository.state
             .map { state ->
                 SimklAnimeWatchedFallback.clearOptimisticRemovals()
-                state.snapshot.animeAlternateWatchedKeys()
+                state.snapshot.animeAlternateWatchedKeys() + state.snapshot.movieAlternateWatchedKeys()
             }
             .distinctUntilChanged()
 

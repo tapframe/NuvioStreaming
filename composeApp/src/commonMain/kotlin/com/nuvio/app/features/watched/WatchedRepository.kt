@@ -39,6 +39,7 @@ import kotlinx.serialization.json.Json
 private data class StoredWatchedPayload(
     val items: List<WatchedItem> = emptyList(),
     val fullyWatchedSeriesKeys: Set<String> = emptySet(),
+    val expandedSiblingKeys: Set<String> = emptySet(),
     val lastSuccessfulPushEpochMs: Long = 0L,
     val deltaCursorEventId: Long = 0L,
     val deltaInitialized: Boolean = false,
@@ -136,6 +137,7 @@ object WatchedRepository {
     private var providerItemsByKey: MutableMap<TrackingProviderId, MutableMap<String, WatchedItem>> = mutableMapOf()
     private var nuvioFullyWatchedSeriesKeys: Set<String> = emptySet()
     private var providerFullyWatchedSeriesKeys: MutableMap<TrackingProviderId, Set<String>> = mutableMapOf()
+    private var expandedSiblingKeys: Set<String> = emptySet()
     private var providerExtraWatchedKeys: MutableMap<TrackingProviderId, Set<String>> = mutableMapOf()
     private var nuvioHasLoaded: Boolean = false
     private var loadedProviders: MutableSet<TrackingProviderId> = mutableSetOf()
@@ -187,6 +189,7 @@ object WatchedRepository {
         providerItemsByKey.clear()
         nuvioFullyWatchedSeriesKeys = emptySet()
         providerFullyWatchedSeriesKeys.clear()
+        expandedSiblingKeys = emptySet()
         providerExtraWatchedKeys.clear()
         nuvioHasLoaded = false
         loadedProviders.clear()
@@ -210,6 +213,7 @@ object WatchedRepository {
         providerItemsByKey.clear()
         nuvioFullyWatchedSeriesKeys = emptySet()
         providerFullyWatchedSeriesKeys.clear()
+        expandedSiblingKeys = emptySet()
         providerExtraWatchedKeys.clear()
         nuvioHasLoaded = true
         loadedProviders.clear()
@@ -232,6 +236,7 @@ object WatchedRepository {
             nuvioDirtyWatchedKeys = storedPayload.dirtyWatchedKeys
                 .filterTo(mutableSetOf()) { key -> key in nuvioItemsByKey }
             nuvioFullyWatchedSeriesKeys = storedPayload.fullyWatchedSeriesKeys
+            expandedSiblingKeys = storedPayload.expandedSiblingKeys
         } else {
             lastSuccessfulPushEpochMs = 0L
             deltaCursorEventId = 0L
@@ -833,6 +838,11 @@ object WatchedRepository {
         return itemsForSource(activeSource).containsKey(watchedItemKey(type, id, season, episode))
     }
 
+    fun isFullyWatchedSeries(id: String, type: String): Boolean {
+        val key = watchedItemKey(type, id)
+        return _fullyWatchedSeriesKeys.value.contains(key)
+    }
+
     fun reconcileSeriesWatchedState(
         meta: MetaDetails,
         todayIsoDate: String,
@@ -867,12 +877,17 @@ object WatchedRepository {
         meta: MetaDetails,
         todayIsoDate: String,
         isEpisodeWatched: (MetaVideo) -> Boolean = { episode ->
-            isWatched(
-                id = meta.id,
-                type = meta.type,
-                season = episode.season,
-                episode = episode.episode,
-            )
+            val key = watchedItemKey(meta.type, meta.id, episode.season, episode.episode)
+            if (key in _uiState.value.watchedKeys) {
+                true
+            } else {
+                val episodeNumber = episode.episode
+                if (episodeNumber != null) {
+                    com.nuvio.app.features.simkl.SimklAnimeWatchedFallback.isWatched(episode.id, episodeNumber)
+                } else {
+                    false
+                }
+            }
         },
         isEpisodeCompleted: (MetaVideo) -> Boolean = { false },
     ): Boolean {
@@ -916,6 +931,20 @@ object WatchedRepository {
             persistNuvio()
         }
     }
+
+    fun setExpandedFullyWatchedSeriesKeys(keys: Set<String>) {
+        expandedSiblingKeys = keys
+        publish()
+        persistNuvio()
+    }
+
+    fun currentExpandedSiblingKeys(): Set<String> = expandedSiblingKeys
+
+    /**
+     * Returns the base fully-watched series keys from the active source,
+     * without sibling expansion. Used by sibling expansion to avoid feedback loops.
+     */
+    fun baseFullyWatchedSeriesKeys(): Set<String> = fullyWatchedSeriesKeysForSource(activeSource)
 
     private fun pushMarksToServer(
         items: Collection<WatchedItem>,
@@ -985,7 +1014,7 @@ object WatchedRepository {
         val hasLoadedRemoteItems = activeSource.providerId
             ?.let(providersLoadedFromRemote::contains)
             ?: nuvioHasLoadedRemote
-        _fullyWatchedSeriesKeys.value = fullyWatchedSeriesKeys
+        _fullyWatchedSeriesKeys.value = fullyWatchedSeriesKeys + expandedSiblingKeys
         _uiState.value = WatchedUiState(
             items = items,
             watchedKeys = watchedKeys,
@@ -1056,6 +1085,7 @@ object WatchedRepository {
                         .map(WatchedItem::normalizedMarkedAt)
                         .sortedByDescending { it.markedAtEpochMs },
                     fullyWatchedSeriesKeys = nuvioFullyWatchedSeriesKeys,
+                    expandedSiblingKeys = expandedSiblingKeys,
                     lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
                     deltaCursorEventId = deltaCursorEventId,
                     deltaInitialized = deltaInitialized,

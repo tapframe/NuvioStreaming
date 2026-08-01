@@ -26,6 +26,7 @@ import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.simkl.SimklAnimeIdPreference
 import com.nuvio.app.features.simkl.SimklAuthUiState
 import com.nuvio.app.features.simkl.SimklConnectionMode
 import com.nuvio.app.features.tracking.TrackingProviderId
@@ -58,6 +59,17 @@ import nuvio.composeapp.generated.resources.settings_tracking_trakt_library_desc
 import nuvio.composeapp.generated.resources.settings_tracking_trakt_progress_description
 import nuvio.composeapp.generated.resources.settings_tracking_trakt_recommendations_description
 import nuvio.composeapp.generated.resources.settings_tracking_viewing_discovery
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_dialog_subtitle
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_dialog_title
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_imdb
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_imdb_description
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_kitsu
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_kitsu_description
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_mal
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_mal_description
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_subtitle
+import nuvio.composeapp.generated.resources.settings_tracking_anime_id_title
+import nuvio.composeapp.generated.resources.settings_tracking_anime_section
 import nuvio.composeapp.generated.resources.settings_trakt_comments
 import nuvio.composeapp.generated.resources.settings_trakt_comments_description
 import nuvio.composeapp.generated.resources.tracking_source_simkl
@@ -122,18 +134,34 @@ internal fun LazyListScope.trackingSettingsContent(
         }
     }
 
-    item {
-        SettingsSection(
-            title = stringResource(Res.string.settings_tracking_viewing_discovery),
-            isTablet = isTablet,
-        ) {
-            TrackingViewingAndDiscovery(
+    if (traktUiState.mode == TraktConnectionMode.CONNECTED) {
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.settings_tracking_viewing_discovery),
                 isTablet = isTablet,
-                settingsUiState = settingsUiState,
-                traktConnected = traktUiState.mode == TraktConnectionMode.CONNECTED,
-                commentsEnabled = commentsEnabled,
-                onCommentsEnabledChange = onCommentsEnabledChange,
-            )
+            ) {
+                TrackingViewingAndDiscovery(
+                    isTablet = isTablet,
+                    settingsUiState = settingsUiState,
+                    traktConnected = true,
+                    commentsEnabled = commentsEnabled,
+                    onCommentsEnabledChange = onCommentsEnabledChange,
+                )
+            }
+        }
+    }
+
+    if (simklUiState.mode == SimklConnectionMode.CONNECTED) {
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.settings_tracking_anime_section),
+                isTablet = isTablet,
+            ) {
+                AnimeIdPreferenceSection(
+                    isTablet = isTablet,
+                    settingsUiState = settingsUiState,
+                )
+            }
         }
     }
 }
@@ -548,3 +576,59 @@ internal fun effectiveTrackingRecommendationsSource(
     } else {
         source
     }
+
+@Composable
+private fun AnimeIdPreferenceSection(
+    isTablet: Boolean,
+    settingsUiState: TrackingSettingsUiState,
+) {
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+
+    SettingsGroup(isTablet = isTablet) {
+        TrackingPreferenceActionRow(
+            title = stringResource(Res.string.settings_tracking_anime_id_title),
+            description = stringResource(Res.string.settings_tracking_anime_id_subtitle),
+            value = animeIdPreferenceLabel(settingsUiState.simklAnimeIdPreference),
+            isTablet = isTablet,
+            onClick = { showPicker = true },
+        )
+    }
+
+    if (showPicker) {
+        TrackingAdaptivePicker(
+            isTablet = isTablet,
+            title = stringResource(Res.string.settings_tracking_anime_id_dialog_title),
+            subtitle = stringResource(Res.string.settings_tracking_anime_id_dialog_subtitle),
+            selectedValue = settingsUiState.simklAnimeIdPreference,
+            options = animeIdPreferenceOptions(),
+            onSelected = TrackingSettingsRepository::setSimklAnimeIdPreference,
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun animeIdPreferenceOptions(): List<TrackingPickerOption<SimklAnimeIdPreference>> = listOf(
+    TrackingPickerOption(
+        value = SimklAnimeIdPreference.IMDB,
+        title = stringResource(Res.string.settings_tracking_anime_id_imdb),
+        description = stringResource(Res.string.settings_tracking_anime_id_imdb_description),
+    ),
+    TrackingPickerOption(
+        value = SimklAnimeIdPreference.MAL,
+        title = stringResource(Res.string.settings_tracking_anime_id_mal),
+        description = stringResource(Res.string.settings_tracking_anime_id_mal_description),
+    ),
+    TrackingPickerOption(
+        value = SimklAnimeIdPreference.KITSU,
+        title = stringResource(Res.string.settings_tracking_anime_id_kitsu),
+        description = stringResource(Res.string.settings_tracking_anime_id_kitsu_description),
+    ),
+)
+
+@Composable
+private fun animeIdPreferenceLabel(preference: SimklAnimeIdPreference): String = when (preference) {
+    SimklAnimeIdPreference.IMDB -> stringResource(Res.string.settings_tracking_anime_id_imdb)
+    SimklAnimeIdPreference.MAL -> stringResource(Res.string.settings_tracking_anime_id_mal)
+    SimklAnimeIdPreference.KITSU -> stringResource(Res.string.settings_tracking_anime_id_kitsu)
+}
