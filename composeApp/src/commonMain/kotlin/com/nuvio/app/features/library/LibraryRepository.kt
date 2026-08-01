@@ -2,22 +2,26 @@ package com.nuvio.app.features.library
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
-import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
 import com.nuvio.app.features.library.sync.LibrarySyncAdapter
 import com.nuvio.app.features.library.sync.SupabaseLibrarySyncAdapter
 import com.nuvio.app.features.library.sync.consumeCursorPages
 import com.nuvio.app.features.library.sync.libraryDeltaPageSize
 import com.nuvio.app.features.library.sync.librarySnapshotPageSize
 import com.nuvio.app.features.profiles.ProfileRepository
-import com.nuvio.app.features.trakt.TraktAuthRepository
-import com.nuvio.app.features.trakt.TraktLibraryRepository
-import com.nuvio.app.features.trakt.TraktListTab
-import com.nuvio.app.features.trakt.TraktListType
-import com.nuvio.app.features.trakt.TraktMembershipChanges
-import com.nuvio.app.features.trakt.TraktSettingsRepository
-import com.nuvio.app.features.trakt.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
-import com.nuvio.app.features.trakt.shouldUseTraktLibrary
+import com.nuvio.app.features.tracking.TrackingLibraryProvider
+import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.TrackingLibraryTabKind
+import com.nuvio.app.features.tracking.TrackingMembershipApplyResult
+import com.nuvio.app.features.tracking.TrackingMembershipResolution
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
+import com.nuvio.app.features.tracking.TrackingRefreshIntent
+import com.nuvio.app.features.tracking.TrackingSettingsRepository
+import com.nuvio.app.features.tracking.supportsContentType
+import com.nuvio.app.features.tracking.effectiveLibrarySourceMode as resolveEffectiveLibrarySourceMode
+import com.nuvio.app.features.tracking.providerId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -39,7 +43,6 @@ import kotlinx.coroutines.sync.withLock
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.library_local_tab_title
 import nuvio.composeapp.generated.resources.library_other
-import nuvio.composeapp.generated.resources.trakt_lists_update_failed
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
@@ -60,80 +63,72 @@ object LibraryRepository {
     internal var syncAdapter: LibrarySyncAdapter = SupabaseLibrarySyncAdapter
 
     init {
+        ensureTrackingProvidersRegistered()
         syncScope.launch {
-            TraktAuthRepository.isAuthenticated.collectLatest { authenticated ->
-                if (authenticated) {
-                    TraktLibraryRepository.preloadListTabsAsync()
-                    if (shouldUseTraktLibrary(authenticated, selectedLibrarySourceMode())) {
-                        runCatching { TraktLibraryRepository.refreshNow() }
-                            .onFailure { log.e(it) { "Failed to refresh Trakt library after auth change" } }
-                    }
+            TrackingProviderRegistry.connectedProviderIds.collectLatest {
+                TrackingProviderRegistry.connectedLibraryProviders().forEach(TrackingLibraryProvider::prepare)
+                activeLibraryProvider()?.let { provider ->
+                    refreshLibraryProvider(
+                        provider = provider,
+                        reason = "connection state change",
+                        intent = provider.connectionRefreshIntent,
+                    )
                 }
                 publish()
             }
         }
         syncScope.launch {
-            TraktSettingsRepository.uiState
+            TrackingSettingsRepository.uiState
                 .map { it.librarySourceMode }
                 .distinctUntilChanged()
-                .collectLatest { source ->
-                    if (shouldUseTraktLibrary(TraktAuthRepository.isAuthenticated.value, source)) {
-                        TraktLibraryRepository.preloadListTabsAsync()
-                        publish()
-                        refreshTraktLibraryAsync()
-                    } else {
-                        publish()
+                .collectLatest {
+                    publish()
+                    activeLibraryProvider()?.let { provider ->
+                        provider.prepare()
+                        refreshLibraryProviderAsync(provider)
                     }
                 }
         }
-        syncScope.launch {
-            TraktLibraryRepository.uiState.collectLatest {
-                if (TraktAuthRepository.isAuthenticated.value) {
-                    publish()
+        TrackingProviderRegistry.libraryProviders().forEach { provider ->
+            syncScope.launch {
+                provider.changes.collectLatest {
+                    if (TrackingProviderRegistry.isAuthenticated(provider.providerId)) {
+                        publish()
+                    }
                 }
             }
         }
     }
 
     fun ensureLoaded() {
-        TraktAuthRepository.ensureLoaded()
-        TraktSettingsRepository.ensureLoaded()
-        TraktLibraryRepository.ensureLoaded()
+        ensureTrackingProvidersRegistered()
+        TrackingProviderRegistry.ensureLoaded()
+        TrackingSettingsRepository.ensureLoaded()
+        TrackingProviderRegistry.libraryProviders().forEach(TrackingLibraryProvider::ensureLoaded)
         while (true) {
             val activeProfileId = ProfileRepository.activeProfileId
             val snapshot = localState.snapshot()
             if (snapshot.hasLoaded && snapshot.token.profileId == activeProfileId) break
             loadFromDisk(activeProfileId)
         }
-        if (TraktAuthRepository.isAuthenticated.value) {
-            TraktLibraryRepository.preloadListTabsAsync()
-            if (isTraktLibrarySourceActive()) {
-                refreshTraktLibraryAsync()
-            }
-        }
+        TrackingProviderRegistry.connectedLibraryProviders().forEach(TrackingLibraryProvider::prepare)
+        activeLibraryProvider()?.let(::refreshLibraryProviderAsync)
     }
 
     fun onProfileChanged(profileId: Int) {
         val current = localState.snapshot()
         if (profileId == current.token.profileId && current.hasLoaded) return
 
-        TraktSettingsRepository.onProfileChanged()
         if (!loadFromDisk(profileId)) return
-        TraktAuthRepository.onProfileChanged(profileId)
-        TraktLibraryRepository.onProfileChanged()
-        if (TraktAuthRepository.isAuthenticated.value) {
-            TraktLibraryRepository.preloadListTabsAsync()
-            if (isTraktLibrarySourceActive()) {
-                refreshTraktLibraryAsync()
-            }
-        }
+        TrackingProviderRegistry.libraryProviders().forEach(TrackingLibraryProvider::onProfileChanged)
+        TrackingProviderRegistry.connectedLibraryProviders().forEach(TrackingLibraryProvider::prepare)
+        activeLibraryProvider()?.let(::refreshLibraryProviderAsync)
     }
 
     fun clearLocalState() {
         val transition = synchronized(loadLock) { localState.reset() }
         transition.detachedPushJob?.cancel()
-        TraktAuthRepository.clearLocalState()
-        TraktLibraryRepository.clearLocalState()
+        TrackingProviderRegistry.libraryProviders().forEach(TrackingLibraryProvider::clearLocalState)
         _uiState.value = LibraryUiState()
     }
 
@@ -188,21 +183,22 @@ object LibraryRepository {
         ) != null
     }
 
-    suspend fun pullFromServer(profileId: Int) {
+    suspend fun pullFromServer(
+        profileId: Int,
+        refreshIntent: TrackingRefreshIntent = TrackingRefreshIntent.AUTOMATIC,
+    ) {
         val operationToken = activeOperationToken(profileId) ?: run {
             log.d { "Skipping library pull for inactive profile $profileId" }
             return
         }
         var serializedOperationToken: LibraryProfileToken? = null
 
-        if (isTraktLibrarySourceActive()) {
-            try {
-                TraktLibraryRepository.refreshNow()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                log.e(error) { "Failed to pull Trakt library" }
-            }
+        activeLibraryProvider()?.let { provider ->
+            refreshLibraryProvider(
+                provider = provider,
+                reason = "explicit pull",
+                intent = refreshIntent,
+            )
             if (!isActiveOperation(operationToken)) return
             publish()
             return
@@ -291,26 +287,37 @@ object LibraryRepository {
     private fun isActiveOperation(token: LibraryProfileToken): Boolean =
         localState.isCurrent(token) && ProfileRepository.activeProfileId == token.profileId
 
-    fun toggleSaved(item: LibraryItem) {
+    suspend fun toggleSaved(
+        item: LibraryItem,
+        confirmedRemovalProviders: Set<TrackingProviderId> = emptySet(),
+    ): TrackingMembershipApplyResult {
         ensureLoaded()
 
-        if (isTraktLibrarySourceActive()) {
-            val profileId = localState.snapshot().token.profileId
-            log.i { "toggleSaved routed to Trakt library source item=${item.id} type=${item.type} profile=$profileId" }
-            syncScope.launch {
-                runCatching { TraktLibraryRepository.toggleWatchlist(item) }
-                    .onFailure { e ->
-                        log.e(e) { "Failed to toggle Trakt watchlist" }
-                        NuvioToastController.show(
-                            e.message?.takeIf { it.isNotBlank() }
-                                ?: getString(Res.string.trakt_lists_update_failed),
-                        )
-                    }
-                publish()
+        activeLibraryProvider()?.let { provider ->
+            val providerMembership = provider.membership(item)
+            val desiredMembership = provider.toggledDefaultMembership(providerMembership)
+            log.i {
+                "toggleSaved routed to ${provider.providerId.storageId} library source " +
+                    "item=${item.id} type=${item.type} profile=${localState.snapshot().token.profileId}"
             }
-            return
+            return applyMembershipChanges(
+                item = item,
+                desiredMembership = desiredMembership,
+                confirmedRemovalProviders = confirmedRemovalProviders,
+                targetProviderIds = setOf(provider.providerId),
+                updateLocal = false,
+            )
         }
 
+        return toggleLocalSavedInternal(item)
+    }
+
+    fun toggleLocalSaved(item: LibraryItem) {
+        ensureLoaded()
+        toggleLocalSavedInternal(item)
+    }
+
+    private fun toggleLocalSavedInternal(item: LibraryItem): TrackingMembershipApplyResult {
         val result = localState.toggle(
             item.copy(savedAtEpochMs = LibraryClock.nowEpochMs()),
         )
@@ -328,6 +335,7 @@ object LibraryRepository {
         persist(result.snapshot)
         publish()
         pushToServer(result.snapshot)
+        return TrackingMembershipApplyResult()
     }
 
     fun save(item: LibraryItem) {
@@ -371,16 +379,7 @@ object LibraryRepository {
     fun isSaved(id: String, type: String? = null): Boolean {
         ensureLoaded()
 
-        if (isTraktLibrarySourceActive()) {
-            if (type != null) {
-                return TraktLibraryRepository.isInAnyList(id, type)
-            }
-            val entry = TraktLibraryRepository.uiState.value.allItems.firstOrNull { it.id == id }
-            if (entry != null) {
-                return TraktLibraryRepository.isInAnyList(entry.id, entry.type)
-            }
-            return false
-        }
+        activeLibraryProvider()?.let { provider -> return provider.contains(id, type) }
 
         return if (type != null) {
             localState.contains(id, type)
@@ -392,48 +391,74 @@ object LibraryRepository {
     fun savedItem(id: String): LibraryItem? {
         ensureLoaded()
 
-        if (isTraktLibrarySourceActive()) {
-            return TraktLibraryRepository.uiState.value.allItems.firstOrNull { it.id == id }
-        }
+        activeLibraryProvider()?.let { provider -> return provider.find(id) }
 
         return localState.findById(id)
     }
 
-    fun libraryListTabs(): List<TraktListTab> {
-        val traktTabs = if (TraktAuthRepository.isAuthenticated.value) {
-            TraktLibraryRepository.currentListTabs()
-        } else {
-            emptyList()
-        }
-        return libraryTabsWithLocal(traktTabs)
-    }
-
-    fun traktListTabs(): List<TraktListTab> = libraryListTabs()
+    fun libraryListTabs(item: LibraryItem? = null): List<TrackingLibraryTab> =
+        libraryTabsWithLocal(
+            TrackingProviderRegistry.connectedLibraryProviders()
+                .flatMap { provider -> provider.snapshot().tabs },
+        ).filter { tab -> item == null || tab.supportsContentType(item.type) }
 
     suspend fun getMembershipSnapshot(item: LibraryItem): Map<String, Boolean> {
         ensureLoaded()
         val inLocal = localState.contains(item.id, item.type)
-        if (TraktAuthRepository.isAuthenticated.value) {
-            val traktMembership = TraktLibraryRepository.getMembershipSnapshot(item).listMembership
-            return libraryMembershipWithLocal(
-                inLocal = inLocal,
-                traktMembership = traktMembership,
-            )
+        val memberships = linkedMapOf<String, Boolean>()
+        TrackingProviderRegistry.connectedLibraryProviders().forEach { provider ->
+            memberships += provider.membership(item)
         }
-        return libraryMembershipWithLocal(inLocal = inLocal)
+        return libraryMembershipWithLocal(inLocal = inLocal, providerMembership = memberships)
     }
 
-    suspend fun applyMembershipChanges(item: LibraryItem, desiredMembership: Map<String, Boolean>) {
+    suspend fun applyMembershipChanges(
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+        confirmedRemovalProviders: Set<TrackingProviderId> = emptySet(),
+    ): TrackingMembershipApplyResult = applyMembershipChanges(
+        item = item,
+        desiredMembership = desiredMembership,
+        confirmedRemovalProviders = confirmedRemovalProviders,
+        targetProviderIds = null,
+        updateLocal = true,
+    )
+
+    private suspend fun applyMembershipChanges(
+        item: LibraryItem,
+        desiredMembership: Map<String, Boolean>,
+        confirmedRemovalProviders: Set<TrackingProviderId>,
+        targetProviderIds: Set<TrackingProviderId>?,
+        updateLocal: Boolean,
+    ): TrackingMembershipApplyResult {
         ensureLoaded()
         val localDesired = desiredMembership[LOCAL_LIBRARY_LIST_KEY] == true
         val currentlyInLocal = localState.contains(item.id, item.type)
         val profileId = localState.snapshot().token.profileId
+        val providerChanges = TrackingProviderRegistry.connectedLibraryProviders()
+            .filter { provider -> targetProviderIds == null || provider.providerId in targetProviderIds }
+            .mapNotNull { provider ->
+                val providerListKeys = provider.snapshot().tabs.mapTo(mutableSetOf(), TrackingLibraryTab::key)
+                val providerMembership = desiredMembership.filterKeys(providerListKeys::contains)
+                providerMembership.takeIf { membership -> membership.isNotEmpty() }?.let { membership ->
+                    provider to membership
+                }
+            }
+        val requiredConfirmations = providerChanges.mapNotNull { (provider, providerMembership) ->
+            provider.membershipRemovalConfirmation(item, providerMembership)
+                ?.takeUnless { confirmation -> confirmation.providerId in confirmedRemovalProviders }
+        }
         log.i {
             "Applying library membership item=${item.id} type=${item.type} profile=$profileId " +
                 "localDesired=$localDesired currentlyInLocal=$currentlyInLocal " +
-                "traktAuthenticated=${TraktAuthRepository.isAuthenticated.value}"
+                "connectedProviders=${TrackingProviderRegistry.connectedProviderIdsSnapshot()}"
         }
-        if (localDesired != currentlyInLocal) {
+        if (requiredConfirmations.isNotEmpty()) {
+            return TrackingMembershipApplyResult(
+                requiredRemovalConfirmations = requiredConfirmations,
+            )
+        }
+        if (updateLocal && localDesired != currentlyInLocal) {
             if (localDesired) {
                 save(item)
             } else {
@@ -441,26 +466,52 @@ object LibraryRepository {
             }
         }
 
-        if (TraktAuthRepository.isAuthenticated.value) {
-            val traktMembership = desiredMembership.filterKeys { it != LOCAL_LIBRARY_LIST_KEY }
-            if (traktMembership.isNotEmpty()) {
-                TraktLibraryRepository.applyMembershipChanges(
+        var firstFailure: Throwable? = null
+        val resolutions = mutableListOf<TrackingMembershipResolution>()
+        providerChanges.forEach { (provider, providerMembership) ->
+            try {
+                provider.applyMembership(
+                    profileId = profileId,
                     item = item,
-                    changes = TraktMembershipChanges(desiredMembership = traktMembership),
-                )
+                    desiredMembership = providerMembership,
+                    destructiveRemovalConfirmed = provider.providerId in confirmedRemovalProviders,
+                )?.let(resolutions::add)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (firstFailure == null) firstFailure = error
+                log.e(error) { "Failed to update ${provider.providerId.storageId} library membership" }
             }
-            publish()
-        } else {
-            publish()
         }
+        publish()
+        firstFailure?.let { throw it }
+        return TrackingMembershipApplyResult(resolutions = resolutions)
     }
 
-    suspend fun removeFromList(item: LibraryItem, listKey: String) {
+    suspend fun removeFromList(
+        item: LibraryItem,
+        listKey: String,
+        confirmedRemovalProviders: Set<TrackingProviderId> = emptySet(),
+    ): TrackingMembershipApplyResult {
+        ensureLoaded()
+        val targetProvider = TrackingProviderRegistry.connectedLibraryProviders()
+            .firstOrNull { provider -> provider.snapshot().tabs.any { tab -> tab.key == listKey } }
+        val currentMembership = if (listKey == LOCAL_LIBRARY_LIST_KEY) {
+            mapOf(LOCAL_LIBRARY_LIST_KEY to localState.contains(item.id, item.type))
+        } else {
+            targetProvider?.membership(item).orEmpty()
+        }
         val desiredMembership = libraryMembershipWithRemovedList(
-            currentMembership = getMembershipSnapshot(item),
+            currentMembership = currentMembership,
             listKey = listKey,
         )
-        applyMembershipChanges(item, desiredMembership)
+        return applyMembershipChanges(
+            item = item,
+            desiredMembership = desiredMembership,
+            confirmedRemovalProviders = confirmedRemovalProviders,
+            targetProviderIds = targetProvider?.let { provider -> setOf(provider.providerId) }.orEmpty(),
+            updateLocal = listKey == LOCAL_LIBRARY_LIST_KEY,
+        )
     }
 
     private fun pushToServer(
@@ -530,28 +581,16 @@ object LibraryRepository {
 
     private fun publish() {
         val localSnapshot = localState.snapshot()
-        if (isTraktLibrarySourceActive()) {
-            val traktState = TraktLibraryRepository.uiState.value
-            val sections = traktState.listTabs.mapNotNull { tab ->
-                val listItems = traktState.entriesByList[tab.key].orEmpty()
-                if (listItems.isEmpty()) {
-                    null
-                } else {
-                    LibrarySection(
-                        type = tab.key,
-                        displayTitle = tab.title,
-                        items = listItems,
-                    )
-                }
-            }
-
+        val sourceMode = effectiveLibrarySourceMode()
+        activeLibraryProvider(sourceMode)?.let { provider ->
+            val providerSnapshot = provider.snapshot()
             val newUiState = LibraryUiState(
-                sourceMode = LibrarySourceMode.TRAKT,
-                items = traktState.allItems,
-                sections = sections,
-                isLoaded = traktState.hasLoaded,
-                isLoading = traktState.isLoading,
-                errorMessage = traktState.errorMessage,
+                sourceMode = sourceMode,
+                items = providerSnapshot.items,
+                sections = providerSnapshot.sections,
+                isLoaded = providerSnapshot.hasLoaded,
+                isLoading = providerSnapshot.isLoading,
+                errorMessage = providerSnapshot.errorMessage,
             )
             localState.runIfTokenCurrent(localSnapshot.token) {
                 _uiState.value = newUiState
@@ -598,52 +637,81 @@ object LibraryRepository {
         }
     }
 
-    private fun refreshTraktLibraryAsync() {
+    private fun refreshLibraryProviderAsync(provider: TrackingLibraryProvider) {
         syncScope.launch {
-            runCatching { TraktLibraryRepository.refreshNow() }
-                .onFailure { e -> log.e(e) { "Failed to refresh Trakt library" } }
+            refreshLibraryProvider(
+                provider = provider,
+                reason = "background refresh",
+                intent = TrackingRefreshIntent.AUTOMATIC,
+            )
             publish()
         }
     }
 
+    private suspend fun refreshLibraryProvider(
+        provider: TrackingLibraryProvider,
+        reason: String,
+        intent: TrackingRefreshIntent,
+    ) {
+        log.i {
+            "Tracking library refresh request provider=${provider.providerId.storageId} " +
+                "reason=$reason intent=$intent"
+        }
+        try {
+            provider.refresh(intent)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            log.e(error) {
+                "Failed to refresh ${provider.providerId.storageId} library during $reason"
+            }
+        }
+    }
+
     private fun selectedLibrarySourceMode(): LibrarySourceMode {
-        TraktSettingsRepository.ensureLoaded()
-        return TraktSettingsRepository.uiState.value.librarySourceMode
+        TrackingSettingsRepository.ensureLoaded()
+        return TrackingSettingsRepository.uiState.value.librarySourceMode
     }
 
     private fun effectiveLibrarySourceMode(): LibrarySourceMode =
         resolveEffectiveLibrarySourceMode(
-            isAuthenticated = TraktAuthRepository.isAuthenticated.value,
-            source = selectedLibrarySourceMode(),
+            requestedSource = selectedLibrarySourceMode(),
+            isProviderAuthenticated = { providerId ->
+                TrackingProviderRegistry.libraryProvider(providerId) != null &&
+                    TrackingProviderRegistry.isAuthenticated(providerId)
+            },
         )
 
-    private fun isTraktLibrarySourceActive(): Boolean =
-        effectiveLibrarySourceMode() == LibrarySourceMode.TRAKT
+    private fun activeLibraryProvider(
+        sourceMode: LibrarySourceMode = effectiveLibrarySourceMode(),
+    ): TrackingLibraryProvider? =
+        sourceMode.providerId?.let(TrackingProviderRegistry::libraryProvider)
 }
 
 internal const val LOCAL_LIBRARY_LIST_KEY = "local"
 private const val DEFAULT_LOCAL_LIBRARY_TAB_TITLE = "Nuvio Library"
 private const val DEFAULT_LIBRARY_OTHER_TITLE = "Other"
 
-internal fun localLibraryListTab(): TraktListTab =
-    TraktListTab(
+internal fun localLibraryListTab(): TrackingLibraryTab =
+    TrackingLibraryTab(
         key = LOCAL_LIBRARY_LIST_KEY,
         title = localizedStringOrDefault(
             resource = Res.string.library_local_tab_title,
             fallback = DEFAULT_LOCAL_LIBRARY_TAB_TITLE,
         ),
-        type = TraktListType.WATCHLIST,
+        providerId = null,
+        kind = TrackingLibraryTabKind.WATCHLIST,
     )
 
-internal fun libraryTabsWithLocal(traktTabs: List<TraktListTab>): List<TraktListTab> =
-    listOf(localLibraryListTab()) + traktTabs
+internal fun libraryTabsWithLocal(providerTabs: List<TrackingLibraryTab>): List<TrackingLibraryTab> =
+    listOf(localLibraryListTab()) + providerTabs
 
 internal fun libraryMembershipWithLocal(
     inLocal: Boolean,
-    traktMembership: Map<String, Boolean> = emptyMap(),
+    providerMembership: Map<String, Boolean> = emptyMap(),
 ): Map<String, Boolean> =
     linkedMapOf<String, Boolean>(LOCAL_LIBRARY_LIST_KEY to inLocal).apply {
-        putAll(traktMembership)
+        putAll(providerMembership)
     }
 
 internal fun libraryMembershipWithRemovedList(

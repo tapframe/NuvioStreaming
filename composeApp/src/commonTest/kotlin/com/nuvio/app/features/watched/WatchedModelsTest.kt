@@ -1,7 +1,9 @@
 package com.nuvio.app.features.watched
 
-import com.nuvio.app.features.trakt.TraktPlatformClock
-import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.core.time.parseZonedIsoDateTimeToEpochMs
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.WatchProgressSource
+import com.nuvio.app.features.tracking.providerId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,7 +12,7 @@ import kotlin.test.assertTrue
 class WatchedModelsTest {
     @Test
     fun `compact watched timestamp normalizes to epoch millis`() {
-        val expected = TraktPlatformClock.parseIsoDateTimeToEpochMs("2026-04-25T10:02:00Z")
+        val expected = parseZonedIsoDateTimeToEpochMs("2026-04-25T10:02:00Z")
 
         assertEquals(expected, normalizeWatchedMarkedAtEpochMs(20260425100200L))
     }
@@ -21,24 +23,9 @@ class WatchedModelsTest {
     }
 
     @Test
-    fun `Trakt watched sync follows selected watch progress source`() {
-        assertTrue(
-            shouldUseTraktWatchedSync(
-                isAuthenticated = true,
-                source = WatchProgressSource.TRAKT,
-            ),
-        )
-        assertFalse(
-            shouldUseTraktWatchedSync(
-                isAuthenticated = true,
-                source = WatchProgressSource.NUVIO_SYNC,
-            ),
-        )
-        assertFalse(
-            shouldUseTraktWatchedSync(
-                isAuthenticated = false,
-                source = WatchProgressSource.TRAKT,
-            ),
-        )
+    fun `remote watched sources carry provider identity`() {
+        assertEquals(TrackingProviderId.TRAKT, WatchProgressSource.TRAKT.providerId)
+        assertEquals(TrackingProviderId.SIMKL, WatchProgressSource.SIMKL.providerId)
+        assertEquals(null, WatchProgressSource.NUVIO_SYNC.providerId)
     }
 }

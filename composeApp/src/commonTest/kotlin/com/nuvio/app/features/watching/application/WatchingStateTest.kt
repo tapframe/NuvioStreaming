@@ -1,6 +1,6 @@
 package com.nuvio.app.features.watching.application
 
-import com.nuvio.app.features.trakt.TraktPlatformClock
+import com.nuvio.app.core.time.parseZonedIsoDateTimeToEpochMs
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktPlayback
@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class WatchingStateTest {
     @Test
-    fun `latest completed ignores Trakt playback below next up seed threshold`() {
+    fun `latest completed aggregates provider-filtered completed progress`() {
         val almostCompletePlayback = entry(
             videoId = "show:1:4",
             seasonNumber = 1,
@@ -24,7 +24,7 @@ class WatchingStateTest {
             watchedItems = emptyList(),
         )
 
-        assertTrue(result.isEmpty())
+        assertEquals(4, result.values.single().episodeNumber)
     }
 
     @Test
@@ -57,7 +57,7 @@ class WatchingStateTest {
 
     @Test
     fun `latest completed normalizes compact watched timestamps before sorting`() {
-        val expected = TraktPlatformClock.parseIsoDateTimeToEpochMs("2026-04-25T10:02:00Z")
+        val expected = parseZonedIsoDateTimeToEpochMs("2026-04-25T10:02:00Z")
 
         val result = WatchingState.latestCompletedBySeries(
             progressEntries = emptyList(),

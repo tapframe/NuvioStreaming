@@ -87,10 +87,20 @@ object PosterZoomAnchorHolder {
     fun consume(): PosterZoomAnchor? = pending.also { pending = null }
 }
 
+enum class PosterZoomOverlayExitAnimation {
+    COLLAPSE,
+    DISINTEGRATE,
+}
+
 class PosterZoomOverlayAction(
     val icon: ImageVector,
     val label: String,
     val isDestructive: Boolean = false,
+    val exitAnimation: PosterZoomOverlayExitAnimation = if (isDestructive) {
+        PosterZoomOverlayExitAnimation.DISINTEGRATE
+    } else {
+        PosterZoomOverlayExitAnimation.COLLAPSE
+    },
     val onSelected: () -> Unit,
 )
 
@@ -181,7 +191,7 @@ fun NuvioPosterZoomActionOverlay(
 
     fun select(action: PosterZoomOverlayAction) {
         if (phase != PosterZoomPhase.Open) return
-        if (action.isDestructive) {
+        if (action.exitAnimation == PosterZoomOverlayExitAnimation.DISINTEGRATE) {
             phase = PosterZoomPhase.Disintegrating
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
             action.onSelected()

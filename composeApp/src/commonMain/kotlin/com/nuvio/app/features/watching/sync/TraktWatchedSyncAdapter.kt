@@ -4,6 +4,8 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.RawHttpResponse
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.tmdb.TmdbService
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingWatchedProvider
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktEpisodeMappingService
 import com.nuvio.app.features.trakt.TraktPlatformClock
@@ -23,7 +25,8 @@ private const val WATCHED_MAX_PAGES = 1_000
 private const val WATCHED_SHOWS_EXTENDED = "progress"
 
 
-object TraktWatchedSyncAdapter : WatchedSyncAdapter {
+object TraktWatchedSyncAdapter : TrackingWatchedProvider {
+    override val providerId: TrackingProviderId = TrackingProviderId.TRAKT
     private val log = Logger.withTag("TraktWatchedSync")
     private val json = Json {
         ignoreUnknownKeys = true

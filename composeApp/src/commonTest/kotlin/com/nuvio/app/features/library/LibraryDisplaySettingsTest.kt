@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 class LibraryDisplaySettingsTest {
 
     @Test
-    fun `local default resolves to recently added while Trakt uses rank order`() {
+    fun `local default resolves to recently added while remote trackers preserve provider order`() {
         assertEquals(
             LibrarySortOption.ADDED_DESC,
             effectiveLibrarySortOption(LibrarySortOption.DEFAULT, LibrarySourceMode.LOCAL),
@@ -14,6 +14,10 @@ class LibraryDisplaySettingsTest {
         assertEquals(
             LibrarySortOption.DEFAULT,
             effectiveLibrarySortOption(LibrarySortOption.DEFAULT, LibrarySourceMode.TRAKT),
+        )
+        assertEquals(
+            LibrarySortOption.DEFAULT,
+            effectiveLibrarySortOption(LibrarySortOption.DEFAULT, LibrarySourceMode.SIMKL),
         )
 
         val input = listOf(
@@ -91,7 +95,7 @@ class LibraryDisplaySettingsTest {
     }
 
     @Test
-    fun `vertical Trakt projection selects one list then filters and sorts its items`() {
+    fun `vertical tracker projection selects one list then filters and sorts its items`() {
         val watchlist = LibrarySection(
             type = "watchlist",
             displayTitle = "Watchlist",
@@ -120,6 +124,16 @@ class LibraryDisplaySettingsTest {
         assertEquals("movie", projection.selectedType)
         assertEquals(listOf("a", "z"), projection.entries.map { it.item.id })
         assertEquals(listOf("watchlist", "watchlist"), projection.entries.map { it.section.type })
+
+        val simklProjection = buildLibraryVerticalProjection(
+            sections = listOf(watchlist),
+            sourceMode = LibrarySourceMode.SIMKL,
+            selectedSectionKey = null,
+            selectedType = null,
+            sortOption = LibrarySortOption.DEFAULT,
+        )
+        assertEquals(listOf("watchlist"), simklProjection.availableSections.map { it.type })
+        assertEquals("watchlist", simklProjection.selectedSectionKey)
     }
 
     @Test
