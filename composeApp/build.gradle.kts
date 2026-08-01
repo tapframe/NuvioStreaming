@@ -40,9 +40,6 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:Input
     abstract val sentryEnvironment: Property<String>
 
-    @get:Input
-    abstract val realtimeSyncEnabled: Property<Boolean>
-
     @TaskAction
     fun generate() {
         val props = Properties()
@@ -73,19 +70,6 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |object SentryConfig {
                 |    const val DSN = "${sentryDsn.get()}"
                 |    const val ENVIRONMENT = "${sentryEnvironment.get()}"
-                |}
-                """.trimMargin()
-            )
-        }
-
-        outDir.resolve("com/nuvio/app/core/sync").apply {
-            mkdirs()
-            resolve("RealtimeSyncConfig.kt").writeText(
-                """
-                |package com.nuvio.app.core.sync
-                |
-                |object RealtimeSyncConfig {
-                |    const val ENABLED = ${realtimeSyncEnabled.get()}
                 |}
                 """.trimMargin()
             )
@@ -315,7 +299,6 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
             else -> "production"
         }
     )
-    realtimeSyncEnabled.set(runtimeConfigBoolean("NUVIO_REALTIME_SYNC_ENABLED", true))
 }
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
@@ -469,7 +452,6 @@ kotlin {
             implementation(libs.supabase.postgrest)
             implementation(libs.supabase.auth)
             implementation(libs.supabase.functions)
-            implementation(libs.supabase.realtime)
             implementation(libs.reorderable)
         }
         commonTest.dependencies {

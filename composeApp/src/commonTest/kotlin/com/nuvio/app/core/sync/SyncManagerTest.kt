@@ -164,33 +164,6 @@ class SyncManagerTest {
         )
     }
 
-    @Test
-    fun `realtime invalidation queued during active sync runs once afterwards`() = runBlocking {
-        val gate = ProfileSyncRequestGate()
-        val firstStarted = CompletableDeferred<Unit>()
-        val releaseFirst = CompletableDeferred<Unit>()
-        val replayCompleted = CompletableDeferred<Unit>()
-        var runCount = 0
-
-        gate.launch(this, profileId = 1) {
-            runCount += 1
-            firstStarted.complete(Unit)
-            releaseFirst.await()
-        }
-        firstStarted.await()
-
-        val queued = gate.launch(this, profileId = 1, queueIfCoalesced = true) {
-            runCount += 1
-            replayCompleted.complete(Unit)
-        }
-
-        assertEquals(ProfileSyncRequestResult.Coalesced, queued)
-        releaseFirst.complete(Unit)
-        replayCompleted.await()
-        assertEquals(2, runCount)
-        gate.cancel()
-    }
-
     private fun recordingOperations(events: MutableList<String>): ProfileSyncOperations =
         ProfileSyncOperations(
             pullAddons = { events += "addons" },
