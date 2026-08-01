@@ -254,9 +254,9 @@ internal suspend fun PlayerScreenRuntime.resolveParentalGuideImdbId(): String? {
 }
 
 internal fun PlayerScreenRuntime.flushWatchProgress(
-    if (!shouldTrackWatchProgress) return
     scrobbleAction: TrackingScrobbleAction = TrackingScrobbleAction.STOP,
 ) {
+    if (!shouldTrackWatchProgress) return
     when (scrobbleAction) {
         TrackingScrobbleAction.PAUSE -> emitTrackingScrobblePause()
         TrackingScrobbleAction.STOP -> emitStopScrobbleForCurrentProgress()

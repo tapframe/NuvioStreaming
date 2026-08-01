@@ -1469,7 +1469,6 @@ object WatchProgressRepository {
         }
 
     private fun currentEntries(): List<WatchProgressEntry> {
-        val entries = if (shouldUseTraktProgress()) {
         val providerEntries = activeProgressProvider()
             ?.snapshot()
             ?.entries
@@ -1479,7 +1478,7 @@ object WatchProgressRepository {
             nuvioEntries = localEntriesSnapshot(),
             providerEntries = providerEntries,
         )
-        return if (activeSource.providerId == null) {
+        val entries = if (activeSource.providerId == null) {
             projectedEntries
         } else {
             providerMetadataOverlay.project(source = activeSource, entries = projectedEntries)
