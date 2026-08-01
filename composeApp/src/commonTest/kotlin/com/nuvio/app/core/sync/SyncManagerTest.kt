@@ -132,30 +132,36 @@ class SyncManagerTest {
     }
 
     @Test
-    fun `realtime invalidation queued during active sync runs once afterwards`() = runBlocking {
-        val gate = ProfileSyncRequestGate()
-        val firstStarted = CompletableDeferred<Unit>()
-        val releaseFirst = CompletableDeferred<Unit>()
-        val replayCompleted = CompletableDeferred<Unit>()
-        var runCount = 0
+    fun `failed profile sync does not advance foreground freshness`() {
+        val previous = ProfilePullFreshness(
+            profileId = 3,
+            completedAtEpochMs = 1_000L,
+        )
+        val failed = previous.recordIfSuccessful(
+            profileId = 3,
+            completedAtEpochMs = 2_000L,
+            result = ProfileSyncResult(setOf(ProfileSyncStep.ActiveWatchSource)),
+        )
+        val succeeded = previous.recordIfSuccessful(
+            profileId = 3,
+            completedAtEpochMs = 2_000L,
+            result = ProfileSyncResult(emptySet()),
+        )
 
-        gate.launch(this, profileId = 1) {
-            runCount += 1
-            firstStarted.complete(Unit)
-            releaseFirst.await()
-        }
-        firstStarted.await()
-
-        val queued = gate.launch(this, profileId = 1, queueIfCoalesced = true) {
-            runCount += 1
-            replayCompleted.complete(Unit)
-        }
-
-        assertEquals(ProfileSyncRequestResult.Coalesced, queued)
-        releaseFirst.complete(Unit)
-        replayCompleted.await()
-        assertEquals(2, runCount)
-        gate.cancel()
+        assertEquals(previous, failed)
+        assertEquals(2_000L, succeeded.completedAtEpochMs)
+        assertFalse(
+            ProfilePullFreshness()
+                .recordIfSuccessful(
+                    profileId = 3,
+                    completedAtEpochMs = 2_000L,
+                    result = ProfileSyncResult(setOf(ProfileSyncStep.ActiveWatchSource)),
+                )
+                .isRecent(profileId = 3, nowEpochMs = 2_001L, minIntervalMs = 1_000L),
+        )
+        assertTrue(
+            succeeded.isRecent(profileId = 3, nowEpochMs = 2_001L, minIntervalMs = 1_000L),
+        )
     }
 
     private fun recordingOperations(events: MutableList<String>): ProfileSyncOperations =

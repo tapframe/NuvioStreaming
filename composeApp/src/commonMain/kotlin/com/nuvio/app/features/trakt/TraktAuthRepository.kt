@@ -5,6 +5,11 @@ import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.tracking.TrackingAuthProvider
+import com.nuvio.app.features.tracking.TrackingCapability
+import com.nuvio.app.features.tracking.TrackingProviderDescriptor
+import com.nuvio.app.features.tracking.TrackingProviderId
+import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.CancellationException
@@ -34,7 +39,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.StringResource
 import kotlinx.coroutines.runBlocking
 
-object TraktAuthRepository {
+object TraktAuthRepository : TrackingAuthProvider {
     private const val BASE_URL = "https://api.trakt.tv"
     private const val AUTHORIZE_URL = "https://trakt.tv/oauth/authorize"
     private const val ACTIVATE_URL = "https://trakt.tv/activate"
@@ -57,7 +62,28 @@ object TraktAuthRepository {
     val uiState: StateFlow<TraktAuthUiState> = _uiState.asStateFlow()
 
     private val _isAuthenticated = MutableStateFlow(false)
-    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+    override val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+
+    override val descriptor = TrackingProviderDescriptor(
+        id = TrackingProviderId.TRAKT,
+        displayName = "Trakt",
+        capabilities = setOf(
+            TrackingCapability.AUTHENTICATION,
+            TrackingCapability.LIBRARY_READ,
+            TrackingCapability.LIBRARY_WRITE,
+            TrackingCapability.WATCHED_READ,
+            TrackingCapability.WATCHED_WRITE,
+            TrackingCapability.PROGRESS_READ,
+            TrackingCapability.PROGRESS_WRITE,
+            TrackingCapability.SCROBBLE,
+            TrackingCapability.COMMENTS,
+            TrackingCapability.RECOMMENDATIONS,
+        ),
+    )
+
+    init {
+        TrackingProviderRegistry.register(this)
+    }
 
     private var hasLoaded = false
     private var currentProfileId: Int = 1
@@ -66,7 +92,15 @@ object TraktAuthRepository {
     private var authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
     private var devicePollingJob: Job? = null
 
-    fun ensureLoaded(profileId: Int = ProfileRepository.activeProfileId) {
+    override fun ensureLoaded() {
+        ensureLoaded(ProfileRepository.activeProfileId)
+    }
+
+    override fun onProfileChanged() {
+        onProfileChanged(ProfileRepository.activeProfileId)
+    }
+
+    fun ensureLoaded(profileId: Int) {
         if (hasLoaded && currentProfileId == profileId) return
         loadFromDisk(profileId)
     }
@@ -75,7 +109,7 @@ object TraktAuthRepository {
         loadFromDisk(profileId)
     }
 
-    fun clearLocalState() {
+    override fun clearLocalState() {
         devicePollingJob?.cancel()
         devicePollingJob = null
         hasLoaded = false
@@ -84,6 +118,10 @@ object TraktAuthRepository {
         authState = TraktAuthState()
         authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
         publish()
+    }
+
+    override fun removeStoredProfile(profileId: Int) {
+        TraktAuthStorage.removeProfile(profileId)
     }
 
     fun snapshot(profileId: Int = ProfileRepository.activeProfileId): TraktAuthUiState {
@@ -200,6 +238,15 @@ object TraktAuthRepository {
             completeAuthorizationFromCallback(callbackUrl, profileId)
         }
     }
+
+    override fun handleAuthCallback(url: String): Boolean {
+        if (!isTraktAuthCallback(url)) return false
+        onAuthCallbackReceived(url)
+        return true
+    }
+
+    private fun isTraktAuthCallback(url: String): Boolean =
+        url == TraktConfig.REDIRECT_URI || url.startsWith("${TraktConfig.REDIRECT_URI}?")
 
     suspend fun authorizedHeaders(profileId: Int = currentProfileId): Map<String, String>? {
         ensureLoaded(profileId)

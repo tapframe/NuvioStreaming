@@ -73,6 +73,25 @@ internal fun unexpectedStreamStopError(
     )
 }
 
+internal fun unexpectedTorrentError(
+    requestId: Long,
+    eventTorrentId: String?,
+    currentTorrentId: String?,
+    message: String?,
+    fallbackMessage: String,
+): P2pStreamingState.Error? {
+    if (requestId != 0L ||
+        eventTorrentId == null ||
+        currentTorrentId == null ||
+        eventTorrentId != currentTorrentId
+    ) {
+        return null
+    }
+    return P2pStreamingState.Error(
+        message?.trim()?.takeIf(String::isNotEmpty) ?: fallbackMessage,
+    )
+}
+
 actual object P2pStreamingEngine {
     private data class EngineConfigurationKey(
         val uploadEnabled: Boolean,
@@ -517,16 +536,16 @@ actual object P2pStreamingEngine {
                 if (engine !== activeEngine) return@collect
                 when (event.type) {
                     NuvioEventType.TorrentError -> {
-                        if (event.requestId != 0L) return@collect
-                        val terminalError = P2pStreamingState.Error(
-                            event.message ?: localizedP2pUnknownTorrentError()
-                        )
+                        val fallbackMessage = localizedP2pUnknownTorrentError()
                         synchronized(lifecycleLock) {
-                            if (engine !== activeEngine ||
-                                (event.torrentId != null && event.torrentId != currentTorrentId)
-                            ) {
-                                return@synchronized
-                            }
+                            if (engine !== activeEngine) return@synchronized
+                            val terminalError = unexpectedTorrentError(
+                                requestId = event.requestId,
+                                eventTorrentId = event.torrentId,
+                                currentTorrentId = currentTorrentId,
+                                message = event.message,
+                                fallbackMessage = fallbackMessage,
+                            ) ?: return@synchronized
                             streamGeneration += 1
                             statsJob?.cancel()
                             statsJob = null
