@@ -1,21 +1,24 @@
-name: Build Nuvio
+name: Build IPA
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - 0.4.0-enhanced
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    inputs:
+      mode:
+        description: Build a full or enhanced ipa
+        required: true
+        type: choice
+        options:
+          - full
+          - enhanced
+        default: full
 
 jobs:
-  build-ios-enhanced:
-    name: Build iOS Enhanced Version
+  build-ipa:
+    name: Build Nuvio for iOS and iPadOS
     runs-on: macos-15-intel
     steps:
       - name: Checkout Repository & Submodules
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           lfs: true
 
@@ -34,12 +37,12 @@ jobs:
                   "2fa3d54cb81f302d6f11c7b2f509af30944381c3b11ee9d35096eb4637a6e2dd"
               ),
               "Libavcodec": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavcodec.xcframework.zip",
-                  "bf0aa69d62981ac8859ef08849312474cf5201bf51242ecece86007b2cc07444"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavcodec.xcframework.zip",
+                  "136e432919a8a7b5b80155c68e9dc91b0ef3ae6623970b87bb8bd96a452543cf"
               ),
               "Libavdevice": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavdevice.xcframework.zip",
-                  "3aec22d82735405a32b87488a13c1889277af10522bb5c8dc543278b2f2bb1ac"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavdevice.xcframework.zip",
+                  "65713615f53352b37baffb38c5b88d88bab647d050d999bcc4684344ab636bdf"
               ),
               "Libavformat": (
                   "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavformat.xcframework.zip",
@@ -112,7 +115,7 @@ jobs:
 
       - name: Download Nuvio Engine Apple XCFramework
         env:
-          NUVIO_ENGINE_VERSION: 0.1.0
+          NUVIO_ENGINE_VERSION: 0.1.1
         run: |
           set -euo pipefail
 
@@ -168,6 +171,9 @@ jobs:
           TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
           TRAKT_REDIRECT_URI=${{ secrets.TRAKT_REDIRECT_URI }}
+          SIMKL_CLIENT_ID=${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_CLIENT_SECRET=${{ secrets.SIMKL_CLIENT_SECRET }}
+          SIMKL_REDIRECT_URI=${{ secrets.SIMKL_REDIRECT_URI }}
           PREMIUMIZE_CLIENT_ID=${{ secrets.PREMIUMIZE_CLIENT_ID }}
           PREMIUMIZE_CLIENT_SECRET=${{ secrets.PREMIUMIZE_CLIENT_SECRET }}
           PREMIUMIZE_REDIRECT_URI=${{ secrets.PREMIUMIZE_REDIRECT_URI }}
@@ -208,6 +214,14 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             build
 
+      - name: Set artifact suffix
+        run: |
+          if [ "${{ inputs.mode }}" = "full" ]; then
+            echo "BUILD_SUFFIX=Full" >> $GITHUB_ENV
+          else
+            echo "BUILD_SUFFIX=Enhanced" >> $GITHUB_ENV
+          fi
+
       - name: Package App into .ipa
         run: |
           cd iosApp/build/Build/Products/Release-iphoneos
@@ -215,68 +229,12 @@ jobs:
           APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_DIR/Info.plist")
           mkdir Payload
           mv "$APP_DIR" Payload/
-          zip -q -r "Nuvio-v${APP_VERSION}-Enhanced.ipa" Payload
-          echo "IPA_FILENAME=Nuvio-v${APP_VERSION}-Enhanced.ipa" >> $GITHUB_ENV
+          IPA_NAME="Nuvio-v${APP_VERSION}-${BUILD_SUFFIX}.ipa"
+          zip -q -r "$IPA_NAME" Payload
+          echo "IPA_NAME=$IPA_NAME" >> $GITHUB_ENV
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: Nuvio-iOS-Enhanced
-          path: iosApp/build/Build/Products/Release-iphoneos/${{ env.IPA_FILENAME }}
-
-  build-android-enhanced:
-    name: Build Android Enhanced Version
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-
-      - name: Generate local.properties
-        run: |
-          cat << 'EOF' > local.properties
-          NUVIO_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          NUVIO_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-          TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
-          TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
-          TRAKT_REDIRECT_URI=${{ secrets.TRAKT_REDIRECT_URI }}
-          PREMIUMIZE_CLIENT_ID=${{ secrets.PREMIUMIZE_CLIENT_ID }}
-          PREMIUMIZE_CLIENT_SECRET=${{ secrets.PREMIUMIZE_CLIENT_SECRET }}
-          PREMIUMIZE_REDIRECT_URI=${{ secrets.PREMIUMIZE_REDIRECT_URI }}
-          TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
-          INTRODB_API_URL=${{ secrets.INTRODB_API_URL }}
-          CONTRIBUTIONS_URL=${{ secrets.CONTRIBUTIONS_URL }}
-          DONATIONS_BASE_URL=${{ secrets.DONATIONS_BASE_URL }}
-          DONATIONS_DONATE_URL=${{ secrets.DONATIONS_DONATE_URL }}
-          DIRECT_DEBRID_API_BASE_URL=${{ secrets.DIRECT_DEBRID_API_BASE_URL }}
-          NUVIO_ANDROID_DISTRIBUTION=full
-          EOF
-
-      - name: Cache Gradle
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-
-      - name: Build Enhanced APK
-        run: |
-          ./gradlew \
-            :androidApp:assembleFullDebug \
-            -Pnuvio.splitAbi=true \
-            --stacktrace
-
-      - name: Upload Android Artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: Nuvio-Android-Enhanced
-          path: androidApp/build/outputs/apk/full/debug/*.apk
+          name: Nuvio-iOS-${{ env.BUILD_SUFFIX }}
+          path: iosApp/build/Build/Products/Release-iphoneos/${{ env.IPA_NAME }}
