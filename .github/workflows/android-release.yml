@@ -147,6 +147,7 @@ jobs:
             NUVIO_RELEASE_KEY_PASSWORD
             TRAKT_CLIENT_ID
             TRAKT_CLIENT_SECRET
+            SIMKL_CLIENT_ID
           )
           for property_name in "${required_properties[@]}"; do
             if ! grep -Eq "^${property_name}=.+" local.properties; then
