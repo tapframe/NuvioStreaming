@@ -32,7 +32,6 @@ data class HomeCatalogSettingsItem(
 
 internal data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
-    val heroArtworkSource: HomeHeroArtworkSource = HomeHeroArtworkSource.BACKDROP,
     val heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
@@ -41,8 +40,6 @@ internal data class HomeCatalogSettingsUiState(
     val signature: String
         get() = buildString {
             append(heroEnabled)
-            append('|')
-            append(heroArtworkSource.storageValue)
             append('|')
             append(heroStyle.storageValue)
             append('|')
@@ -58,6 +55,10 @@ internal data class HomeCatalogSettingsUiState(
         }
 }
 
+/**
+ * Not a user setting: the hero derives this from the layout (portrait -> poster,
+ * landscape/tablet -> backdrop). See heroUsesWideArtwork in HomeHeroSection.
+ */
 internal enum class HomeHeroArtworkSource(
     val storageValue: String,
 ) {
@@ -97,7 +98,6 @@ internal data class HomeCatalogPreference(
 
 internal data class HomeCatalogSettingsSnapshot(
     val heroEnabled: Boolean,
-    val heroArtworkSource: HomeHeroArtworkSource,
     val heroStyle: HomeHeroStyle,
     val showCatalogType: Boolean,
     val hideUnreleasedContent: Boolean,
@@ -116,7 +116,6 @@ private data class StoredHomeCatalogPreference(
 @Serializable
 private data class StoredHomeCatalogSettingsPayload(
     val heroEnabled: Boolean = true,
-    val heroArtworkSource: String = HomeHeroArtworkSource.BACKDROP.storageValue,
     val heroStyle: String = HomeHeroStyle.FULL_BLEED.storageValue,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
@@ -139,7 +138,6 @@ object HomeCatalogSettingsRepository {
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
     private var preferences: MutableMap<String, StoredHomeCatalogPreference> = mutableMapOf()
     private var heroEnabled = true
-    private var heroArtworkSource = HomeHeroArtworkSource.BACKDROP
     private var heroStyle = HomeHeroStyle.FULL_BLEED
     private var showCatalogType = true
     private var hideUnreleasedContent = false
@@ -148,7 +146,6 @@ object HomeCatalogSettingsRepository {
         hasLoaded = false
         preferences.clear()
         heroEnabled = true
-        heroArtworkSource = HomeHeroArtworkSource.BACKDROP
         heroStyle = HomeHeroStyle.FULL_BLEED
         showCatalogType = true
         hideUnreleasedContent = false
@@ -163,7 +160,6 @@ object HomeCatalogSettingsRepository {
         collectionDefinitions = emptyList()
         preferences.clear()
         heroEnabled = true
-        heroArtworkSource = HomeHeroArtworkSource.BACKDROP
         heroStyle = HomeHeroStyle.FULL_BLEED
         showCatalogType = true
         hideUnreleasedContent = false
@@ -198,7 +194,6 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         return HomeCatalogSettingsSnapshot(
             heroEnabled = heroEnabled,
-            heroArtworkSource = heroArtworkSource,
             heroStyle = heroStyle,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
@@ -216,15 +211,6 @@ object HomeCatalogSettingsRepository {
     fun setHeroEnabled(enabled: Boolean) {
         ensureLoaded()
         heroEnabled = enabled
-        publish()
-        persist()
-        HomeRepository.applyCurrentSettings()
-    }
-
-    internal fun setHeroArtworkSource(source: HomeHeroArtworkSource) {
-        ensureLoaded()
-        if (heroArtworkSource == source) return
-        heroArtworkSource = source
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
@@ -287,7 +273,6 @@ object HomeCatalogSettingsRepository {
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
-        heroArtworkSource = HomeHeroArtworkSource.BACKDROP
         heroStyle = HomeHeroStyle.FULL_BLEED
         showCatalogType = true
         hideUnreleasedContent = false
@@ -338,7 +323,6 @@ object HomeCatalogSettingsRepository {
 
         if (parsedPayload != null) {
             heroEnabled = parsedPayload.heroEnabled
-            heroArtworkSource = HomeHeroArtworkSource.fromStorageValue(parsedPayload.heroArtworkSource)
             heroStyle = HomeHeroStyle.fromStorageValue(parsedPayload.heroStyle)
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
@@ -440,7 +424,6 @@ object HomeCatalogSettingsRepository {
 
         _uiState.value = HomeCatalogSettingsUiState(
             heroEnabled = heroEnabled,
-            heroArtworkSource = heroArtworkSource,
             heroStyle = heroStyle,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
@@ -453,7 +436,6 @@ object HomeCatalogSettingsRepository {
             json.encodeToString(
                 StoredHomeCatalogSettingsPayload(
                     heroEnabled = heroEnabled,
-                    heroArtworkSource = heroArtworkSource.storageValue,
                     heroStyle = heroStyle.storageValue,
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,

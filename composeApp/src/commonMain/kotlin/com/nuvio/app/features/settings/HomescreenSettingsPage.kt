@@ -37,7 +37,6 @@ import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
-import com.nuvio.app.features.home.HomeHeroArtworkSource
 import com.nuvio.app.features.home.HomeHeroStyle
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import nuvio.composeapp.generated.resources.Res
@@ -47,18 +46,12 @@ import nuvio.composeapp.generated.resources.layout_hide_unreleased_sub
 import nuvio.composeapp.generated.resources.layout_catalog_type
 import nuvio.composeapp.generated.resources.layout_catalog_type_sub
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
-import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_card
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_card_description
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_description
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_full_bleed
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_style_full_bleed_description
-import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_backdrop
-import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_backdrop_description
-import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_description
-import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_poster
-import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_poster_description
 import nuvio.composeapp.generated.resources.settings_homescreen_catalogs_source
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_title
 import nuvio.composeapp.generated.resources.settings_homescreen_keep_home_focused
@@ -145,10 +138,6 @@ internal fun LazyListScope.homescreenSettingsContent(
                     HeroStyleOptions(
                         isTablet = isTablet,
                         selectedStyle = settingsUiState.heroStyle,
-                    )
-                    HeroArtworkSourceOptions(
-                        isTablet = isTablet,
-                        selectedSource = settingsUiState.heroArtworkSource,
                     )
                     HeroSourcesDropdown(
                         isTablet = isTablet,
@@ -272,98 +261,6 @@ private fun HeroStyleOption(
         modifier = modifier
             .heightIn(min = if (selected) 92.dp else 88.dp)
             .clickable { HomeCatalogSettingsRepository.setHeroStyle(style) },
-        shape = RoundedCornerShape(14.dp),
-        color = containerColor,
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HeroArtworkSourceOptions(
-    isTablet: Boolean,
-    selectedSource: HomeHeroArtworkSource,
-) {
-    SettingsGroup(isTablet = isTablet) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = stringResource(Res.string.settings_homescreen_artwork_source),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = stringResource(Res.string.settings_homescreen_artwork_source_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                HeroArtworkSourceOption(
-                    modifier = Modifier.weight(1f),
-                    source = HomeHeroArtworkSource.BACKDROP,
-                    selectedSource = selectedSource,
-                    title = stringResource(Res.string.settings_homescreen_artwork_source_backdrop),
-                    description = stringResource(Res.string.settings_homescreen_artwork_source_backdrop_description),
-                )
-                HeroArtworkSourceOption(
-                    modifier = Modifier.weight(1f),
-                    source = HomeHeroArtworkSource.POSTER,
-                    selectedSource = selectedSource,
-                    title = stringResource(Res.string.settings_homescreen_artwork_source_poster),
-                    description = stringResource(Res.string.settings_homescreen_artwork_source_poster_description),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroArtworkSourceOption(
-    modifier: Modifier,
-    source: HomeHeroArtworkSource,
-    selectedSource: HomeHeroArtworkSource,
-    title: String,
-    description: String,
-) {
-    val selected = selectedSource == source
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-    }
-
-    Surface(
-        modifier = modifier
-            .heightIn(min = if (selected) 92.dp else 88.dp)
-            .clickable { HomeCatalogSettingsRepository.setHeroArtworkSource(source) },
         shape = RoundedCornerShape(14.dp),
         color = containerColor,
     ) {
