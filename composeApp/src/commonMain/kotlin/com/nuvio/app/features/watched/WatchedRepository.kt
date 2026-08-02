@@ -113,6 +113,11 @@ internal suspend fun <T> watchedProviderRefreshOrNull(
     null
 }
 
+internal fun extraWatchedKeysChanged(
+    previous: Set<String>?,
+    current: Set<String>,
+): Boolean = previous.orEmpty() != current
+
 object WatchedRepository {
     private data class WatchedRefreshOperation(
         val profileId: Int,
@@ -1099,7 +1104,10 @@ object WatchedRepository {
             adapter.observeExtraWatchedKeys(currentProfileId)
                 .distinctUntilChanged()
                 .collectLatest { extraKeys ->
-                    val keysChanged = providerExtraWatchedKeys[providerId] != extraKeys
+                    val keysChanged = extraWatchedKeysChanged(
+                        previous = providerExtraWatchedKeys[providerId],
+                        current = extraKeys,
+                    )
                     if (keysChanged) {
                         val freshItems = watchedProviderRefreshOrNull(
                             refresh = {

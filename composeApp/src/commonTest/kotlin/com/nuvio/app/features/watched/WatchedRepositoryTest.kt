@@ -15,6 +15,26 @@ import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
     @Test
+    fun emptyProviderExtraKeys_doNotTriggerInitialRefresh() {
+        assertFalse(extraWatchedKeysChanged(previous = null, current = emptySet()))
+    }
+
+    @Test
+    fun populatedProviderExtraKeys_triggerRefreshFromEmptyState() {
+        assertTrue(extraWatchedKeysChanged(previous = null, current = setOf("series:tt1:-1:-1")))
+    }
+
+    @Test
+    fun changedProviderExtraKeys_triggerRefresh() {
+        assertTrue(
+            extraWatchedKeysChanged(
+                previous = setOf("series:tt1:-1:-1"),
+                current = setOf("series:tt2:-1:-1"),
+            ),
+        )
+    }
+
+    @Test
     fun providerRefreshFailure_isContainedWithoutReplacingState() = runBlocking {
         val failure = IllegalStateException("rate limited")
         var observedFailure: Throwable? = null
