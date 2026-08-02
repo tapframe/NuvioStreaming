@@ -7,17 +7,21 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import com.nuvio.app.features.home.HomeHeroStyle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -61,17 +65,37 @@ private fun rememberHomeSkeletonBrush(): Brush {
 }
 
 @Composable
-fun HomeSkeletonHero(
+internal fun HomeSkeletonHero(
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
+    heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
 ) {
     val brush = rememberHomeSkeletonBrush()
+    val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
+            .then(
+                if (isCardStyle) {
+                    Modifier.padding(
+                        top = statusBarTopPadding + HERO_CARD_TOP_PADDING,
+                        start = HERO_CARD_HORIZONTAL_PADDING,
+                        end = HERO_CARD_HORIZONTAL_PADDING,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .clip(
+                if (isCardStyle) {
+                    RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+                } else {
+                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                },
+            ),
     ) {
         val layout = homeHeroLayout(
             maxWidthDp = maxWidth.value,
@@ -79,11 +103,20 @@ fun HomeSkeletonHero(
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
         )
         val containerWidth = maxWidth
+        val heroHeight = if (isCardStyle) {
+            cardHeroHeight(
+                maxWidth = maxWidth,
+                viewportHeight = viewportHeight,
+                isTablet = layout.isTablet,
+            )
+        } else {
+            layout.heroHeight
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(layout.heroHeight)
+                .height(heroHeight)
                 .background(brush),
         ) {
             Box(

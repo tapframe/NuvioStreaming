@@ -633,6 +633,12 @@
     <string name="settings_homescreen_section_collections">COLLECTIONS</string>
     <string name="settings_homescreen_section_hero">HOME LAYOUT</string>
     <string name="settings_homescreen_section_hero_sources">HERO CATALOGS</string>
+    <string name="settings_homescreen_hero_style">Hero Style</string>
+    <string name="settings_homescreen_hero_style_description">How the featured artwork is framed at the top of the home screen.</string>
+    <string name="settings_homescreen_hero_style_full_bleed">Full-bleed</string>
+    <string name="settings_homescreen_hero_style_full_bleed_description">Artwork fills the width of the screen.</string>
+    <string name="settings_homescreen_hero_style_card">Card</string>
+    <string name="settings_homescreen_hero_style_card_description">Rounded poster-shaped card, inset below the status bar.</string>
     <string name="settings_homescreen_artwork_source">Artwork Source</string>
     <string name="settings_homescreen_artwork_source_description">Choose which artwork type is used as the Home hero background.</string>
     <string name="settings_homescreen_artwork_source_backdrop">Backdrop</string>

@@ -911,6 +911,7 @@ fun HomeScreen(
                                 modifier = Modifier,
                                 viewportHeight = maxHeight,
                                 mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                heroStyle = homeSettingsUiState.heroStyle,
                             )
 
                             homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
@@ -919,6 +920,7 @@ fun HomeScreen(
                                 viewportHeight = maxHeight,
                                 mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
                                 artworkSource = homeSettingsUiState.heroArtworkSource,
+                                heroStyle = homeSettingsUiState.heroStyle,
                                 listState = homeListState,
                                 stretchPx = { heroStretchState.stretchPx },
                                 onItemClick = onPosterClick,
@@ -929,6 +931,7 @@ fun HomeScreen(
                                 modifier = Modifier,
                                 viewportHeight = maxHeight,
                                 mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                heroStyle = homeSettingsUiState.heroStyle,
                             )
                         }
                     }

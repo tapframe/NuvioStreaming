@@ -52,17 +52,17 @@ val LocalDynamicArtworkBackgroundActive = staticCompositionLocalOf { false }
 private const val PALETTE_SAMPLE_PX = 96
 
 /** How far the theme background is pulled towards the artwork's dominant colour. */
-private const val DOMINANT_BLEND_FRACTION = 0.55f
+private const val DOMINANT_BLEND_FRACTION = 0.9f
 
 /** Alpha of the two radial colour blobs. */
-private const val PRIMARY_BLOB_ALPHA = 0.85f
-private const val SECONDARY_BLOB_ALPHA = 0.5f
+private const val PRIMARY_BLOB_ALPHA = 1f
+private const val SECONDARY_BLOB_ALPHA = 0.7f
 
 /** Softens the blob edges into each other. Gradients degrade gracefully where blur is a no-op. */
 private val WASH_BLUR_RADIUS = 72.dp
 
 /** Opacity of the base fade that keeps list content readable towards the bottom of the screen. */
-private const val BOTTOM_FADE_ALPHA = 0.55f
+private const val BOTTOM_FADE_ALPHA = 0.3f
 
 private const val COLOR_TRANSITION_MS = 900
 

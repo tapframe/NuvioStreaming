@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
@@ -57,6 +60,7 @@ import com.nuvio.app.core.ui.dynamicScrimAlpha
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
 import com.nuvio.app.features.home.HomeHeroArtworkSource
+import com.nuvio.app.features.home.HomeHeroStyle
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -81,6 +85,44 @@ private const val MOBILE_HERO_MIN_HEIGHT_DP = 360f
 private const val MOBILE_HERO_MAX_HEIGHT_DP = 760f
 private const val TABLET_LANDSCAPE_HERO_HEIGHT_MULTIPLIER = 1.5f
 
+/** TMDB posters are 2:3, so height is width * 1.5. Shared with the skeleton/reserved placeholders. */
+internal const val TMDB_POSTER_HEIGHT_RATIO = 1.5f
+
+/** Backdrops are 16:9, so height is width * 0.5625. */
+internal const val BACKDROP_HEIGHT_RATIO = 9f / 16f
+
+/** Stops a 16:9 card from swallowing the whole viewport on a landscape phone. */
+private const val CARD_WIDE_MAX_VIEWPORT_FRACTION = 0.72f
+internal val HERO_CARD_CORNER_RADIUS = 28.dp
+internal val HERO_CARD_HORIZONTAL_PADDING = 12.dp
+internal val HERO_CARD_TOP_PADDING = 8.dp
+
+/**
+ * Card mode follows the shape of the screen: a 2:3 poster in portrait, a 16:9 backdrop in landscape
+ * or on tablets. A 2:3 card in landscape is taller than the viewport itself, which is why the
+ * artwork source is switched along with the ratio rather than just cropping the poster.
+ */
+internal fun cardHeroUsesWideArtwork(
+    maxWidth: Dp,
+    viewportHeight: Dp?,
+    isTablet: Boolean,
+): Boolean = isTablet || (viewportHeight != null && maxWidth > viewportHeight)
+
+internal fun cardHeroHeight(
+    maxWidth: Dp,
+    viewportHeight: Dp?,
+    isTablet: Boolean,
+): Dp = if (cardHeroUsesWideArtwork(maxWidth, viewportHeight, isTablet)) {
+    val wideHeight = maxWidth * BACKDROP_HEIGHT_RATIO
+    if (viewportHeight != null) {
+        minOf(wideHeight, viewportHeight * CARD_WIDE_MAX_VIEWPORT_FRACTION)
+    } else {
+        wideHeight
+    }
+} else {
+    maxWidth * TMDB_POSTER_HEIGHT_RATIO
+}
+
 internal data class HomeHeroLayout(
     val isTablet: Boolean,
     val heroHeight: Dp,
@@ -99,6 +141,7 @@ internal fun HomeHeroSection(
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
     artworkSource: HomeHeroArtworkSource = HomeHeroArtworkSource.BACKDROP,
+    heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
     listState: LazyListState? = null,
     stretchPx: () -> Float = { 0f },
     onItemClick: ((MetaPreview) -> Unit)? = null,
@@ -123,21 +166,61 @@ internal fun HomeHeroSection(
         }
     }
 
+    val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val cardInsetModifier = if (isCardStyle) {
+        Modifier.padding(
+            top = statusBarTopPadding + HERO_CARD_TOP_PADDING,
+            start = HERO_CARD_HORIZONTAL_PADDING,
+            end = HERO_CARD_HORIZONTAL_PADDING,
+        )
+    } else {
+        Modifier
+    }
+    val heroShape = if (isCardStyle) {
+        RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+    } else {
+        RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
+            .then(cardInsetModifier)
             .homeHeroPagerGesture(
                 pagerState = pagerState,
                 itemCount = items.size,
                 coroutineScope = coroutineScope,
             )
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
+            .clip(heroShape),
     ) {
-        val layout = homeHeroLayout(
+        val baseLayout = homeHeroLayout(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
         )
+        // In card mode the height is dictated by the artwork ratio, not the viewport.
+        val layout = if (isCardStyle) {
+            baseLayout.copy(
+                heroHeight = cardHeroHeight(
+                    maxWidth = maxWidth,
+                    viewportHeight = viewportHeight,
+                    isTablet = baseLayout.isTablet,
+                ),
+            )
+        } else {
+            baseLayout
+        }
+        val effectiveArtworkSource = when {
+            !isCardStyle -> artworkSource
+            cardHeroUsesWideArtwork(maxWidth, viewportHeight, baseLayout.isTablet) ->
+                HomeHeroArtworkSource.BACKDROP
+            else -> HomeHeroArtworkSource.POSTER
+        }
+        // The card is sized to the artwork's own ratio, so the zoom and parallax that exist to hide
+        // the edges of a cropped full-bleed backdrop would only crop the artwork for no reason.
+        val artworkParallax = if (isCardStyle) 0f else HERO_BACKGROUND_PARALLAX
+        val artworkBaseScale = if (isCardStyle) 1f else HERO_BACKGROUND_SCALE
         val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
         val scrollOffsetPx by remember(listState, heroHeightPx) {
@@ -177,7 +260,7 @@ internal fun HomeHeroSection(
             ?.let(items::get)
             ?: items[currentPage]
 
-        val activeArtworkUrl = when (artworkSource) {
+        val activeArtworkUrl = when (effectiveArtworkSource) {
             HomeHeroArtworkSource.POSTER -> currentItem.poster ?: currentItem.banner
             HomeHeroArtworkSource.BACKDROP -> currentItem.banner ?: currentItem.poster
         }
@@ -211,11 +294,11 @@ internal fun HomeHeroSection(
                 ) {
                     visiblePages.forEach { layer ->
                         val item = items[layer.page]
-                        val artworkUrl = when (artworkSource) {
+                        val artworkUrl = when (effectiveArtworkSource) {
                             HomeHeroArtworkSource.POSTER -> item.poster ?: item.banner
                             HomeHeroArtworkSource.BACKDROP -> item.banner ?: item.poster
                         }
-                        key(artworkSource, item.type, item.id, artworkUrl) {
+                        key(effectiveArtworkSource, item.type, item.id, artworkUrl) {
                             AsyncImage(
                                 model = artworkUrl,
                                 contentDescription = item.name,
@@ -223,10 +306,12 @@ internal fun HomeHeroSection(
                                     .fillMaxSize()
                                     .graphicsLayer {
                                         alpha = layer.visibility
-                                        translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                        translationY = heroScrollTranslationY
-                                        scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
-                                        scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
+                                        translationX = -layer.offset * heroWidthPx * artworkParallax
+                                        translationY = if (isCardStyle) 0f else heroScrollTranslationY
+                                        scaleX = artworkBaseScale *
+                                            if (isCardStyle) 1f else heroScrollScale
+                                        scaleY = artworkBaseScale *
+                                            if (isCardStyle) 1f else heroScrollScale
                                     },
                                 alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
                                 contentScale = ContentScale.Crop,
@@ -368,26 +453,56 @@ private fun heroPageVisibility(
 }
 
 @Composable
-fun HomeHeroReservedSpace(
+internal fun HomeHeroReservedSpace(
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
+    heroStyle: HomeHeroStyle = HomeHeroStyle.FULL_BLEED,
 ) {
+    val isCardStyle = heroStyle == HomeHeroStyle.CARD
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
+            .then(
+                if (isCardStyle) {
+                    Modifier.padding(
+                        top = statusBarTopPadding + HERO_CARD_TOP_PADDING,
+                        start = HERO_CARD_HORIZONTAL_PADDING,
+                        end = HERO_CARD_HORIZONTAL_PADDING,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .clip(
+                if (isCardStyle) {
+                    RoundedCornerShape(HERO_CARD_CORNER_RADIUS)
+                } else {
+                    RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                },
+            ),
     ) {
-        val layout = homeHeroLayout(
+        val baseLayout = homeHeroLayout(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
         )
+        val heroHeight = if (isCardStyle) {
+            cardHeroHeight(
+                maxWidth = maxWidth,
+                viewportHeight = viewportHeight,
+                isTablet = baseLayout.isTablet,
+            )
+        } else {
+            baseLayout.heroHeight
+        }
 
         Spacer(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(layout.heroHeight),
+                .height(heroHeight),
         )
     }
 }
