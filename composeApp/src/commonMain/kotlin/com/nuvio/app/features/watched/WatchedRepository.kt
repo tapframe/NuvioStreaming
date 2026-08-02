@@ -101,6 +101,18 @@ internal fun replaceWatchedItemsForSource(
     target.putAll(replacement)
 }
 
+internal suspend fun <T> watchedProviderRefreshOrNull(
+    refresh: suspend () -> T,
+    onFailure: (Throwable) -> Unit,
+): T? = try {
+    refresh()
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Throwable) {
+    onFailure(error)
+    null
+}
+
 object WatchedRepository {
     private data class WatchedRefreshOperation(
         val profileId: Int,
@@ -1054,16 +1066,21 @@ object WatchedRepository {
                 .collectLatest { extraKeys ->
                     val keysChanged = providerExtraWatchedKeys[providerId] != extraKeys
                     if (keysChanged) {
-                        providerExtraWatchedKeys[providerId] = extraKeys
-                        // Re-pull items from provider to reflect snapshot changes
-                        // (e.g. after remote episode removal)
-                        val freshItems = adapter.pull(
-                            profileId = currentProfileId,
-                            pageSize = watchedItemsPageSize,
-                        )
+                        val freshItems = watchedProviderRefreshOrNull(
+                            refresh = {
+                                adapter.pull(
+                                    profileId = currentProfileId,
+                                    pageSize = watchedItemsPageSize,
+                                )
+                            },
+                            onFailure = { error ->
+                                log.w(error) { "Failed to refresh watched items from ${providerId.storageId}" }
+                            },
+                        ) ?: return@collectLatest
                         val itemsByKey = freshItems.associateBy { item ->
                             watchedItemKey(item.type, item.id, item.season, item.episode)
                         }.toMutableMap()
+                        providerExtraWatchedKeys[providerId] = extraKeys
                         providerItemsByKey[providerId] = itemsByKey
                         publish()
                     }
