@@ -59,6 +59,8 @@ import nuvio.composeapp.generated.resources.settings_appearance_nav_bar_style
 import nuvio.composeapp.generated.resources.settings_appearance_nav_bar_style_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_black
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_description
+import nuvio.composeapp.generated.resources.settings_appearance_dynamic_artwork_background
+import nuvio.composeapp.generated.resources.settings_appearance_dynamic_artwork_background_description
 import nuvio.composeapp.generated.resources.settings_appearance_continue_watching_description
 import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass
 import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass_description
@@ -83,6 +85,8 @@ internal fun LazyListScope.appearanceSettingsContent(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    dynamicArtworkBackgroundEnabled: Boolean,
+    onDynamicArtworkBackgroundToggle: (Boolean) -> Unit,
     liquidGlassNativeTabBarSupported: Boolean,
     liquidGlassNativeTabBarEnabled: Boolean,
     onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
@@ -162,6 +166,16 @@ internal fun LazyListScope.appearanceSettingsContent(
                     checked = amoledEnabled,
                     isTablet = isTablet,
                     onCheckedChange = onAmoledToggle,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
+                    description = stringResource(
+                        Res.string.settings_appearance_dynamic_artwork_background_description,
+                    ),
+                    checked = dynamicArtworkBackgroundEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = onDynamicArtworkBackgroundToggle,
                 )
                 if (liquidGlassNativeTabBarSupported) {
                     SettingsGroupDivider(isTablet = isTablet)

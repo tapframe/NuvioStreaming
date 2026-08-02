@@ -379,6 +379,15 @@ internal fun settingsSearchEntries(
         section = stringResource(Res.string.settings_appearance_section_display),
         icon = Icons.Rounded.Palette,
     )
+    addRow(
+        page = SettingsPage.Appearance,
+        key = "dynamic-artwork-background",
+        title = stringResource(Res.string.settings_appearance_dynamic_artwork_background),
+        description = stringResource(Res.string.settings_appearance_dynamic_artwork_background_description),
+        pageLabel = layoutPage,
+        section = stringResource(Res.string.settings_appearance_section_display),
+        icon = Icons.Rounded.Palette,
+    )
     if (liquidGlassNativeTabBarSupported) {
         addRow(
             page = SettingsPage.Appearance,

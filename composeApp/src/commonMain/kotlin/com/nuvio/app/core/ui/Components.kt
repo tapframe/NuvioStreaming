@@ -85,11 +85,17 @@ fun NuvioScreen(
 ) {
     val tokens = MaterialTheme.nuvio
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // A dynamic artwork layer is painted behind this screen, so the opaque fill would hide it.
+    val screenBackground = if (LocalDynamicArtworkBackgroundActive.current) {
+        Color.Transparent
+    } else {
+        tokens.colors.background
+    }
     LazyColumn(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .background(tokens.colors.background),
+            .background(screenBackground),
         contentPadding = PaddingValues(
             start = horizontalPadding,
             top = topPadding ?: tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding,

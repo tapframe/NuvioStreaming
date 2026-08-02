@@ -24,6 +24,7 @@ import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.NativeTabBarScrollEffect
+import com.nuvio.app.core.ui.DynamicArtworkBackground
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
@@ -891,156 +892,164 @@ fun HomeScreen(
             Modifier
         }
 
-        NuvioScreen(
-            modifier = Modifier.fillMaxSize().then(heroStretchModifier),
-            horizontalPadding = 0.dp,
-            topPadding = if (showHeroSlot) 0.dp else null,
-            listState = homeListState,
-        ) {
-            if (showHeroSlot) {
-                item {
-                    when {
-                        showHeroSkeleton -> HomeSkeletonHero(
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                        )
+        var activeHeroArtworkUrl by remember { mutableStateOf<String?>(null) }
+        val onActiveHeroArtworkChange: (String?) -> Unit = remember {
+            { url -> activeHeroArtworkUrl = url }
+        }
 
-                        homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                            items = homeUiState.heroItems,
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                            artworkSource = homeSettingsUiState.heroArtworkSource,
-                            listState = homeListState,
-                            stretchPx = { heroStretchState.stretchPx },
-                            onItemClick = onPosterClick,
-                        )
-
-                        else -> HomeHeroReservedSpace(
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                        )
-                    }
-                }
-            }
-
-            when {
-                !hasActiveAddons && !hasRenderableCollectionRows -> {
-                    homeContinueWatchingSections(
-                        preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
-                        upcomingItems = upcomingItems,
-                        dataSourceKey = effectiveWatchProgressSource,
-                        sectionPadding = homeSectionPadding,
-                        layout = continueWatchingLayout,
-                        continueWatchingListState = continueWatchingListState,
-                        upcomingListState = upcomingListState,
-                        onItemClick = onContinueWatchingClick,
-                        onItemLongPress = onContinueWatchingLongPress,
-                    )
+        DynamicArtworkBackground(artworkUrl = activeHeroArtworkUrl) {
+            NuvioScreen(
+                modifier = Modifier.fillMaxSize().then(heroStretchModifier),
+                horizontalPadding = 0.dp,
+                topPadding = if (showHeroSlot) 0.dp else null,
+                listState = homeListState,
+            ) {
+                if (showHeroSlot) {
                     item {
-                        HomeEmptyStateCard(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            title = stringResource(Res.string.compose_search_empty_no_active_addons_title),
-                            message = stringResource(Res.string.home_empty_no_active_addons_message),
-                        )
-                    }
-                }
-
-                homeUiState.isLoading && homeUiState.sections.isEmpty() && !hasRenderableCollectionRows -> {
-                    homeContinueWatchingSections(
-                        preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
-                        upcomingItems = upcomingItems,
-                        dataSourceKey = effectiveWatchProgressSource,
-                        sectionPadding = homeSectionPadding,
-                        layout = continueWatchingLayout,
-                        continueWatchingListState = continueWatchingListState,
-                        upcomingListState = upcomingListState,
-                        onItemClick = onContinueWatchingClick,
-                        onItemLongPress = onContinueWatchingLongPress,
-                    )
-                    items(3) {
-                        HomeSkeletonRow(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                        )
-                    }
-                }
-
-                homeUiState.sections.isEmpty() && homeUiState.heroItems.isEmpty() &&
-                    (!continueWatchingPreferences.isVisible || !hasContinueWatchingRows) &&
-                    !hasRenderableCollectionRows -> {
-                    item {
-                        if (networkStatusUiState.isOfflineLike) {
-                            NuvioNetworkOfflineCard(
-                                condition = networkStatusUiState.condition,
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                onRetry = {
-                                    NetworkStatusRepository.requestRefresh(force = true)
-                                    HomeRepository.refresh(addonsUiState.addons.enabledAddons(), force = true)
-                                },
+                        when {
+                            showHeroSkeleton -> HomeSkeletonHero(
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
                             )
-                        } else {
-                            HomeEmptyStateCard(
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                title = stringResource(Res.string.home_empty_no_rows_title),
-                                message = homeUiState.errorMessage
-                                    ?: stringResource(Res.string.home_empty_no_rows_message),
+
+                            homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
+                                items = homeUiState.heroItems,
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                artworkSource = homeSettingsUiState.heroArtworkSource,
+                                listState = homeListState,
+                                stretchPx = { heroStretchState.stretchPx },
+                                onItemClick = onPosterClick,
+                                onActiveArtworkChange = onActiveHeroArtworkChange,
+                            )
+
+                            else -> HomeHeroReservedSpace(
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
                             )
                         }
                     }
                 }
 
-                else -> {
-                    homeContinueWatchingSections(
-                        preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
-                        upcomingItems = upcomingItems,
-                        dataSourceKey = effectiveWatchProgressSource,
-                        sectionPadding = homeSectionPadding,
-                        layout = continueWatchingLayout,
-                        continueWatchingListState = continueWatchingListState,
-                        upcomingListState = upcomingListState,
-                        onItemClick = onContinueWatchingClick,
-                        onItemLongPress = onContinueWatchingLongPress,
-                    )
+                when {
+                    !hasActiveAddons && !hasRenderableCollectionRows -> {
+                        homeContinueWatchingSections(
+                            preferences = continueWatchingPreferences,
+                            continueWatchingItems = continueWatchingItems,
+                            upcomingItems = upcomingItems,
+                            dataSourceKey = effectiveWatchProgressSource,
+                            sectionPadding = homeSectionPadding,
+                            layout = continueWatchingLayout,
+                            continueWatchingListState = continueWatchingListState,
+                            upcomingListState = upcomingListState,
+                            onItemClick = onContinueWatchingClick,
+                            onItemLongPress = onContinueWatchingLongPress,
+                        )
+                        item {
+                            HomeEmptyStateCard(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                title = stringResource(Res.string.compose_search_empty_no_active_addons_title),
+                                message = stringResource(Res.string.home_empty_no_active_addons_message),
+                            )
+                        }
+                    }
 
-                    keyedEnabledHomeItems.forEach { keyedSettingsItem ->
-                        val settingsItem = keyedSettingsItem.value
-                        if (settingsItem.isCollection) {
-                            val collection = collectionsMap[settingsItem.key]
-                            if (collection != null) {
-                                item(key = keyedSettingsItem.lazyKey) {
-                                    HomeCollectionRowSection(
-                                        collection = collection,
-                                        modifier = Modifier.padding(bottom = 12.dp),
-                                        sectionPadding = homeSectionPadding,
-                                        animateGifs = animateCollectionGifs,
-                                        onFolderClick = onFolderClick,
-                                    )
-                                }
+                    homeUiState.isLoading && homeUiState.sections.isEmpty() && !hasRenderableCollectionRows -> {
+                        homeContinueWatchingSections(
+                            preferences = continueWatchingPreferences,
+                            continueWatchingItems = continueWatchingItems,
+                            upcomingItems = upcomingItems,
+                            dataSourceKey = effectiveWatchProgressSource,
+                            sectionPadding = homeSectionPadding,
+                            layout = continueWatchingLayout,
+                            continueWatchingListState = continueWatchingListState,
+                            upcomingListState = upcomingListState,
+                            onItemClick = onContinueWatchingClick,
+                            onItemLongPress = onContinueWatchingLongPress,
+                        )
+                        items(3) {
+                            HomeSkeletonRow(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
+                    }
+
+                    homeUiState.sections.isEmpty() && homeUiState.heroItems.isEmpty() &&
+                        (!continueWatchingPreferences.isVisible || !hasContinueWatchingRows) &&
+                        !hasRenderableCollectionRows -> {
+                        item {
+                            if (networkStatusUiState.isOfflineLike) {
+                                NuvioNetworkOfflineCard(
+                                    condition = networkStatusUiState.condition,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    onRetry = {
+                                        NetworkStatusRepository.requestRefresh(force = true)
+                                        HomeRepository.refresh(addonsUiState.addons.enabledAddons(), force = true)
+                                    },
+                                )
+                            } else {
+                                HomeEmptyStateCard(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    title = stringResource(Res.string.home_empty_no_rows_title),
+                                    message = homeUiState.errorMessage
+                                        ?: stringResource(Res.string.home_empty_no_rows_message),
+                                )
                             }
-                        } else {
-                            val section = sectionsMap[settingsItem.key]
-                            if (section != null && section.items.isNotEmpty()) {
-                                item(key = keyedSettingsItem.lazyKey) {
-                                    HomeCatalogRowSection(
-                                        section = section,
-                                        entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
-                                        modifier = Modifier.padding(bottom = 12.dp),
-                                        sectionPadding = homeSectionPadding,
-                                        onViewAllClick = if (section.canOpenCatalog(HOME_CATALOG_PREVIEW_LIMIT)) {
-                                            onCatalogClick?.let { { it(section) } }
-                                        } else {
-                                            null
-                                        },
-                                        watchedKeys = watchedUiState.watchedKeys,
-                                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                                        onPosterClick = onPosterClick,
-                                        onPosterLongClick = onPosterLongClick,
-                                    )
+                        }
+                    }
+
+                    else -> {
+                        homeContinueWatchingSections(
+                            preferences = continueWatchingPreferences,
+                            continueWatchingItems = continueWatchingItems,
+                            upcomingItems = upcomingItems,
+                            dataSourceKey = effectiveWatchProgressSource,
+                            sectionPadding = homeSectionPadding,
+                            layout = continueWatchingLayout,
+                            continueWatchingListState = continueWatchingListState,
+                            upcomingListState = upcomingListState,
+                            onItemClick = onContinueWatchingClick,
+                            onItemLongPress = onContinueWatchingLongPress,
+                        )
+
+                        keyedEnabledHomeItems.forEach { keyedSettingsItem ->
+                            val settingsItem = keyedSettingsItem.value
+                            if (settingsItem.isCollection) {
+                                val collection = collectionsMap[settingsItem.key]
+                                if (collection != null) {
+                                    item(key = keyedSettingsItem.lazyKey) {
+                                        HomeCollectionRowSection(
+                                            collection = collection,
+                                            modifier = Modifier.padding(bottom = 12.dp),
+                                            sectionPadding = homeSectionPadding,
+                                            animateGifs = animateCollectionGifs,
+                                            onFolderClick = onFolderClick,
+                                        )
+                                    }
+                                }
+                            } else {
+                                val section = sectionsMap[settingsItem.key]
+                                if (section != null && section.items.isNotEmpty()) {
+                                    item(key = keyedSettingsItem.lazyKey) {
+                                        HomeCatalogRowSection(
+                                            section = section,
+                                            entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
+                                            modifier = Modifier.padding(bottom = 12.dp),
+                                            sectionPadding = homeSectionPadding,
+                                            onViewAllClick = if (section.canOpenCatalog(HOME_CATALOG_PREVIEW_LIMIT)) {
+                                                onCatalogClick?.let { { it(section) } }
+                                            } else {
+                                                null
+                                            },
+                                            watchedKeys = watchedUiState.watchedKeys,
+                                            fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                                            onPosterClick = onPosterClick,
+                                            onPosterLongClick = onPosterLongClick,
+                                        )
+                                    }
                                 }
                             }
                         }

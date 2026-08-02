@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.core.ui.dynamicScrimAlpha
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
 import com.nuvio.app.features.home.HomeHeroArtworkSource
@@ -101,6 +102,7 @@ internal fun HomeHeroSection(
     listState: LazyListState? = null,
     stretchPx: () -> Float = { 0f },
     onItemClick: ((MetaPreview) -> Unit)? = null,
+    onActiveArtworkChange: ((String?) -> Unit)? = null,
 ) {
     if (items.isEmpty()) return
 
@@ -175,6 +177,14 @@ internal fun HomeHeroSection(
             ?.let(items::get)
             ?: items[currentPage]
 
+        val activeArtworkUrl = when (artworkSource) {
+            HomeHeroArtworkSource.POSTER -> currentItem.poster ?: currentItem.banner
+            HomeHeroArtworkSource.BACKDROP -> currentItem.banner ?: currentItem.poster
+        }
+        LaunchedEffect(onActiveArtworkChange, activeArtworkUrl) {
+            onActiveArtworkChange?.invoke(activeArtworkUrl)
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -231,10 +241,10 @@ internal fun HomeHeroSection(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.02f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.02f)),
+                                    MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.12f)),
+                                    MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.34f)),
+                                    MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(0.78f)),
                                 ),
                             ),
                         ),
@@ -249,7 +259,7 @@ internal fun HomeHeroSection(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.background.copy(alpha = 0f),
-                                    MaterialTheme.colorScheme.background,
+                                    MaterialTheme.colorScheme.background.copy(alpha = dynamicScrimAlpha(1f)),
                                 ),
                             ),
                         ),

@@ -152,6 +152,9 @@ fun SettingsScreen(
             ThemeSettingsRepository.selectedTheme
         }.collectAsStateWithLifecycle()
         val amoledEnabled by remember { ThemeSettingsRepository.amoledEnabled }.collectAsStateWithLifecycle()
+        val dynamicArtworkBackgroundEnabled by remember {
+            ThemeSettingsRepository.dynamicArtworkBackgroundEnabled
+        }.collectAsStateWithLifecycle()
         val liquidGlassNativeTabBarEnabled by remember {
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled
         }.collectAsStateWithLifecycle()
@@ -402,6 +405,8 @@ fun SettingsScreen(
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
                 onAmoledToggle = ThemeSettingsRepository::setAmoled,
+                dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
+                onDynamicArtworkBackgroundToggle = ThemeSettingsRepository::setDynamicArtworkBackground,
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                 liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
                 onLiquidGlassNativeTabBarToggle = ThemeSettingsRepository::setLiquidGlassNativeTabBar,
@@ -466,6 +471,8 @@ fun SettingsScreen(
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
                 onAmoledToggle = ThemeSettingsRepository::setAmoled,
+                dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
+                onDynamicArtworkBackgroundToggle = ThemeSettingsRepository::setDynamicArtworkBackground,
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                 liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
                 onLiquidGlassNativeTabBarToggle = ThemeSettingsRepository::setLiquidGlassNativeTabBar,
@@ -540,6 +547,8 @@ private fun MobileSettingsScreen(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    dynamicArtworkBackgroundEnabled: Boolean,
+    onDynamicArtworkBackgroundToggle: (Boolean) -> Unit,
     liquidGlassNativeTabBarSupported: Boolean,
     liquidGlassNativeTabBarEnabled: Boolean,
     onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
@@ -753,6 +762,8 @@ private fun MobileSettingsScreen(
                     onThemeSelected = onThemeSelected,
                     amoledEnabled = amoledEnabled,
                     onAmoledToggle = onAmoledToggle,
+                    dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
+                    onDynamicArtworkBackgroundToggle = onDynamicArtworkBackgroundToggle,
                     liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                     liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
                     onLiquidGlassNativeTabBarToggle = onLiquidGlassNativeTabBarToggle,
@@ -923,6 +934,8 @@ private fun TabletSettingsScreen(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    dynamicArtworkBackgroundEnabled: Boolean,
+    onDynamicArtworkBackgroundToggle: (Boolean) -> Unit,
     liquidGlassNativeTabBarSupported: Boolean,
     liquidGlassNativeTabBarEnabled: Boolean,
     onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
@@ -1191,6 +1204,8 @@ private fun TabletSettingsScreen(
                         onThemeSelected = onThemeSelected,
                         amoledEnabled = amoledEnabled,
                         onAmoledToggle = onAmoledToggle,
+                        dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
+                        onDynamicArtworkBackgroundToggle = onDynamicArtworkBackgroundToggle,
                         liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                         liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
                         onLiquidGlassNativeTabBarToggle = onLiquidGlassNativeTabBarToggle,

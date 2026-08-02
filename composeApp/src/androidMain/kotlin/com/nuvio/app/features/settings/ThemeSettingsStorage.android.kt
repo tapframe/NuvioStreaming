@@ -18,12 +18,14 @@ actual object ThemeSettingsStorage {
     private const val selectedThemeKey = "selected_theme"
     private const val amoledEnabledKey = "amoled_enabled"
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
+    private const val dynamicArtworkBackgroundEnabledKey = "dynamic_artwork_background_enabled"
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val NAV_BAR_STYLE_KEY = "nav_bar_style"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
         amoledEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
+        dynamicArtworkBackgroundEnabledKey,
         NAV_BAR_STYLE_KEY,
     )
 
@@ -70,6 +72,19 @@ actual object ThemeSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadDynamicArtworkBackgroundEnabled(): Boolean? =
+        preferences?.let { prefs ->
+            val key = ProfileScopedKey.of(dynamicArtworkBackgroundEnabledKey)
+            if (prefs.contains(key)) prefs.getBoolean(key, false) else null
+        }
+
+    actual fun saveDynamicArtworkBackgroundEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(dynamicArtworkBackgroundEnabledKey), enabled)
+            ?.apply()
+    }
+
     actual fun loadSelectedAppLanguage(): String? {
         val value = preferences?.getString(selectedAppLanguageKey, null)
         if (value != null) return value
@@ -109,6 +124,7 @@ actual object ThemeSettingsStorage {
         loadSelectedTheme()?.let { put(selectedThemeKey, encodeSyncString(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
         loadLiquidGlassNativeTabBarEnabled()?.let { put(liquidGlassNativeTabBarEnabledKey, encodeSyncBoolean(it)) }
+        loadDynamicArtworkBackgroundEnabled()?.let { put(dynamicArtworkBackgroundEnabledKey, encodeSyncBoolean(it)) }
         loadNavBarStyle()?.let { put(NAV_BAR_STYLE_KEY, encodeSyncString(it)) }
     }
 
@@ -120,6 +136,7 @@ actual object ThemeSettingsStorage {
         payload.decodeSyncString(selectedThemeKey)?.let(::saveSelectedTheme)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
         payload.decodeSyncBoolean(liquidGlassNativeTabBarEnabledKey)?.let(::saveLiquidGlassNativeTabBarEnabled)
+        payload.decodeSyncBoolean(dynamicArtworkBackgroundEnabledKey)?.let(::saveDynamicArtworkBackgroundEnabled)
         payload.decodeSyncString(NAV_BAR_STYLE_KEY)?.let(::saveNavBarStyle)
         applySelectedAppLanguage(loadSelectedAppLanguage() ?: AppLanguage.DEVICE.code)
     }
