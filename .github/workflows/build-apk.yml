@@ -1,0 +1,189 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ feature/advanced-player-features ]
+  workflow_dispatch:
+
+# ✅ منع تشغيل متعدد في نفس الوقت
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    # ✅ صلاحيات واضحة
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      # ─────────────────────────────────────────
+      # 1. CHECKOUT
+      # ─────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          token: ${{ secrets.GITHUB_TOKEN }}   # ✅ حل مشكلة exit 128
+          fetch-depth: 1
+
+      # ─────────────────────────────────────────
+      # 2. SUBMODULES
+      # ─────────────────────────────────────────
+      - name: Initialize submodules manually
+        run: |
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git submodule init MPVKit
+          git submodule update --depth=1 MPVKit
+        env:
+          GIT_TERMINAL_PROMPT: 0   # ✅ منع توقف Git عند طلب كلمة مرور
+
+      # ─────────────────────────────────────────
+      # 3. JDK SETUP
+      # ─────────────────────────────────────────
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'   # ✅ cache تلقائي للـ Gradle
+
+      # ─────────────────────────────────────────
+      # 4. ANDROID SDK + NDK
+      # ─────────────────────────────────────────
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK (required for MPVKit)
+        run: |
+          echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;27.2.12479018" \
+            "cmake;3.22.1"
+        # ✅ MPVKit يحتاج NDK، بدونه البناء يفشل
+
+      # ─────────────────────────────────────────
+      # 5. GRADLE SETUP
+      # ─────────────────────────────────────────
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          gradle-home-cache-cleanup: true   # ✅ تنظيف cache القديم
+
+      # ─────────────────────────────────────────
+      # 6. CONFIGURATION FILES
+      # ─────────────────────────────────────────
+      - name: Create local.properties
+        run: |
+          cat > local.properties << 'EOF'
+          sdk.dir=/usr/local/lib/android/sdk
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
+          TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          TRAKT_REDIRECT_URI=nuvio://auth/trakt
+          INTRO_DB_URL=${{ secrets.INTRO_DB_URL }}
+          EOF
+        # ✅ استخدام Secrets بدل قيم فارغة
+
+      - name: Add Gradle properties
+        run: |
+          cat >> gradle.properties << 'EOF'
+          kotlin.native.ignoreDisabledTargets=true
+          kotlin.native.enableKlibsCrossCompilation=false
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          android.useAndroidX=true
+          EOF
+        # ✅ زيادة الذاكرة + تفعيل parallel build
+
+      # ─────────────────────────────────────────
+      # 7. BUILD
+      # ─────────────────────────────────────────
+      - name: Build Full Debug APK
+        run: |
+          ./gradlew :composeApp:assembleFullDebug \
+            -x lint \
+            -x test \
+            --stacktrace \
+            --build-cache \
+            --parallel
+        # ✅ حذف --no-configuration-cache (يبطئ)
+        # ✅ أضفنا --stacktrace لتفاصيل الأخطاء
+        # ✅ أضفنا --build-cache و --parallel للسرعة
+
+      # ─────────────────────────────────────────
+      # 8. APK HANDLING
+      # ─────────────────────────────────────────
+      - name: Find and Rename APK
+        id: apk_info
+        run: |
+          APK_PATH=$(find composeApp/build/outputs/apk -name "*.apk" | head -1)
+          if [ -n "$APK_PATH" ]; then
+            DEST="composeApp/build/outputs/apk/NuvioMobile-custom-debug.apk"
+            cp "$APK_PATH" "$DEST"
+            echo "apk_found=true" >> $GITHUB_OUTPUT
+            echo "apk_path=$DEST" >> $GITHUB_OUTPUT
+            echo "✅ APK found: $APK_PATH"
+            # ✅ طباعة حجم الـ APK
+            ls -lh "$APK_PATH"
+          else
+            echo "apk_found=false" >> $GITHUB_OUTPUT
+            echo "❌ No APK found!"
+          fi
+
+      # ─────────────────────────────────────────
+      # 9. UPLOAD ARTIFACTS
+      # ─────────────────────────────────────────
+      - name: Upload APK Artifact
+        if: steps.apk_info.outputs.apk_found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NuvioMobile-APK-${{ github.run_number }}   # ✅ رقم فريد لكل build
+          path: ${{ steps.apk_info.outputs.apk_path }}
+          retention-days: 7   # ✅ احتفظ 7 أيام فقط (توفير مساحة)
+          if-no-files-found: error
+
+      - name: Upload All APKs (fallback)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: All-APKs-${{ github.run_number }}
+          path: composeApp/build/outputs/apk/**/*.apk
+          retention-days: 3
+          if-no-files-found: warn
+
+      # ─────────────────────────────────────────
+      # 10. BUILD SUMMARY
+      # ─────────────────────────────────────────
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## 📦 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.apk_info.outputs.apk_found }}" == "true" ]; then
+            echo "- **Status:** ✅ APK Built Successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status:** ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # ─────────────────────────────────────────
+      # 11. UPLOAD LOGS ON FAILURE
+      # ─────────────────────────────────────────
+      - name: Upload Build Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.run_number }}
+          path: |
+            **/build/reports/
+            **/build/outputs/logs/
+          retention-days: 3
+          if-no-files-found: warn

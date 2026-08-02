@@ -151,6 +151,11 @@ private fun skipLabel(type: String?): String =
     when (type?.lowercase()) {
         "intro", "op", "mixed-op" -> stringResource(Res.string.player_skip_intro)
         "outro", "ed", "mixed-ed", "credits" -> stringResource(Res.string.player_skip_outro)
-        "recap" -> stringResource(Res.string.player_skip_recap)
+        "recap", "preview" -> stringResource(Res.string.player_skip_recap)
+        "sponsor" -> "Skip Sponsor"
+        "selfpromo" -> "Skip Self-Promo"
+        "interaction" -> "Skip Interaction"
+        "filler" -> "Skip Filler"
+        "music_offtopic" -> "Skip Non-Music"
         else -> stringResource(Res.string.player_skip)
     }

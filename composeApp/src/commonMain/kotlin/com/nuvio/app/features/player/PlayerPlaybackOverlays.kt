@@ -21,6 +21,7 @@ import com.nuvio.app.features.p2p.P2pLoadingStatus
 import com.nuvio.app.features.player.skip.NextEpisodeCard
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.SkipIntroButton
+import com.nuvio.app.features.player.dualsubtitle.DualSubtitleOverlay
 import com.nuvio.app.features.player.skip.SkipInterval
 
 @Composable
@@ -125,6 +126,13 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             }
         }
     }
+
+    // Dual Subtitle Overlay - rendered above the primary subtitle area
+    DualSubtitleOverlay(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = overlayBottomPadding + 48.dp),
+    )
 
     if (!playerControlsLocked) {
         SkipIntroButton(
