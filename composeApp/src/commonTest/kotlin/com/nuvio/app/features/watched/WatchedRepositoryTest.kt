@@ -4,12 +4,61 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.WatchProgressSource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
+    @Test
+    fun emptyProviderExtraKeys_doNotTriggerInitialRefresh() {
+        assertFalse(extraWatchedKeysChanged(previous = null, current = emptySet()))
+    }
+
+    @Test
+    fun populatedProviderExtraKeys_triggerRefreshFromEmptyState() {
+        assertTrue(extraWatchedKeysChanged(previous = null, current = setOf("series:tt1:-1:-1")))
+    }
+
+    @Test
+    fun changedProviderExtraKeys_triggerRefresh() {
+        assertTrue(
+            extraWatchedKeysChanged(
+                previous = setOf("series:tt1:-1:-1"),
+                current = setOf("series:tt2:-1:-1"),
+            ),
+        )
+    }
+
+    @Test
+    fun providerRefreshFailure_isContainedWithoutReplacingState() = runBlocking {
+        val failure = IllegalStateException("rate limited")
+        var observedFailure: Throwable? = null
+
+        val result = watchedProviderRefreshOrNull(
+            refresh = { throw failure },
+            onFailure = { observedFailure = it },
+        )
+
+        assertNull(result)
+        assertEquals(failure, observedFailure)
+    }
+
+    @Test
+    fun providerRefreshCancellation_isNotContained() = runBlocking {
+        assertFailsWith<CancellationException> {
+            watchedProviderRefreshOrNull(
+                refresh = { throw CancellationException("cancelled") },
+                onFailure = {},
+            )
+        }
+        Unit
+    }
+
     @Test
     fun watchedItemKey_isTypeAware() {
         assertEquals("movie:tt1:-1:-1", watchedItemKey(type = "movie", id = "tt1"))

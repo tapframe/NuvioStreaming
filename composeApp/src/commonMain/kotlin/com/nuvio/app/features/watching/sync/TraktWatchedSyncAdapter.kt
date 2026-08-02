@@ -14,6 +14,7 @@ import com.nuvio.app.features.watched.normalizeWatchedMarkedAtEpochMs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -23,6 +24,71 @@ private const val BASE_URL = "https://api.trakt.tv"
 private const val WATCHED_PAGE_LIMIT = 250
 private const val WATCHED_MAX_PAGES = 1_000
 private const val WATCHED_SHOWS_EXTENDED = "progress"
+internal const val TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES = 8 * 1024 * 1024
+private const val TRAKT_WATCHED_MAX_ATTEMPTS = 2
+private const val TRAKT_WATCHED_MAX_RETRY_DELAY_MS = 60_000L
+
+internal fun interface TraktWatchedHttpEngine {
+    suspend fun get(
+        url: String,
+        headers: Map<String, String>,
+        maxResponseBodyBytes: Int,
+    ): RawHttpResponse
+}
+
+internal class TraktWatchedPageClient(
+    private val engine: TraktWatchedHttpEngine,
+    private val sleep: suspend (Long) -> Unit = { delayMs -> delay(delayMs) },
+) {
+    suspend fun get(url: String, headers: Map<String, String>): RawHttpResponse {
+        repeat(TRAKT_WATCHED_MAX_ATTEMPTS) { attempt ->
+            val response = engine.get(
+                url = url,
+                headers = headers,
+                maxResponseBodyBytes = TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES,
+            )
+            if (response.status in 200..299) return response
+            if (!isTransientTraktWatchedStatus(response.status) || attempt == TRAKT_WATCHED_MAX_ATTEMPTS - 1) {
+                throw TraktWatchedHttpException(response.status)
+            }
+            sleep(
+                traktWatchedRetryDelayMs(
+                    attempt = attempt,
+                    retryAfterSeconds = response.headers.entries
+                        .firstOrNull { (name, _) -> name.equals("retry-after", ignoreCase = true) }
+                        ?.value,
+                ),
+            )
+        }
+        error("Trakt watched request exhausted without a response")
+    }
+}
+
+internal class TraktWatchedHttpException(
+    val status: Int,
+) : Exception("Trakt watched request failed: $status")
+
+internal fun isTransientTraktWatchedStatus(status: Int): Boolean =
+    status == 429 || status in 500..599
+
+internal fun traktWatchedRetryDelayMs(attempt: Int, retryAfterSeconds: String?): Long =
+    retryAfterSeconds
+        ?.trim()
+        ?.toLongOrNull()
+        ?.coerceAtLeast(0L)
+        ?.times(1_000L)
+        ?.coerceAtMost(TRAKT_WATCHED_MAX_RETRY_DELAY_MS)
+        ?: (1_000L shl attempt.coerceIn(0, 5)).coerceAtMost(TRAKT_WATCHED_MAX_RETRY_DELAY_MS)
+
+private val platformTraktWatchedHttpEngine = TraktWatchedHttpEngine { url, headers, maxResponseBodyBytes ->
+    httpRequestRaw(
+        method = "GET",
+        url = url,
+        headers = headers,
+        body = "",
+        maxResponseBodyBytes = maxResponseBodyBytes,
+    )
+}
 
 
 object TraktWatchedSyncAdapter : TrackingWatchedProvider {
@@ -33,6 +99,7 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         encodeDefaults = false
         explicitNulls = false
     }
+    private val pageClient = TraktWatchedPageClient(platformTraktWatchedHttpEngine)
 
     // ── pull ────────────────────────────────────────────────────────────
     override suspend fun pull(
@@ -118,15 +185,10 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         val items = mutableListOf<TraktWatchedMovieDto>()
         var page = 1
         while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
+            val response = pageClient.get(
                 url = "$BASE_URL/sync/watched/movies?page=$page&limit=$WATCHED_PAGE_LIMIT",
                 headers = headers,
-                body = "",
             )
-            if (response.status !in 200..299) {
-                error("Trakt watched movies request failed: ${response.status}")
-            }
             val pageItems = json.decodeFromString<List<TraktWatchedMovieDto>>(response.body)
             if (pageItems.isEmpty()) break
             items.addAll(pageItems)
@@ -144,15 +206,10 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         val items = mutableListOf<TraktWatchedShowDto>()
         var page = 1
         while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
+            val response = pageClient.get(
                 url = "$BASE_URL/sync/watched/shows?page=$page&limit=$WATCHED_PAGE_LIMIT&extended=$WATCHED_SHOWS_EXTENDED",
                 headers = headers,
-                body = "",
             )
-            if (response.status !in 200..299) {
-                error("Trakt watched shows request failed: ${response.status}")
-            }
             val pageItems = json.decodeFromString<List<TraktWatchedShowDto>>(response.body)
             if (pageItems.isEmpty()) break
             items.addAll(pageItems)
