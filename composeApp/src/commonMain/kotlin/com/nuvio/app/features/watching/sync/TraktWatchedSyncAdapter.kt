@@ -23,6 +23,36 @@ private const val BASE_URL = "https://api.trakt.tv"
 private const val WATCHED_PAGE_LIMIT = 250
 private const val WATCHED_MAX_PAGES = 1_000
 private const val WATCHED_SHOWS_EXTENDED = "progress"
+internal const val TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES = 8 * 1024 * 1024
+
+internal fun interface TraktWatchedHttpEngine {
+    suspend fun get(
+        url: String,
+        headers: Map<String, String>,
+        maxResponseBodyBytes: Int,
+    ): RawHttpResponse
+}
+
+internal class TraktWatchedPageClient(
+    private val engine: TraktWatchedHttpEngine,
+) {
+    suspend fun get(url: String, headers: Map<String, String>): RawHttpResponse =
+        engine.get(
+            url = url,
+            headers = headers,
+            maxResponseBodyBytes = TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES,
+        )
+}
+
+private val platformTraktWatchedHttpEngine = TraktWatchedHttpEngine { url, headers, maxResponseBodyBytes ->
+    httpRequestRaw(
+        method = "GET",
+        url = url,
+        headers = headers,
+        body = "",
+        maxResponseBodyBytes = maxResponseBodyBytes,
+    )
+}
 
 
 object TraktWatchedSyncAdapter : TrackingWatchedProvider {
@@ -33,6 +63,7 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         encodeDefaults = false
         explicitNulls = false
     }
+    private val pageClient = TraktWatchedPageClient(platformTraktWatchedHttpEngine)
 
     // ── pull ────────────────────────────────────────────────────────────
     override suspend fun pull(
@@ -118,11 +149,9 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         val items = mutableListOf<TraktWatchedMovieDto>()
         var page = 1
         while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
+            val response = pageClient.get(
                 url = "$BASE_URL/sync/watched/movies?page=$page&limit=$WATCHED_PAGE_LIMIT",
                 headers = headers,
-                body = "",
             )
             if (response.status !in 200..299) {
                 error("Trakt watched movies request failed: ${response.status}")
@@ -144,11 +173,9 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         val items = mutableListOf<TraktWatchedShowDto>()
         var page = 1
         while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
+            val response = pageClient.get(
                 url = "$BASE_URL/sync/watched/shows?page=$page&limit=$WATCHED_PAGE_LIMIT&extended=$WATCHED_SHOWS_EXTENDED",
                 headers = headers,
-                body = "",
             )
             if (response.status !in 200..299) {
                 error("Trakt watched shows request failed: ${response.status}")
