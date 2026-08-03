@@ -2,13 +2,96 @@ package com.nuvio.app.features.watching.sync
 
 import com.nuvio.app.features.addons.DefaultRawHttpResponseMaxBytes
 import com.nuvio.app.features.addons.RawHttpResponse
+import com.nuvio.app.features.watched.WatchedItem
+import com.nuvio.app.features.watched.watchedItemKey
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class TraktWatchedSyncAdapterTest {
+    @Test
+    fun `watched content ids preserve every Trakt identity in canonical order`() {
+        val result = traktWatchedContentIds(
+            imdb = "tt1234567",
+            tmdb = 123,
+            tvdb = 456,
+            trakt = 789,
+            slug = "example-movie",
+        )
+
+        assertEquals(
+            listOf("tt1234567", "tmdb:123", "trakt:789", "example-movie", "tvdb:456"),
+            result,
+        )
+    }
+
+    @Test
+    fun `movie projection emits poster keys for every Trakt identity`() {
+        val item = watchedItem(id = "tt1234567", type = "movie")
+
+        val projection = buildTraktWatchedProjection(
+            listOf(
+                TraktWatchedProjectionCandidate(
+                    item = item,
+                    contentIds = listOf("tt1234567", "tmdb:123", "trakt:789", "example-movie"),
+                ),
+            ),
+        )
+
+        assertEquals(listOf(item), projection.items)
+        assertTrue(watchedItemKey("movie", "tmdb:123") in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("movie", "trakt:789") in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("movie", "example-movie") in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("film", "tt1234567") in projection.extraWatchedKeys)
+        assertFalse(watchedItemKey("movie", "tt1234567") in projection.extraWatchedKeys)
+    }
+
+    @Test
+    fun `episode projection emits aliases with matching coordinates and content types`() {
+        val projection = buildTraktWatchedProjection(
+            listOf(
+                TraktWatchedProjectionCandidate(
+                    item = watchedItem(
+                        id = "tt7654321",
+                        type = "series",
+                        season = 2,
+                        episode = 4,
+                    ),
+                    contentIds = listOf("tt7654321", "tmdb:321", "trakt:987", "example-show"),
+                ),
+            ),
+        )
+
+        assertTrue(watchedItemKey("series", "tmdb:321", 2, 4) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("tv", "tt7654321", 2, 4) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("show", "trakt:987", 2, 4) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("tvshow", "example-show", 2, 4) in projection.extraWatchedKeys)
+    }
+
+    @Test
+    fun `ambiguous show ids are excluded while unique siblings remain usable`() {
+        val firstIds = listOf("tt-shared", "tmdb:100", "trakt:1", "first-show")
+        val secondIds = listOf("tt-shared", "tmdb:200", "trakt:2", "second-show")
+        val ambiguousIds = ambiguousTraktWatchedShowIds(listOf(firstIds, secondIds))
+        val safeFirstIds = firstIds.filterNot(ambiguousIds::contains)
+        val projection = buildTraktWatchedProjection(
+            listOf(
+                TraktWatchedProjectionCandidate(
+                    item = watchedItem(id = safeFirstIds.first(), type = "series", season = 1, episode = 1),
+                    contentIds = safeFirstIds,
+                ),
+            ),
+        )
+
+        assertEquals(setOf("tt-shared"), ambiguousIds)
+        assertFalse(watchedItemKey("series", "tt-shared", 1, 1) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("series", "trakt:1", 1, 1) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("series", "first-show", 1, 1) in projection.extraWatchedKeys)
+    }
+
     @Test
     fun `watched history responses larger than generic limit remain complete`() = runBlocking {
         val body = "x".repeat(DefaultRawHttpResponseMaxBytes + 1)
@@ -87,5 +170,19 @@ class TraktWatchedSyncAdapterTest {
         url = "https://api.trakt.tv/sync/watched/shows",
         body = "[]",
         headers = headers,
+    )
+
+    private fun watchedItem(
+        id: String,
+        type: String,
+        season: Int? = null,
+        episode: Int? = null,
+    ): WatchedItem = WatchedItem(
+        id = id,
+        type = type,
+        name = id,
+        season = season,
+        episode = episode,
+        markedAtEpochMs = 1L,
     )
 }

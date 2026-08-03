@@ -1,7 +1,9 @@
 package com.nuvio.app.features.watching.application
 
 import com.nuvio.app.core.time.parseZonedIsoDateTimeToEpochMs
+import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.watched.WatchedItem
+import com.nuvio.app.features.watched.watchedItemKey
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktPlayback
 import kotlin.test.Test
@@ -9,6 +11,27 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class WatchingStateTest {
+    @Test
+    fun `tv poster matches fully watched series key`() {
+        val result = WatchingState.isPosterWatched(
+            watchedKeys = emptySet(),
+            item = MetaPreview(id = "tmdb:123", type = "tv", name = "Show"),
+            fullyWatchedSeriesKeys = setOf(watchedItemKey("series", "tmdb:123")),
+        )
+
+        assertTrue(result)
+    }
+
+    @Test
+    fun `film poster matches movie watched key`() {
+        val result = WatchingState.isPosterWatched(
+            watchedKeys = setOf(watchedItemKey("movie", "tt1234567")),
+            item = MetaPreview(id = "tt1234567", type = "film", name = "Movie"),
+        )
+
+        assertTrue(result)
+    }
+
     @Test
     fun `latest completed aggregates provider-filtered completed progress`() {
         val almostCompletePlayback = entry(

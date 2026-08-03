@@ -503,9 +503,7 @@ object WatchedRepository {
             setFullyWatchedSeriesKeysForSource(source, keys)
         }
         source.providerId?.let { providerId ->
-            if (extraWatchedKeys.isNotEmpty()) {
-                providerExtraWatchedKeys[providerId] = extraWatchedKeys
-            }
+            providerExtraWatchedKeys[providerId] = extraWatchedKeys
             loadedProviders += providerId
             providersLoadedFromRemote += providerId
         } ?: run {
@@ -734,13 +732,12 @@ object WatchedRepository {
 
     fun toggleWatched(item: WatchedItem) {
         ensureLoaded()
-        val source = activeSource
-        val key = watchedItemKey(item.type, item.id, item.season, item.episode)
-        val isMarked = itemsStore.read { nuvioItems, providerItems, _ ->
-            source.providerId
-                ?.let { providerId -> providerItems[providerId]?.containsKey(key) == true }
-                ?: nuvioItems.containsKey(key)
-        }
+        val isMarked = isWatched(
+            id = item.id,
+            type = item.type,
+            season = item.season,
+            episode = item.episode,
+        )
         if (isMarked) {
             unmarkWatched(item)
         } else {
@@ -829,13 +826,29 @@ object WatchedRepository {
         ensureLoaded()
         if (items.isEmpty()) return
         val source = activeSource
-        val removedItems = itemsStore.update { nuvioItems, providerItems, dirtyNuvioKeys ->
+        val (removedItems, removedExtraKeys) = itemsStore.update { nuvioItems, providerItems, dirtyNuvioKeys ->
             val targetItems = source.providerId
                 ?.let { providerId -> providerItems.getOrPut(providerId, ::mutableMapOf) }
                 ?: nuvioItems
-            items.mapNotNull { watchedItem ->
-                val key = watchedItemKey(watchedItem.type, watchedItem.id, watchedItem.season, watchedItem.episode)
-                targetItems.remove(key)?.let { storeItem ->
+            var extraKeysChanged = false
+            val removed = items.mapNotNull { watchedItem ->
+                val keys = watchedItemKeys(
+                    type = watchedItem.type,
+                    id = watchedItem.id,
+                    season = watchedItem.season,
+                    episode = watchedItem.episode,
+                )
+                val matchingKey = keys.firstOrNull(targetItems::containsKey)
+                source.providerId?.let { providerId ->
+                    providerExtraWatchedKeys[providerId]?.let { extraKeys ->
+                        val updated = extraKeys - keys
+                        if (updated != extraKeys) {
+                            providerExtraWatchedKeys[providerId] = updated
+                            extraKeysChanged = true
+                        }
+                    }
+                }
+                matchingKey?.let(targetItems::remove)?.let { storeItem ->
                     if (watchedItem.videoId != null && storeItem.videoId == null) {
                         storeItem.copy(videoId = watchedItem.videoId)
                     } else {
@@ -843,17 +856,11 @@ object WatchedRepository {
                     }
                 }?.also {
                     if (source.providerId == null) {
-                        dirtyNuvioKeys -= key
-                    }
-                    source.providerId?.let { providerId ->
-                        providerExtraWatchedKeys[providerId]?.let { extraKeys ->
-                            if (key in extraKeys) {
-                                providerExtraWatchedKeys[providerId] = extraKeys - key
-                            }
-                        }
+                        dirtyNuvioKeys.remove(matchingKey)
                     }
                 }
             }
+            removed to extraKeysChanged
         }
         if (removedItems.isNotEmpty()) {
             publish()
@@ -862,9 +869,7 @@ object WatchedRepository {
             }
             pushDeleteToServer(items = removedItems, source = source)
         } else if (source.providerId != null) {
-            // Items not found in local store (e.g. anime resolved via snapshot fallback).
-            // Still push delete to provider so it can remove from remote.
-            // The observer on snapshot changes will re-pull items and update the store.
+            if (removedExtraKeys) publish()
             pushDeleteToServer(items = items.toList(), source = source)
         }
     }
@@ -877,17 +882,20 @@ object WatchedRepository {
     ): Boolean {
         ensureLoaded()
         val source = activeSource
-        val key = watchedItemKey(type, id, season, episode)
-        return itemsStore.read { nuvioItems, providerItems, _ ->
-            source.providerId
-                ?.let { providerId -> providerItems[providerId]?.containsKey(key) == true }
-                ?: nuvioItems.containsKey(key)
+        val keys = watchedItemKeys(type = type, id = id, season = season, episode = episode)
+        val stored = itemsStore.read { nuvioItems, providerItems, _ ->
+            source.providerId?.let { providerId ->
+                providerItems[providerId]?.let { itemsByKey -> keys.any(itemsByKey::containsKey) } == true
+            } ?: keys.any(nuvioItems::containsKey)
         }
+        if (stored) return true
+        val providerId = source.providerId ?: return false
+        return providerExtraWatchedKeys[providerId]?.let { extraKeys -> keys.any(extraKeys::contains) } == true
     }
 
     fun isFullyWatchedSeries(id: String, type: String): Boolean {
-        val key = watchedItemKey(type, id)
-        return _fullyWatchedSeriesKeys.value.contains(key)
+        val keys = watchedItemKeys(type = type, id = id)
+        return keys.any(_fullyWatchedSeriesKeys.value::contains)
     }
 
     fun reconcileSeriesWatchedState(
