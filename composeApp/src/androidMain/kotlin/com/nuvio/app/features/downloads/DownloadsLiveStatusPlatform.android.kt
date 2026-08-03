@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.nuvio.app.core.deeplink.buildDownloadsDeepLinkUrl
+import com.nuvio.app.features.settings.AppIconPlatform
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -81,7 +82,8 @@ internal actual object DownloadsLiveStatusPlatform {
 
     private fun buildNotification(context: Context, item: DownloadItem): android.app.Notification {
         val subtitle = buildSubtitle(item)
-        val launchIntent = Intent(context, com.nuvio.app.MainActivity::class.java).apply {
+        val launchIntent = Intent().apply {
+            component = AppIconPlatform.currentLauncherComponent(context)
             action = Intent.ACTION_VIEW
             data = android.net.Uri.parse(buildDownloadsDeepLinkUrl())
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or

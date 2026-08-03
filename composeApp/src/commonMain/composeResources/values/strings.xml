@@ -577,6 +577,17 @@
     <string name="settings_account_status_signed_in">Signed in</string>
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
+    <string name="settings_appearance_app_icon">App Icon</string>
+    <string name="settings_appearance_app_icon_arctic_blue">Arctic Blue</string>
+    <string name="settings_appearance_app_icon_android_confirmation_message">Changing to %1$s will close Nuvio. Tap OK to continue.</string>
+    <string name="settings_appearance_app_icon_android_confirmation_title">Change App Icon?</string>
+    <string name="settings_appearance_app_icon_change_failed">The icon could not be changed. Please try again.</string>
+    <string name="settings_appearance_app_icon_copper">Copper</string>
+    <string name="settings_appearance_app_icon_emerald">Emerald</string>
+    <string name="settings_appearance_app_icon_graphite">Graphite</string>
+    <string name="settings_appearance_app_icon_original">Original</string>
+    <string name="settings_appearance_app_icon_rose_gold">Rose Gold</string>
+    <string name="settings_appearance_app_icon_sheet_title">Choose App Icon</string>
     <string name="settings_appearance_app_language">App Language</string>
     <string name="settings_appearance_app_language_device">Device language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
