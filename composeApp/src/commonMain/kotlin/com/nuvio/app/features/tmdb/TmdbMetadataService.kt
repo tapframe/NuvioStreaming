@@ -524,8 +524,8 @@ object TmdbMetadataService {
         if (!settings.enabled || !settings.hasApiKey) return meta
 
         val tmdbType = normalizeMetaType(meta.type)
-        val tmdbId = TmdbService.ensureTmdbId(meta.id, tmdbType)
-            ?: TmdbService.ensureTmdbId(fallbackItemId, tmdbType)
+        val tmdbId = TmdbService.ensureTmdbIdForEnrichment(meta.id, tmdbType)
+            ?: TmdbService.ensureTmdbIdForEnrichment(fallbackItemId, tmdbType)
             ?: return meta
 
         val needsEpisodes = (

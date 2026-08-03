@@ -110,8 +110,10 @@ object TraktRelatedRepository {
 
         val tmdbId = resolveTmdbCandidate(meta.id)
             ?: resolveTmdbCandidate(fallbackItemId)
-            ?: TmdbService.ensureTmdbId(meta.id, meta.type)?.toIntOrNull()
-            ?: fallbackItemId?.let { TmdbService.ensureTmdbId(it, fallbackItemType ?: meta.type) }?.toIntOrNull()
+            ?: TmdbService.ensureTmdbIdForEnrichment(meta.id, meta.type)?.toIntOrNull()
+            ?: fallbackItemId?.let {
+                TmdbService.ensureTmdbIdForEnrichment(it, fallbackItemType ?: meta.type)
+            }?.toIntOrNull()
             ?: return null
 
         return resolveViaTraktSearch(type = type, tmdbId = tmdbId, headers = headers)

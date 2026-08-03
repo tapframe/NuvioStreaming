@@ -334,8 +334,8 @@ fun MetaDetailsScreen(
         val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
         val tmdbId = extractTmdbId(metaForRatings.id)
             ?: extractTmdbId(id)
-            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
-            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
+            ?: TmdbService.ensureTmdbIdForEnrichment(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
+            ?: TmdbService.ensureTmdbIdForEnrichment(id, type)?.toIntOrNull()
 
         if (imdbId == null && tmdbId == null) {
             episodeImdbRatings = emptyMap()

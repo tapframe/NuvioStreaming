@@ -16,8 +16,6 @@ object TmdbService {
     private val cacheMutex = Mutex()
 
     suspend fun ensureTmdbId(videoId: String, mediaType: String): String? {
-        val apiKey = currentApiKey() ?: return null
-
         val normalized = videoId
             .removePrefix("tmdb:")
             .removePrefix("movie:")
@@ -30,7 +28,29 @@ object TmdbService {
         if (normalized.all(Char::isDigit)) return normalized
         if (!normalized.startsWith("tt", ignoreCase = true)) return null
 
+        val apiKey = currentApiKey() ?: return null
         return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
+    }
+
+    suspend fun ensureTmdbIdForEnrichment(videoId: String, mediaType: String): String? =
+        if (AnimeIdResolution.supports(videoId)) {
+            AnimeIdResolution.resolveTmdbId(videoId)?.toString()
+        } else {
+            ensureTmdbId(videoId, mediaType)
+        }
+
+    fun canResolveForEnrichment(videoId: String): Boolean {
+        if (AnimeIdResolution.supports(videoId)) return true
+        val normalized = videoId
+            .removePrefix("tmdb:")
+            .removePrefix("movie:")
+            .removePrefix("series:")
+            .substringBefore(':')
+            .substringBefore('/')
+            .trim()
+        return normalized.isNotBlank() && (
+            normalized.all(Char::isDigit) || normalized.startsWith("tt", ignoreCase = true)
+        )
     }
 
     suspend fun tmdbToImdb(tmdbId: Int, mediaType: String): String? {

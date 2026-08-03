@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpPostJson
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaExternalRating
+import com.nuvio.app.features.tmdb.TmdbService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -49,7 +50,10 @@ object MdbListMetadataService {
         if (!settings.enabled) return false
         if (settings.apiKey.trim().isBlank()) return false
         if (settings.enabledProvidersInPriorityOrder().isEmpty()) return false
-        return extractImdbId(meta.id) != null || extractImdbId(fallbackItemId) != null
+        return extractImdbId(meta.id) != null ||
+            extractImdbId(fallbackItemId) != null ||
+            TmdbService.canResolveForEnrichment(meta.id) ||
+            TmdbService.canResolveForEnrichment(fallbackItemId)
     }
 
     suspend fun enrichMeta(
@@ -64,6 +68,8 @@ object MdbListMetadataService {
 
         val imdbId = extractImdbId(meta.id)
             ?: extractImdbId(fallbackItemId)
+            ?: resolveImdbLookup(meta.id, meta.type)
+            ?: resolveImdbLookup(fallbackItemId, meta.type)
             ?: return meta.copy(externalRatings = emptyList())
         val mediaType = toMdbListMediaType(meta.type)
         val enabledProviders = settings.enabledProvidersInPriorityOrder()
@@ -137,6 +143,12 @@ object MdbListMetadataService {
         if (value.isNullOrBlank()) return null
         return imdbRegex.find(value)?.value
     }
+
+    private suspend fun resolveImdbLookup(value: String, mediaType: String): String? =
+        TmdbService.ensureTmdbIdForEnrichment(value, mediaType)
+            ?.toIntOrNull()
+            ?.let { TmdbService.tmdbToImdb(tmdbId = it, mediaType = mediaType) }
+            ?.takeIf { it.startsWith("tt", ignoreCase = true) }
 
     private fun toMdbListMediaType(metaType: String): String {
         val normalized = metaType.trim().lowercase()
