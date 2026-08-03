@@ -28,6 +28,9 @@ data class MetaDetails(
     val country: String? = null,
     val awards: String? = null,
     val language: String? = null,
+    /** Movies only, in whole US dollars, from TMDB. Null when unknown or not applicable. */
+    val budget: Long? = null,
+    val revenue: Long? = null,
     val website: String? = null,
     val hasScheduledVideos: Boolean = false,
     val defaultVideoId: String? = null,

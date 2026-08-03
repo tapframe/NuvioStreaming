@@ -1760,6 +1760,8 @@
     <string name="details_movie_details">Movie Details</string>
     <string name="details_original_language">Original Language</string>
     <string name="details_origin_country">Origin Country</string>
+    <string name="details_budget">Budget</string>
+    <string name="details_revenue">Revenue</string>
     <string name="details_release_info">Release Info</string>
     <string name="details_runtime">Runtime</string>
     <string name="details_season_view_posters">Posters</string>
