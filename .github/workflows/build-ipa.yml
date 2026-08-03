@@ -1,0 +1,240 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Build a full or enhanced ipa
+        required: true
+        type: choice
+        options:
+          - full
+          - enhanced
+        default: full
+
+jobs:
+  build-ipa:
+    name: Build Nuvio for iOS and iPadOS
+    runs-on: macos-15-intel
+    steps:
+      - name: Checkout Repository & Submodules
+        uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Fetch iOS Specific Submodule
+        run: git submodule update --init --recursive MPVKit
+
+      - name: Patch MPVKit Package.swift for CI (replace local path targets with remote URLs)
+        run: |
+          cd MPVKit
+          python3 - << 'PYEOF'
+          import re
+
+          replacements = {
+              "Libplacebo": (
+                  "https://github.com/mpvkit/libplacebo-build/releases/download/7.360.1/Libplacebo.xcframework.zip",
+                  "2fa3d54cb81f302d6f11c7b2f509af30944381c3b11ee9d35096eb4637a6e2dd"
+              ),
+              "Libavcodec": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavcodec.xcframework.zip",
+                  "136e432919a8a7b5b80155c68e9dc91b0ef3ae6623970b87bb8bd96a452543cf"
+              ),
+              "Libavdevice": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavdevice.xcframework.zip",
+                  "65713615f53352b37baffb38c5b88d88bab647d050d999bcc4684344ab636bdf"
+              ),
+              "Libavformat": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavformat.xcframework.zip",
+                  "962c010aa2c4b369cf8f6efa2b0bd26e0a2392d58a1487e6a2be8c3d73044d45"
+              ),
+              "Libavfilter": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavfilter.xcframework.zip",
+                  "1ea0aebfc460f347d631fad982dd1db3a929896d02722cd18903faeb4c5f4103"
+              ),
+              "Libavutil": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavutil.xcframework.zip",
+                  "62d7d932c0a9d2bd45a23d7845db12a293b4f810e5cfae2b5e4ad05e8b737a1b"
+              ),
+              "Libswresample": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libswresample.xcframework.zip",
+                  "80fbd7a266d0633a916d21a01fcfab347b4ffb8d16c7a02e43671ef71e6999f0"
+              ),
+              "Libswscale": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libswscale.xcframework.zip",
+                  "fd968cad30f5295082b86a8ab7ada5dd9ea18e9049ec194a748e91bd0027afb5"
+              ),
+              "Libmpv": (
+                  "https://github.com/NuvioMedia/MPVKit/releases/download/0.41.0-n8.1.2-nuvio.2/Libmpv.xcframework.zip",
+                  "d2abcf546c715fc9dd740ac0a5ddfa88b002a3a41c91f2f9df1938924895a3ad"
+              ),
+          }
+
+          with open("Package.swift", "r") as f:
+              content = f.read()
+
+          for name, (url, checksum) in replacements.items():
+              # Match binaryTarget with path: for this exact name
+              pattern = (
+                  r'(\.binaryTarget\(\s*\n\s*name:\s*"' + re.escape(name) + r'",\s*\n)'
+                  r'\s*path:\s*"[^"]+"\s*\n'
+                  r'(\s*\))'
+              )
+              replacement = (
+                  r'\g<1>'
+                  f'            url: "{url}",\n'
+                  f'            checksum: "{checksum}"\n'
+                  r'\g<2>'
+              )
+              new_content, count = re.subn(pattern, replacement, content)
+              if count:
+                  print(f"✓ Patched {name}")
+                  content = new_content
+              else:
+                  print(f"  (skipped {name} — already url-based or not found)")
+
+          with open("Package.swift", "w") as f:
+              f.write(content)
+
+          print("\nDone.")
+          PYEOF
+
+      - name: Select Latest Stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Download Nuvio Engine Apple XCFramework
+        env:
+          NUVIO_ENGINE_VERSION: 0.1.1
+        run: |
+          set -euo pipefail
+
+          ENGINE_ROOT="../nuvio-engine/platform/apple"
+          ENGINE_DEST="${ENGINE_ROOT}/NuvioEngine.xcframework"
+          ARCHIVE="${RUNNER_TEMP}/nuvio-engine-apple-${NUVIO_ENGINE_VERSION}.zip"
+          EXTRACT_DIR="${RUNNER_TEMP}/nuvio-engine-apple-${NUVIO_ENGINE_VERSION}"
+
+          rm -rf "${ENGINE_ROOT}" "${EXTRACT_DIR}" "${ARCHIVE}"
+          mkdir -p "${ENGINE_ROOT}" "${EXTRACT_DIR}"
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-all-errors \
+            "https://github.com/NuvioMedia/nuvio-engine/releases/download/v${NUVIO_ENGINE_VERSION}/nuvio-engine-apple-${NUVIO_ENGINE_VERSION}.zip" \
+            --output "${ARCHIVE}"
+
+          ditto -x -k "${ARCHIVE}" "${EXTRACT_DIR}"
+
+          XCFRAMEWORK="$(find "${EXTRACT_DIR}" -type d -name NuvioEngine.xcframework -print -quit)"
+          if [[ -z "${XCFRAMEWORK}" ]]; then
+            echo "::error::NuvioEngine.xcframework was not found in the downloaded archive."
+            find "${EXTRACT_DIR}" -maxdepth 4 -print
+            exit 1
+          fi
+
+          ditto "${XCFRAMEWORK}" "${ENGINE_DEST}"
+
+          for SLICE in ios-arm64 ios-arm64_x86_64-simulator; do
+            SLICE_DIR="${ENGINE_DEST}/${SLICE}"
+
+            test -f "${SLICE_DIR}/libCNuvioEngine.a" || {
+              echo "::error::Missing ${SLICE_DIR}/libCNuvioEngine.a"
+              exit 1
+            }
+
+            test -f "${SLICE_DIR}/Headers/nuvio_engine/nuvio_engine.h" || {
+              echo "::error::Missing ${SLICE_DIR}/Headers/nuvio_engine/nuvio_engine.h"
+              exit 1
+            }
+          done
+
+          echo "Nuvio Engine Apple XCFramework installed at ${ENGINE_DEST}"
+          find "${ENGINE_DEST}" -maxdepth 4 -type f -print
+
+      - name: Generate local.properties
+        run: |
+          cat << 'EOF' > local.properties
+          NUVIO_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
+          TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+          TRAKT_REDIRECT_URI=${{ secrets.TRAKT_REDIRECT_URI }}
+          SIMKL_CLIENT_ID=${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_CLIENT_SECRET=${{ secrets.SIMKL_CLIENT_SECRET }}
+          SIMKL_REDIRECT_URI=${{ secrets.SIMKL_REDIRECT_URI }}
+          PREMIUMIZE_CLIENT_ID=${{ secrets.PREMIUMIZE_CLIENT_ID }}
+          PREMIUMIZE_CLIENT_SECRET=${{ secrets.PREMIUMIZE_CLIENT_SECRET }}
+          PREMIUMIZE_REDIRECT_URI=${{ secrets.PREMIUMIZE_REDIRECT_URI }}
+          TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
+          INTRODB_API_URL=${{ secrets.INTRODB_API_URL }}
+          CONTRIBUTIONS_URL=${{ secrets.CONTRIBUTIONS_URL }}
+          DONATIONS_BASE_URL=${{ secrets.DONATIONS_BASE_URL }}
+          DONATIONS_DONATE_URL=${{ secrets.DONATIONS_DONATE_URL }}
+          DIRECT_DEBRID_API_BASE_URL=${{ secrets.DIRECT_DEBRID_API_BASE_URL }}
+          NUVIO_IOS_DISTRIBUTION=full
+          EOF
+
+      - name: Cache iOS build dependencies
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+            ~/Library/Caches/org.swift.swiftpm
+            iosApp/build/SourcePackages
+          key: ${{ runner.os }}-ios-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'MPVKit/Package.swift', 'iosApp/iosApp.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-ios-
+
+      - name: Build iOS App via Xcode
+        run: |
+          cd iosApp
+          xcodebuild \
+            -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Set artifact suffix
+        run: |
+          if [ "${{ inputs.mode }}" = "full" ]; then
+            echo "BUILD_SUFFIX=Full" >> $GITHUB_ENV
+          else
+            echo "BUILD_SUFFIX=Enhanced" >> $GITHUB_ENV
+          fi
+
+      - name: Package App into .ipa
+        run: |
+          cd iosApp/build/Build/Products/Release-iphoneos
+          APP_DIR=$(ls -d *.app | head -n 1)
+          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_DIR/Info.plist")
+          mkdir Payload
+          mv "$APP_DIR" Payload/
+          IPA_NAME="Nuvio-v${APP_VERSION}-${BUILD_SUFFIX}.ipa"
+          zip -q -r "$IPA_NAME" Payload
+          echo "IPA_NAME=$IPA_NAME" >> $GITHUB_ENV
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: Nuvio-iOS-${{ env.BUILD_SUFFIX }}
+          path: iosApp/build/Build/Products/Release-iphoneos/${{ env.IPA_NAME }}
