@@ -392,8 +392,8 @@ internal fun settingsSearchEntries(
         addRow(
             page = SettingsPage.Appearance,
             key = "liquid-glass",
-            title = stringResource(Res.string.settings_appearance_liquid_glass),
-            description = stringResource(Res.string.settings_appearance_liquid_glass_description),
+            title = stringResource(Res.string.settings_appearance_tab_bar_behavior),
+            description = stringResource(NuvioTabBarBehavior.Default.descriptionRes),
             pageLabel = layoutPage,
             section = stringResource(Res.string.settings_appearance_section_display),
             icon = Icons.Rounded.Palette,

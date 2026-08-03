@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.max
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
-import com.nuvio.app.core.ui.NativeTabBarScrollEffect
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.PlatformBackHandler
@@ -84,7 +83,6 @@ import com.nuvio.app.features.tmdb.TmdbSettings
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesUiState
-import com.nuvio.app.navigation.LocalUseNativeNavigation
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import kotlinx.coroutines.delay
@@ -155,12 +153,11 @@ fun SettingsScreen(
         val dynamicArtworkBackgroundEnabled by remember {
             ThemeSettingsRepository.dynamicArtworkBackgroundEnabled
         }.collectAsStateWithLifecycle()
-        val liquidGlassNativeTabBarEnabled by remember {
-            ThemeSettingsRepository.liquidGlassNativeTabBarEnabled
+        val tabBarBehavior by remember {
+            ThemeSettingsRepository.tabBarBehavior
         }.collectAsStateWithLifecycle()
-        val useNativeNavigation = LocalUseNativeNavigation.current
-        val liquidGlassNativeTabBarSupported = remember(useNativeNavigation) {
-            !useNativeNavigation && isLiquidGlassNativeTabBarSupported()
+        val liquidGlassNativeTabBarSupported = remember {
+            isLiquidGlassNativeTabBarSupported()
         }
         val selectedAppLanguage by remember { ThemeSettingsRepository.selectedAppLanguage }.collectAsStateWithLifecycle()
         val navBarStyle by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
@@ -408,8 +405,8 @@ fun SettingsScreen(
                 dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
                 onDynamicArtworkBackgroundToggle = ThemeSettingsRepository::setDynamicArtworkBackground,
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
-                liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
-                onLiquidGlassNativeTabBarToggle = ThemeSettingsRepository::setLiquidGlassNativeTabBar,
+                tabBarBehavior = tabBarBehavior,
+                onTabBarBehaviorSelected = ThemeSettingsRepository::setTabBarBehavior,
                 selectedAppLanguage = selectedAppLanguage,
                 onAppLanguageSelected = ThemeSettingsRepository::setAppLanguage,
                 navBarStyle = navBarStyle,
@@ -474,8 +471,8 @@ fun SettingsScreen(
                 dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
                 onDynamicArtworkBackgroundToggle = ThemeSettingsRepository::setDynamicArtworkBackground,
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
-                liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
-                onLiquidGlassNativeTabBarToggle = ThemeSettingsRepository::setLiquidGlassNativeTabBar,
+                tabBarBehavior = tabBarBehavior,
+                onTabBarBehaviorSelected = ThemeSettingsRepository::setTabBarBehavior,
                 selectedAppLanguage = selectedAppLanguage,
                 onAppLanguageSelected = ThemeSettingsRepository::setAppLanguage,
                 navBarStyle = navBarStyle,
@@ -550,8 +547,8 @@ private fun MobileSettingsScreen(
     dynamicArtworkBackgroundEnabled: Boolean,
     onDynamicArtworkBackgroundToggle: (Boolean) -> Unit,
     liquidGlassNativeTabBarSupported: Boolean,
-    liquidGlassNativeTabBarEnabled: Boolean,
-    onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
+    tabBarBehavior: NuvioTabBarBehavior,
+    onTabBarBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
     selectedAppLanguage: AppLanguage,
     onAppLanguageSelected: (AppLanguage) -> Unit,
     navBarStyle: NavBarStyle,
@@ -593,8 +590,7 @@ private fun MobileSettingsScreen(
         var rootSearchVisible by rememberSaveable { mutableStateOf(false) }
         var rootSearchRevealAnimating by rememberSaveable { mutableStateOf(false) }
         val listState = rememberLazyListState()
-        NativeTabBarScrollEffect(listState)
-        val hapticFeedback = LocalHapticFeedback.current
+            val hapticFeedback = LocalHapticFeedback.current
         val hapticScope = rememberCoroutineScope()
         val rootSearchRevealConnection = rememberSettingsRootSearchRevealConnection(
             page = page,
@@ -663,6 +659,7 @@ private fun MobileSettingsScreen(
         NuvioScreen(
             modifier = Modifier.nestedScroll(rootSearchRevealConnection),
             listState = listState,
+            autoHidesNativeTabBar = true,
         ) {
             if (showInternalHeader) {
                 stickyHeader {
@@ -765,8 +762,8 @@ private fun MobileSettingsScreen(
                     dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
                     onDynamicArtworkBackgroundToggle = onDynamicArtworkBackgroundToggle,
                     liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
-                    liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
-                    onLiquidGlassNativeTabBarToggle = onLiquidGlassNativeTabBarToggle,
+                    tabBarBehavior = tabBarBehavior,
+                    onTabBarBehaviorSelected = onTabBarBehaviorSelected,
                     selectedAppLanguage = selectedAppLanguage,
                     onAppLanguageSelected = onAppLanguageSelected,
                     selectedNavBarStyle = navBarStyle,
@@ -937,8 +934,8 @@ private fun TabletSettingsScreen(
     dynamicArtworkBackgroundEnabled: Boolean,
     onDynamicArtworkBackgroundToggle: (Boolean) -> Unit,
     liquidGlassNativeTabBarSupported: Boolean,
-    liquidGlassNativeTabBarEnabled: Boolean,
-    onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
+    tabBarBehavior: NuvioTabBarBehavior,
+    onTabBarBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
     selectedAppLanguage: AppLanguage,
     onAppLanguageSelected: (AppLanguage) -> Unit,
     navBarStyle: NavBarStyle,
@@ -1207,8 +1204,8 @@ private fun TabletSettingsScreen(
                         dynamicArtworkBackgroundEnabled = dynamicArtworkBackgroundEnabled,
                         onDynamicArtworkBackgroundToggle = onDynamicArtworkBackgroundToggle,
                         liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
-                        liquidGlassNativeTabBarEnabled = liquidGlassNativeTabBarEnabled,
-                        onLiquidGlassNativeTabBarToggle = onLiquidGlassNativeTabBarToggle,
+                        tabBarBehavior = tabBarBehavior,
+                        onTabBarBehaviorSelected = onTabBarBehaviorSelected,
                         selectedAppLanguage = selectedAppLanguage,
                         onAppLanguageSelected = onAppLanguageSelected,
                         selectedNavBarStyle = navBarStyle,

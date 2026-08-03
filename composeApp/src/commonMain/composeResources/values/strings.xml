@@ -597,6 +597,16 @@
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
     <string name="settings_appearance_dynamic_artwork_background">Dynamic background color</string>
+    <string name="settings_appearance_tab_bar_behavior">Liquid Glass tab bar</string>
+    <string name="settings_appearance_tab_bar_behavior_sheet_title">Liquid Glass tab bar</string>
+    <string name="settings_tab_bar_behavior_off">Off</string>
+    <string name="settings_tab_bar_behavior_off_description">Use the standard in-app navigation bar.</string>
+    <string name="settings_tab_bar_behavior_static">Static</string>
+    <string name="settings_tab_bar_behavior_static_description">Always visible while you browse.</string>
+    <string name="settings_tab_bar_behavior_auto_hide">Auto hide</string>
+    <string name="settings_tab_bar_behavior_auto_hide_description">Slides away when you scroll down, returns when you scroll up.</string>
+    <string name="settings_tab_bar_behavior_morphed">Morphed</string>
+    <string name="settings_tab_bar_behavior_morphed_description">Shrinks to a compact pill when you scroll down, expands when you scroll up.</string>
     <string name="settings_appearance_dynamic_artwork_background_description">Tint the home screen with a soft gradient built from the featured artwork\'s colours.</string>
     <string name="settings_appearance_app_language">App Language</string>
     <string name="settings_appearance_app_language_device">Device language</string>

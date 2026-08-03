@@ -87,7 +87,6 @@ import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
-import com.nuvio.app.core.ui.NativeTabBarScrollEffect
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
@@ -171,7 +170,6 @@ fun LibraryScreen(
     var selectedLibraryType by rememberSaveable { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
-    NativeTabBarScrollEffect(listState)
     val isRemoteSource = uiState.sourceMode != LibrarySourceMode.LOCAL
     val effectiveSortOption = effectiveLibrarySortOption(
         selected = displaySettings.sortOption,
@@ -282,6 +280,7 @@ fun LibraryScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalPadding = 0.dp,
             listState = listState,
+            autoHidesNativeTabBar = true,
         ) {
             stickyHeader {
                 Box(modifier = Modifier.fillMaxWidth()) {

@@ -6,6 +6,7 @@ import platform.UIKit.UIDevice
 import platform.UIKit.UIUserInterfaceIdiomPhone
 
 private const val liquidGlassNativeTabBarEnabledKey = "NuvioLiquidGlassNativeTabBarEnabled"
+private const val nativeTabBarBehaviorKey = "NuvioNativeTabBarBehavior"
 private const val nativeTabBarVisibleKey = "NuvioNativeTabBarVisible"
 private const val nativeSelectedTabKey = "NuvioNativeSelectedTab"
 private const val nativeTabAccentColorKey = "NuvioNativeTabAccentColor"
@@ -26,6 +27,11 @@ internal actual fun isLiquidGlassNativeTabBarSupported(): Boolean {
 
 internal actual fun publishLiquidGlassNativeTabBarEnabled(enabled: Boolean) {
     publishBool(liquidGlassNativeTabBarEnabledKey, enabled)
+}
+
+internal actual fun publishNativeTabBarBehavior(behaviorKey: String) {
+    NSUserDefaults.standardUserDefaults.setObject(behaviorKey, forKey = nativeTabBarBehaviorKey)
+    notifyNativeTabChromeChanged()
 }
 
 internal actual fun publishNativeTabBarVisible(visible: Boolean) {

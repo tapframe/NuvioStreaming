@@ -267,8 +267,12 @@ struct RouteWrapper: Hashable, Identifiable {
 @available(iOS 16.0, *)
 @MainActor
 final class TabNavigationCoordinator: ObservableObject {
-    @Published var path: [RouteWrapper] = []
+    @Published var path: [RouteWrapper] = [] {
+        didSet { onPathChanged?(path.isEmpty) }
+    }
     var onReturnedToRoot: (() -> Void)?
+    /// Fired on every push and pop, not just on returning to root.
+    var onPathChanged: ((Bool) -> Void)?
 
     func push(_ route: AppRoute, launchSingleTop: Bool) {
         if launchSingleTop,
@@ -643,11 +647,16 @@ final class AppNavigationCoordinator: ObservableObject {
         didSet {
             if selectedTab != oldValue {
                 setTabBarVisible(true)
+                refreshSelectedTabDepth()
             }
         }
     }
     @Published private(set) var isAppReady = false
     @Published private(set) var isTabBarVisible = true
+    @Published private(set) var tabBarBehavior: NuvioTabBarBehavior = NuvioTabBarBehavior.current()
+    /// Mirrors the selected tab's navigation depth. `nativeTabs` only observes this object, so it
+    /// cannot see a nested TabNavigationCoordinator's `path` change on its own.
+    @Published private(set) var isSelectedTabAtRoot = true
     @Published private(set) var isLiveTvTabVisible = false
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
     @Published private(set) var localizedSwitchProfileTitle = ""
@@ -664,10 +673,14 @@ final class AppNavigationCoordinator: ObservableObject {
 
     init() {
         setTabBarVisible(true)
+        reloadTabBarBehavior()
         reloadLiveTvTabVisibility()
         allCoordinators.forEach { coordinator in
             coordinator.onReturnedToRoot = { [weak self] in
                 self?.setTabBarVisible(true)
+            }
+            coordinator.onPathChanged = { [weak self] _ in
+                self?.refreshSelectedTabDepth()
             }
         }
         profileTabInteraction.onLongPress = { [weak self] in
@@ -684,7 +697,33 @@ final class AppNavigationCoordinator: ObservableObject {
         NuvioAppTab.allCases.filter { $0 != .liveTv || isLiveTvTabVisible }
     }
 
+    func reloadTabBarBehavior() {
+        let behavior = NuvioTabBarBehavior.current()
+        guard tabBarBehavior != behavior else { return }
+        tabBarBehavior = behavior
+        // Static never collapses, so leaving a stale collapsed state behind would strand the bar.
+        if !behavior.respondsToScroll {
+            setTabBarVisible(true)
+        }
+    }
+
+    private func refreshSelectedTabDepth() {
+        let atRoot = coordinator(for: selectedTab).path.isEmpty
+        if isSelectedTabAtRoot != atRoot {
+            isSelectedTabAtRoot = atRoot
+        }
+    }
+
+    /// Called by the custom bar when the collapsed pill is tapped.
+    func requestTabBarVisible(_ visible: Bool) {
+        setTabBarVisible(visible)
+    }
+
     func reloadTabBarVisibility() {
+        guard tabBarBehavior.respondsToScroll else {
+            if !isTabBarVisible { isTabBarVisible = true }
+            return
+        }
         guard let visible = UserDefaults.standard.object(
             forKey: Self.nativeTabBarVisibleKey
         ) as? Bool else {
@@ -948,6 +987,7 @@ struct TabContentView: View {
         // full-screen on iOS 26, where a modifier on TabView itself is ignored.
         .toolbar(
             usesNativeTabBar &&
+                !appCoordinator.tabBarBehavior.usesCustomBar &&
                 appCoordinator.isAppReady &&
                 coordinator.path.isEmpty &&
                 appCoordinator.isTabBarVisible
@@ -1448,7 +1488,24 @@ struct NativeNavContentView: View {
             }
         }
         .tint(Color(uiColor: iconStore.accentColor))
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabBarMinimizeBehavior(
+            appCoordinator.tabBarBehavior.respondsToScroll ? .onScrollDown : .never
+        )
+        .overlay(alignment: .bottom) {
+            // Same gate as the system tab bar above: hidden on login (isAppReady), and on every
+            // pushed route, which is what keeps it off details, streams and the player.
+            if appCoordinator.tabBarBehavior.usesCustomBar &&
+                appCoordinator.isAppReady &&
+                appCoordinator.isSelectedTabAtRoot {
+                NuvioGlassTabBar(
+                    appCoordinator: appCoordinator,
+                    iconStore: iconStore,
+                    selection: tabSelection
+                )
+                .padding(.horizontal, 16)
+                .transition(.opacity)
+            }
+        }
     }
 
     @ViewBuilder
@@ -1465,6 +1522,7 @@ struct NativeNavContentView: View {
                 for: Notification.Name("NuvioNativeTabChromeDidChange")
             )
         ) { _ in
+            appCoordinator.reloadTabBarBehavior()
             appCoordinator.reloadTabBarVisibility()
         }
         .onReceive(

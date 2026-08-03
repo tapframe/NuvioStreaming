@@ -23,7 +23,6 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
-import com.nuvio.app.core.ui.NativeTabBarScrollEffect
 import com.nuvio.app.core.ui.DynamicArtworkBackground
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
@@ -137,7 +136,6 @@ fun HomeScreen(
     }.collectAsStateWithLifecycle()
     val homeListState = rememberLazyListState()
     val continueWatchingListState = rememberLazyListState()
-    NativeTabBarScrollEffect(homeListState)
     val upcomingListState = rememberLazyListState()
     val collections by CollectionRepository.collections.collectAsStateWithLifecycle()
     val continueWatchingPreferences by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
@@ -903,6 +901,7 @@ fun HomeScreen(
                 horizontalPadding = 0.dp,
                 topPadding = if (showHeroSlot) 0.dp else null,
                 listState = homeListState,
+                autoHidesNativeTabBar = true,
             ) {
                 if (showHeroSlot) {
                     item {
