@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -66,7 +65,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -84,13 +82,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
+import com.nuvio.app.features.settings.AppBrandWordmark
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.app_logo_wordmark
 import nuvio.composeapp.generated.resources.compose_auth_already_have_account
 import nuvio.composeapp.generated.resources.compose_auth_continue_without_account
 import nuvio.composeapp.generated.resources.compose_auth_create_account
@@ -107,7 +105,6 @@ import nuvio.composeapp.generated.resources.compose_auth_tagline
 import nuvio.composeapp.generated.resources.compose_auth_terms_link
 import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
 import nuvio.composeapp.generated.resources.compose_auth_welcome_back
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private val AuthTextPrimary = Color(0xFFF5F7F8)
@@ -429,11 +426,9 @@ private fun AuthLargeLayout(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start,
         ) {
-            Image(
-                painter = painterResource(Res.drawable.app_logo_wordmark),
+            AppBrandWordmark(
                 contentDescription = null,
                 modifier = Modifier.height(60.dp * scale),
-                contentScale = ContentScale.Fit,
             )
             Spacer(modifier = Modifier.height(32.dp * scale))
             Text(
@@ -527,11 +522,9 @@ private fun AuthBrandLockup(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(
-            painter = painterResource(Res.drawable.app_logo_wordmark),
+        AppBrandWordmark(
             contentDescription = null,
             modifier = Modifier.height(logoHeight),
-            contentScale = ContentScale.Fit,
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(

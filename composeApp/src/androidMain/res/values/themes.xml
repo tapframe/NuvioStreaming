@@ -5,4 +5,9 @@
     </style>
 
     <style name="Theme.Nuvio.Splash" parent="@style/Theme.Nuvio" />
+    <style name="Theme.Nuvio.Splash.ArcticBlue" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Emerald" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.RoseGold" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Copper" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Graphite" parent="@style/Theme.Nuvio.Splash" />
 </resources>
