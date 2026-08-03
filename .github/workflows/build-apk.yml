@@ -1,7 +1,14 @@
 name: Build APK
 
+run-name: Build APK - ${{ inputs.description }}
+
 on:
   workflow_dispatch:
+    inputs:
+      description:
+        description: Run description
+        required: true
+        type: string
 
 jobs:
   build-apk:
