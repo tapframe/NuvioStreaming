@@ -7,15 +7,16 @@ import ComposeApp
 // PiP behavior is isolated from MPVPlayerBridge.swift so upstream player changes
 // can be merged without repeatedly touching the PiP state machine.
 extension MPVPlayerViewController {
-    func installExperimentalPictureInPictureRendererIfNeeded() -> Bool {
-        guard experimentalSinglePrimaryPictureInPictureEnabled else { return false }
+    func installExperimentalPictureInPictureCaptureIfNeeded() {
+        guard experimentalSinglePrimaryPictureInPictureEnabled else { return }
 
-        InAppLogBridge.shared.warn(
+        InAppLogBridge.shared.info(
             tag: "PiP/iOS",
-            message: "Experimental single-primary libmpv PiP renderer is enabled; inline video output uses vo=libmpv/OpenGL instead of gpu-next/MoltenVK"
+            message: "PiP frame capture enabled; inline video keeps gpu-next/MoltenVK and EDR"
         )
-        let renderSurface = MPVPrimaryRenderSurface(
+        let renderSurface = MPVPictureInPictureFrameCapture(
             displayLayer: sampleBufferDisplayView.displayLayer,
+            metalLayer: metalLayer,
             videoSizeProvider: { [weak self] in self?.currentRenderVideoSize() ?? .zero },
             playbackPositionProvider: { [weak self] in
                 guard let self else { return 0 }
@@ -33,55 +34,25 @@ extension MPVPlayerViewController {
             isPausedProvider: { [weak self] in !(self?.isPlayerPlaying ?? false) }
         )
         primaryRenderSurface = renderSurface
+        // The layer must stay in a visible hierarchy for AVPictureInPictureController to accept
+        // it, so it keeps full alpha and is simply parked behind the opaque Metal layer.
         sampleBufferDisplayView.alpha = 1.0
-        view.addSubview(sampleBufferDisplayView)
-        if let renderSurface {
-            view.addSubview(renderSurface.glView)
-        }
+        view.insertSubview(sampleBufferDisplayView, at: 0)
         sampleBufferDisplayView.pictureInPictureController?.setAutomaticStartEnabled(false)
-        return true
     }
 
     func layoutExperimentalPictureInPictureSurfacesIfNeeded(in bounds: CGRect) -> Bool {
         guard experimentalSinglePrimaryPictureInPictureEnabled else { return false }
         sampleBufferDisplayView.frame = CGRect(origin: .zero, size: bounds.size)
-        primaryRenderSurface?.glView.frame = CGRect(origin: .zero, size: bounds.size)
         primaryRenderSurface?.requestRenderBurst(reason: "layout", count: 2)
-        return true
+        // The Metal layer still owns the inline picture, so let the normal layout path run.
+        return false
     }
 
     func initializeExperimentalPictureInPictureMpvIfNeeded() -> Bool {
-        guard experimentalSinglePrimaryPictureInPictureEnabled else { return false }
-
-        InAppLogBridge.shared.info(tag: "MPV/iOS", message: "Initializing mpv vo=libmpv primary OpenGL render pipeline hwdec=videotoolbox-copy")
-        checkError(mpv_request_log_messages(mpv, "warn"))
-
-        checkError(mpv_set_option_string(mpv, "vo", "libmpv"))
-        checkError(mpv_set_option_string(mpv, "hwdec", "videotoolbox-copy"))
-        checkError(mpv_set_option_string(mpv, "vd-lavc-dr", "no"))
-        checkError(mpv_set_option_string(mpv, "force-window", "no"))
-        checkError(mpv_set_option_string(mpv, "ao", Self.defaultAudioOutput))
-        checkError(mpv_set_option_string(mpv, "audio-channels", "auto"))
-        checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
-        checkError(mpv_set_option_string(mpv, "volume-max", "200"))
-        checkError(mpv_set_option_string(mpv, "volume", "100"))
-        checkError(mpv_set_option_string(mpv, "volume-gain-max", "12"))
-        checkError(mpv_set_option_string(mpv, "volume-gain", "0"))
-        checkError(mpv_set_option_string(mpv, "video-rotate", "no"))
-        checkError(mpv_set_option_string(mpv, "subs-match-os-language", "yes"))
-        checkError(mpv_set_option_string(mpv, "subs-fallback", "yes"))
-        checkError(mpv_set_option_string(mpv, "keep-open", "yes"))
-        checkError(mpv_set_option_string(mpv, "target-colorspace-hint", "yes"))
-        checkError(mpv_set_option_string(mpv, "tone-mapping", "auto"))
-        checkError(mpv_set_option_string(mpv, "hdr-compute-peak", "yes"))
-        checkError(mpv_set_option_string(mpv, "demuxer-lavf-o", "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]"))
-
-        configureAudioSessionForPlayback()
-        checkError(mpv_initialize(mpv))
-        if let handle = mpv, primaryRenderSurface?.attach(mpv: handle) != true {
-            InAppLogBridge.shared.error(tag: "MPV/iOS", message: "Primary render surface failed to attach to libmpv")
-        }
-        return true
+        // mpv is no longer configured differently for PiP: the capture reads the frames
+        // gpu-next/MoltenVK already produced, so the standard setup path applies unchanged.
+        return false
     }
 
     func setupNotifications() {

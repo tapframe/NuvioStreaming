@@ -273,11 +273,11 @@ final class MPVPlayerViewController: UIViewController {
 
     private let errorStateLock = NSLock()
     let experimentalSinglePrimaryPictureInPictureEnabled: Bool
-    private var metalLayer = MetalLayer()
+    let metalLayer = MetalLayer()
     private var lastAppliedDrawableSize: CGSize = .zero
     private var externallyManagedViewSize: CGSize?
     private var pendingSurfaceLayoutWorkItems: [DispatchWorkItem] = []
-    var primaryRenderSurface: MPVPrimaryRenderSurface?
+    var primaryRenderSurface: MPVPictureInPictureFrameCapture?
     private var pendingLoadRequest: PendingLoadRequest?
     private var pendingLoadRetryWorkItem: DispatchWorkItem?
     var mpv: OpaquePointer?
@@ -378,19 +378,18 @@ final class MPVPlayerViewController: UIViewController {
         view.backgroundColor = .black
         view.layer.masksToBounds = true
 
-        if !installExperimentalPictureInPictureRendererIfNeeded() {
-            metalLayer.contentsGravity = .resize
-            metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
-            metalLayer.framebufferOnly = true
-            metalLayer.backgroundColor = UIColor.black.cgColor
-            metalLayer.wantsExtendedDynamicRangeContent = true
-            metalLayer.anchorPoint = CGPoint(x: 0, y: 0)
-            metalLayer.position = .zero
-            view.layer.addSublayer(metalLayer)
-        }
+        metalLayer.contentsGravity = .resize
+        metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
+        metalLayer.framebufferOnly = true
+        metalLayer.backgroundColor = UIColor.black.cgColor
+        metalLayer.wantsExtendedDynamicRangeContent = true
+        metalLayer.anchorPoint = CGPoint(x: 0, y: 0)
+        metalLayer.position = .zero
+        view.layer.addSublayer(metalLayer)
         layoutPlayerSurfaces()
 
         setupMpv()
+        installExperimentalPictureInPictureCaptureIfNeeded()
         if !isEmbeddedPreviewMode {
             activateAudioSessionForPlayback()
         }
@@ -781,17 +780,11 @@ final class MPVPlayerViewController: UIViewController {
         saturation: Int,
         gamma: Int
     ) {
-        if experimentalSinglePrimaryPictureInPictureEnabled {
-            primaryRenderSurface?.setExtendedDynamicRangePreferred(extendedDynamicRange)
-        } else {
-            metalLayer.wantsExtendedDynamicRangeContent = extendedDynamicRange
-        }
+        metalLayer.wantsExtendedDynamicRangeContent = extendedDynamicRange
+        primaryRenderSurface?.setExtendedDynamicRangePreferred(extendedDynamicRange)
         guard mpv != nil else { return }
 
-        let resolvedHardwareDecoder = experimentalSinglePrimaryPictureInPictureEnabled && hardwareDecoder == "videotoolbox"
-            ? "videotoolbox-copy"
-            : hardwareDecoder
-        setStringProperty("hwdec", resolvedHardwareDecoder)
+        setStringProperty("hwdec", hardwareDecoder)
         setStringProperty("target-colorspace-hint", targetColorspaceHint ? "yes" : "no")
         setStringProperty("tone-mapping", toneMapping)
         setStringProperty("hdr-compute-peak", hdrComputePeak ? "yes" : "no")
