@@ -2014,7 +2014,7 @@ private fun MainAppContent(
                                 CompositionLocalProvider(
                                     LocalNuvioBottomNavigationOverlayPadding provides when {
                                         tabsRouteActive && useNativeBottomTabs -> 49.dp
-                                        tabsRouteActive && !isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC -> 72.dp
+                                        tabsRouteActive && navBarStyleSetting != NavBarStyle.CLASSIC -> 72.dp
                                         else -> 0.dp
                                     },
                                     LocalNuvioNavBarScrollState provides navBarScrollState,
@@ -2161,7 +2161,10 @@ private fun MainAppContent(
                                     )
                                 }
 
-                                if (isTabletLayout && !useNativeBottomTabs) {
+                                // CLASSIC keeps the previous per-form-factor chrome: a top rail on
+                                // tablet/landscape and the solid bottom bar on phones. Every other
+                                // style now uses the floating pill at the bottom on all sizes.
+                                if (isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
                                     TabletFloatingTopBar(
                                         selectedTab = selectedTab,
                                         showLiveTv = showLiveTvInNavigation,
@@ -2172,7 +2175,7 @@ private fun MainAppContent(
                                 }
 
                                 // Floating pill navigation bar overlay
-                                if (tabsRouteActive && !isTabletLayout && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
+                                if (tabsRouteActive && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
                                     // Force expand/collapse for non-adaptive modes
                                     when (navBarStyleSetting) {
                                         NavBarStyle.EXPANDED -> navBarScrollState.expand()

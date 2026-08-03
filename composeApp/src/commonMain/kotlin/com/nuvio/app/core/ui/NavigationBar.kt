@@ -102,6 +102,9 @@ fun rememberNuvioNavBarScrollState(): NuvioNavBarScrollState {
     return androidx.compose.runtime.remember { NuvioNavBarScrollState() }
 }
 
+/** Beyond this the bar stops looking like a floating pill and starts looking like a toolbar. */
+private val NuvioNavigationBarMaxWidth = 560.dp
+
 /**
  * Floating pill-shaped navigation bar with scroll-responsive labels.
  *
@@ -142,6 +145,9 @@ fun NuvioNavigationBar(
         // The floating pill
         val pillModifier = Modifier
             .padding(horizontal = horizontalPadding)
+            // On a phone the horizontal padding alone shapes the pill, but on a tablet or in
+            // landscape it would stretch to nearly the full width and stop reading as a pill.
+            .widthIn(max = NuvioNavigationBarMaxWidth)
             .fillMaxWidth()
             .clip(RoundedCornerShape(NuvioTokens.Radius.full))
             .then(
