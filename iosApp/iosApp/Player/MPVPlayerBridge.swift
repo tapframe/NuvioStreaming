@@ -432,6 +432,13 @@ final class MPVPlayerViewController: UIViewController {
         super.viewWillDisappear(animated)
     }
 
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        if parent == nil {
+            publishImmersiveSystemUIVisibility(isVisible: false)
+        }
+    }
+
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         syncVideoSurfaceLayout()
@@ -1709,6 +1716,12 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     private func publishImmersiveSystemUIVisibility(isVisible: Bool) {
+        guard !isEmbeddedPreviewMode else { return }
+        if isVisible {
+            NuvioImmersiveSystemUI.shared.playerDidBecomeVisible(self)
+        } else {
+            NuvioImmersiveSystemUI.shared.playerDidBecomeHidden(self)
+        }
         NotificationCenter.default.post(
             name: nuvioPlayerImmersiveSystemUIVisibilityDidChange,
             object: self,

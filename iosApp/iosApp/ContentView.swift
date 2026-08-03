@@ -45,7 +45,6 @@ final class RootComposeViewController: UIViewController {
     private let disablesInteractiveContentPopGesture: Bool
     private let hidesContainingTabBar: Bool
     private let onTabBarControllerAvailable: ((UITabBarController) -> Void)?
-    private weak var visibleImmersivePlayer: UIViewController?
     private var immersiveSystemUIObserver: NSObjectProtocol?
 
     init(
@@ -87,8 +86,8 @@ final class RootComposeViewController: UIViewController {
             forName: nuvioPlayerImmersiveSystemUIVisibilityDidChange,
             object: nil,
             queue: .main
-        ) { [weak self] notification in
-            self?.updateVisibleImmersivePlayer(from: notification)
+        ) { [weak self] _ in
+            self?.refreshImmersiveSystemUI()
         }
     }
 
@@ -111,19 +110,19 @@ final class RootComposeViewController: UIViewController {
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
-        visibleImmersivePlayer?.prefersHomeIndicatorAutoHidden
+        NuvioImmersiveSystemUI.shared.activePlayer?.prefersHomeIndicatorAutoHidden
             ?? immersiveController(in: contentController)?.prefersHomeIndicatorAutoHidden
             ?? false
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
-        visibleImmersivePlayer?.preferredScreenEdgesDeferringSystemGestures
+        NuvioImmersiveSystemUI.shared.activePlayer?.preferredScreenEdgesDeferringSystemGestures
             ?? immersiveController(in: contentController)?.preferredScreenEdgesDeferringSystemGestures
             ?? []
     }
 
     override var prefersStatusBarHidden: Bool {
-        visibleImmersivePlayer?.prefersStatusBarHidden
+        NuvioImmersiveSystemUI.shared.activePlayer?.prefersStatusBarHidden
             ?? immersiveController(in: contentController)?.prefersStatusBarHidden
             ?? false
     }
@@ -185,27 +184,7 @@ final class RootComposeViewController: UIViewController {
             current.setNeedsStatusBarAppearanceUpdate()
             controller = current.parent
         }
-    }
-
-    private func updateVisibleImmersivePlayer(from notification: Notification) {
-        guard let player = notification.object as? UIViewController else { return }
-        let isVisible = notification.userInfo?[nuvioPlayerImmersiveSystemUIVisibleKey] as? Bool ?? false
-
-        if isVisible {
-            guard
-                let playerView = player.viewIfLoaded,
-                playerView === view || playerView.isDescendant(of: view)
-            else {
-                return
-            }
-            visibleImmersivePlayer = player
-        } else if visibleImmersivePlayer === player {
-            visibleImmersivePlayer = nil
-        } else {
-            return
-        }
-
-        refreshImmersiveSystemUI()
+        NuvioImmersiveSystemUI.shared.refresh()
     }
 
     private func setInteractiveContentPopGestureEnabled(_ enabled: Bool) {
@@ -1536,13 +1515,19 @@ struct NativeNavContentView: View {
 }
 
 struct ContentView: View {
+    @ObservedObject private var immersiveSystemUI = NuvioImmersiveSystemUI.shared
+
     var body: some View {
-        if #available(iOS 16.0, *) {
-            NativeNavContentView()
-        } else {
-            ComposeView()
-                .ignoresSafeArea(.all)
+        Group {
+            if #available(iOS 16.0, *) {
+                NativeNavContentView()
+            } else {
+                ComposeView()
+                    .ignoresSafeArea(.all)
+            }
         }
+        .persistentSystemOverlays(immersiveSystemUI.isPlayerImmersive ? .hidden : .automatic)
+        .statusBarHidden(immersiveSystemUI.isPlayerImmersive)
     }
 }
 
