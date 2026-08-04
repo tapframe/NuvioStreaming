@@ -515,7 +515,11 @@ private fun ExoPlayerSurface(
                     "error attempt=${playbackDiagnostics.attempt} " +
                         "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                         "code=${error.errorCodeName} cause=${error.cause?.javaClass?.simpleName ?: "none"} " +
-                        "message=${diagnosticPlayerMessage(error.message)}",
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "bufferedMs=${exoPlayer.bufferedPosition.coerceAtLeast(0L)} " +
+                        "durationMs=${exoPlayer.duration.coerceAtLeast(0L)} " +
+                        "message=${diagnosticPlayerMessage(error.message)} " +
+                        "causeChain=${diagnosticThrowableChain(error)}",
                     error,
                 )
 
@@ -576,7 +580,9 @@ private fun ExoPlayerSurface(
                         "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                         "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
                         "bufferedMs=${exoPlayer.bufferedPosition.coerceAtLeast(0L)} " +
-                        "bufferedPercent=${exoPlayer.bufferedPercentage} playWhenReady=${exoPlayer.playWhenReady}",
+                        "durationMs=${exoPlayer.duration.coerceAtLeast(0L)} " +
+                        "bufferedPercent=${exoPlayer.bufferedPercentage} playWhenReady=${exoPlayer.playWhenReady} " +
+                        "terminalError=${exoPlayer.playerError?.errorCodeName ?: "none"}",
                 )
                 if (playbackState == Player.STATE_READY) {
                     fallbackStartPositionMs = null
@@ -910,6 +916,7 @@ private fun LibmpvPlayerSurface(
     val latestOnError = rememberUpdatedState(onError)
     val latestPlayWhenReady = rememberUpdatedState(playWhenReady)
     val coroutineScope = rememberCoroutineScope()
+    val playbackDiagnostics = remember { PlaybackDiagnostics() }
     val sanitizedSourceHeaders = remember(sourceHeaders) {
         sanitizePlaybackHeaders(sourceHeaders)
     }
@@ -976,6 +983,13 @@ private fun LibmpvPlayerSurface(
                 }
             }
             override fun eventProperty(property: String, value: Boolean) {
+                if (property == "eof-reached" && value) {
+                    Log.w(
+                        PLAYER_DIAGNOSTIC_TAG,
+                        "mpv_property=eof-reached value=true attempt=${playbackDiagnostics.attempt} " +
+                            "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                    )
+                }
                 if (property == "eof-reached" || property == "pause" || property == "paused-for-cache" || property == "seeking") {
                     dispatchSnapshot(updateKeepScreenOn = true)
                 }
@@ -992,6 +1006,11 @@ private fun LibmpvPlayerSurface(
             override fun event(eventId: Int, data: MPVNode) {
                 when (eventId) {
                     MPV.mpvEvent.MPV_EVENT_START_FILE -> {
+                        Log.i(
+                            PLAYER_DIAGNOSTIC_TAG,
+                            "mpv_event=START_FILE attempt=${playbackDiagnostics.attempt} " +
+                                "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                        )
                         coroutineScope.launch(Dispatchers.Main.immediate) {
                             latestOnError.value(null)
                             val snapshot = PlayerPlaybackSnapshot()
@@ -1004,17 +1023,51 @@ private fun LibmpvPlayerSurface(
                         coroutineScope.launch(Dispatchers.Main.immediate) {
                             latestOnError.value(null)
                             val snapshot = view.snapshot()
+                            Log.i(
+                                PLAYER_DIAGNOSTIC_TAG,
+                                "mpv_event=${if (eventId == MPV.mpvEvent.MPV_EVENT_FILE_LOADED) "FILE_LOADED" else "PLAYBACK_RESTART"} " +
+                                    "attempt=${playbackDiagnostics.attempt} " +
+                                    "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                                    "positionMs=${snapshot.positionMs} bufferedMs=${snapshot.bufferedPositionMs} " +
+                                    "durationMs=${snapshot.durationMs}",
+                            )
                             latestOnSnapshot.value(snapshot)
                             nowPlayingController?.syncPlayback(snapshot)
                         }
                     }
-                    MPV.mpvEvent.MPV_EVENT_END_FILE -> dispatchSnapshot()
+                    MPV.mpvEvent.MPV_EVENT_END_FILE -> {
+                        coroutineScope.launch(Dispatchers.Main.immediate) {
+                            val snapshot = view.snapshot()
+                            Log.w(
+                                PLAYER_DIAGNOSTIC_TAG,
+                                "mpv_event=END_FILE attempt=${playbackDiagnostics.attempt} " +
+                                    "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                                    "positionMs=${snapshot.positionMs} bufferedMs=${snapshot.bufferedPositionMs} " +
+                                    "durationMs=${snapshot.durationMs} eof=${snapshot.isEnded} " +
+                                    "data=${diagnosticPlayerMessage(data.toJson())}",
+                            )
+                            latestOnSnapshot.value(snapshot)
+                            nowPlayingController?.syncPlayback(snapshot)
+                            view.keepScreenOn = view.shouldKeepScreenOn()
+                        }
+                    }
                 }
             }
         }
+        val logObserver = object : MPV.LogObserver {
+            override fun logMessage(prefix: String, level: Int, text: String) {
+                Log.w(
+                    PLAYER_DIAGNOSTIC_TAG,
+                    "mpv_log level=$level prefix=${diagnosticPlayerMessage(prefix)} " +
+                        "message=${diagnosticPlayerMessage(text)}",
+                )
+            }
+        }
         view.mpv.addObserver(observer)
+        view.mpv.addLogObserver(logObserver)
         onDispose {
             view.mpv.removeObserver(observer)
+            view.mpv.removeLogObserver(logObserver)
         }
     }
 
@@ -1043,6 +1096,13 @@ private fun LibmpvPlayerSurface(
 
     LaunchedEffect(playerViewRef, sourceUrl, sourceAudioUrl, sanitizedSourceHeaders, externalSubtitles) {
         val view = playerViewRef ?: return@LaunchedEffect
+        playbackDiagnostics.attempt += 1
+        playbackDiagnostics.prepareStartedAtMs = SystemClock.elapsedRealtime()
+        Log.i(
+            PLAYER_DIAGNOSTIC_TAG,
+            "mpv_prepare_begin attempt=${playbackDiagnostics.attempt} " +
+                "source=${diagnosticPlaybackSource(sourceUrl)} audioSource=${!sourceAudioUrl.isNullOrBlank()}",
+        )
         val snapshot = PlayerPlaybackSnapshot()
         latestOnSnapshot.value(snapshot)
         nowPlayingController?.syncPlayback(snapshot)
@@ -2075,6 +2135,14 @@ private fun isLoopbackPlaybackSource(value: String): Boolean = runCatching {
 
 private fun diagnosticPlayerMessage(value: String?): String =
     value?.replace('\n', ' ')?.replace('\r', ' ')?.take(160) ?: "none"
+
+private fun diagnosticThrowableChain(value: Throwable): String =
+    generateSequence(value) { it.cause }
+        .take(6)
+        .joinToString(" -> ") { error ->
+            "${error.javaClass.simpleName}:${diagnosticPlayerMessage(error.message)}"
+        }
+        .let(::diagnosticPlayerMessage)
 
 internal class SubtitleRequestHeaderDataSourceFactory(
     private val upstreamFactory: DataSource.Factory,
