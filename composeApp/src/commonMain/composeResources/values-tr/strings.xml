@@ -786,6 +786,13 @@
     <string name="settings_playback_option_device_language">Cihaz dili</string>
     <string name="settings_playback_option_forced">Zorunlu</string>
     <string name="settings_playback_option_none">Yok</string>
+    <string name="settings_playback_addon_subtitle_startup_all">Tüm eklenti altyazıları</string>
+    <string name="settings_playback_addon_subtitle_startup_all_description">Bulunan tüm eklenti altyazılarını baştan arka planda getirir. Videonun başlaması biraz daha uzun sürebilir.</string>
+    <string name="settings_playback_addon_subtitle_startup_fast">Hızlı başlangıç</string>
+    <string name="settings_playback_addon_subtitle_startup_fast_description">Videoyu beklemeden başlatır. Eklentiden farklı bir altyazı seçerseniz oynatıcı anlık olarak yeniden yüklenebilir.</string>
+    <string name="settings_playback_addon_subtitle_startup_mode">Eklenti Altyazılarını Yükleme</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred">Tercih edilen diller</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred_description">Video başlamadan önce eklenti altyazılarını arar ve yalnızca seçtiğiniz dillerdeki altyazıları hazır eder.</string>
     <string name="settings_playback_prefer_binge_group">Binge grubunu tercih et</string>
     <string name="settings_playback_prefer_binge_group_description">Otomatik oynatırken mevcut yayınla aynı binge grubundan bir yayın tercih et.</string>
     <string name="settings_playback_reuse_binge_group">Binge Grubunu Tekrar Kullan</string>

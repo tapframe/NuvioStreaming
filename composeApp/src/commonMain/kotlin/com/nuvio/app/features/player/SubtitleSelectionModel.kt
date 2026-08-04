@@ -8,6 +8,12 @@ internal data class SubtitleLanguageItem(
     val count: Int,
 )
 
+internal enum class SubtitleOptionsRailEmptyContent {
+    NONE,
+    LOADING,
+    FETCH,
+}
+
 internal sealed interface SubtitleSelectionOption {
     val id: String
 
@@ -78,6 +84,21 @@ internal fun buildSubtitleSelectionOptions(
         .filter { seenAddonIds.add(it.id) }
 
     return builtInOptions + addonOptions
+}
+
+internal fun subtitleOptionsRailEmptyContent(
+    selectedLanguageKey: String,
+    hasAvailableLanguages: Boolean,
+    isLoadingAddonSubtitles: Boolean,
+): SubtitleOptionsRailEmptyContent {
+    if (selectedLanguageKey == SubtitleOffLanguageKey && hasAvailableLanguages) {
+        return SubtitleOptionsRailEmptyContent.NONE
+    }
+    return if (isLoadingAddonSubtitles) {
+        SubtitleOptionsRailEmptyContent.LOADING
+    } else {
+        SubtitleOptionsRailEmptyContent.FETCH
+    }
 }
 
 internal fun selectedSubtitleLanguageKey(
