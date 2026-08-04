@@ -1796,12 +1796,16 @@ private fun ContinueWatchingItem.withFallbackMetadata(
             hasPlaceholderHomeTitle() && fallbackTitle != null -> fallbackTitle
             else -> title
         },
-        subtitle = subtitle.takeIf { it.isNotBlank() }
-            ?: fallback?.subtitle?.takeIf { it.isNotBlank() }.orEmpty(),
+        subtitle = when {
+            subtitle.isBlank() -> fallback?.subtitle?.takeIf { it.isNotBlank() }.orEmpty()
+            fallback?.subtitle.isNullOrBlank() -> subtitle
+            else -> fallback.subtitle
+        },
         imageUrl = imageUrl.orNonBlank(fallback?.imageUrl),
         logo = logo.orNonBlank(fallback?.logo),
         poster = poster.orNonBlank(fallback?.poster),
         background = background.orNonBlank(fallback?.background),
+        videoId = fallback?.videoId?.takeIf { it.isNotBlank() } ?: videoId,
         episodeTitle = episodeTitle.orNonBlank(fallback?.episodeTitle),
         episodeThumbnail = episodeThumbnail.orNonBlank(fallback?.episodeThumbnail),
         pauseDescription = pauseDescription.orNonBlank(fallback?.pauseDescription),
