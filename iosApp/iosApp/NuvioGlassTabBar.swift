@@ -33,7 +33,7 @@ struct NuvioGlassTabBar: View {
     private static let barGlassID = "nuvio.tabbar"
 
     static let portraitBottomInset: CGFloat = 12
-    static let landscapeBottomInset: CGFloat = 12
+    static let landscapeBottomInset: CGFloat = 6
 
     var bottomInset: CGFloat {
         verticalSizeClass == .compact ? Self.landscapeBottomInset : Self.portraitBottomInset

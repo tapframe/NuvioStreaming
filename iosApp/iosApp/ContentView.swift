@@ -37,9 +37,6 @@ private enum NuvioComposeHost {
     }
 }
 
-/// A navigation-neutral container for Compose. The MPV player is nested below the
-/// Compose controller, so UIKit's immersive-system-UI queries need to be forwarded
-/// to the deepest child that requests them.
 final class RootComposeViewController: UIViewController {
     private let contentController: UIViewController
     private let disablesInteractiveContentPopGesture: Bool
@@ -250,7 +247,6 @@ final class TabNavigationCoordinator: ObservableObject {
         didSet { onPathChanged?(path.isEmpty) }
     }
     var onReturnedToRoot: (() -> Void)?
-    /// Fired on every push and pop, not just on returning to root.
     var onPathChanged: ((Bool) -> Void)?
 
     func push(_ route: AppRoute, launchSingleTop: Bool) {
@@ -633,8 +629,6 @@ final class AppNavigationCoordinator: ObservableObject {
     @Published private(set) var isAppReady = false
     @Published private(set) var isTabBarVisible = true
     @Published private(set) var tabBarBehavior: NuvioTabBarBehavior = NuvioTabBarBehavior.current()
-    /// Mirrors the selected tab's navigation depth. `nativeTabs` only observes this object, so it
-    /// cannot see a nested TabNavigationCoordinator's `path` change on its own.
     @Published private(set) var isSelectedTabAtRoot = true
     @Published private(set) var isLiveTvTabVisible = false
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
@@ -680,7 +674,6 @@ final class AppNavigationCoordinator: ObservableObject {
         let behavior = NuvioTabBarBehavior.current()
         guard tabBarBehavior != behavior else { return }
         tabBarBehavior = behavior
-        // Static never collapses, so leaving a stale collapsed state behind would strand the bar.
         if !behavior.respondsToScroll {
             setTabBarVisible(true)
         }
@@ -693,7 +686,6 @@ final class AppNavigationCoordinator: ObservableObject {
         }
     }
 
-    /// Called by the custom bar when the collapsed pill is tapped.
     func requestTabBarVisible(_ visible: Bool) {
         setTabBarVisible(visible)
     }
@@ -1471,8 +1463,6 @@ struct NativeNavContentView: View {
             appCoordinator.tabBarBehavior.respondsToScroll ? .onScrollDown : .never
         )
         .overlay(alignment: .bottom) {
-            // Same gate as the system tab bar above: hidden on login (isAppReady), and on every
-            // pushed route, which is what keeps it off details, streams and the player.
             if appCoordinator.tabBarBehavior.usesCustomBar &&
                 appCoordinator.isAppReady &&
                 appCoordinator.isSelectedTabAtRoot {
@@ -1485,6 +1475,7 @@ struct NativeNavContentView: View {
                 .transition(.opacity)
             }
         }
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 
     @ViewBuilder
