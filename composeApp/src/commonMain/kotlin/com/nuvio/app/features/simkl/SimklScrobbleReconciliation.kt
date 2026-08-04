@@ -32,15 +32,17 @@ private fun SimklSyncSnapshot.withPausedScrobble(
         .mergeMissing(existingEntry?.media)
         .mergeMissing(existingSession?.media)
     val mediaType = existingEntry?.mediaType ?: result.mediaType
+    val isAnimeMovie = mediaType == SimklMediaType.ANIME &&
+        (existingEntry?.animeType == "movie" || result.episode == null)
     val session = SimklPlaybackSession(
         id = result.playbackId ?: existingSession?.id,
         progress = result.progress,
         pausedAt = committedAt,
-        type = if (mediaType == SimklMediaType.MOVIES) "movie" else "episode",
+        type = if (mediaType == SimklMediaType.MOVIES || isAnimeMovie) "movie" else "episode",
         episode = result.episode?.mergeMissing(existingSession?.episode),
         show = media.takeIf { mediaType == SimklMediaType.SHOWS },
-        anime = media.takeIf { mediaType == SimklMediaType.ANIME },
-        movie = media.takeIf { mediaType == SimklMediaType.MOVIES },
+        anime = media.takeIf { mediaType == SimklMediaType.ANIME && !isAnimeMovie },
+        movie = media.takeIf { mediaType == SimklMediaType.MOVIES || isAnimeMovie },
     )
     return copy(
         playback = playback.filterNot { candidate ->
@@ -56,11 +58,13 @@ private fun SimklSyncSnapshot.withCompletedScrobble(
     val updatedEntries = entries.toMutableList()
     val index = updatedEntries.indexOfMatchingEntry(result)
     val existing = updatedEntries.getOrNull(index)
-    val updated = when (result.mediaType) {
-        SimklMediaType.MOVIES -> existing
+    val updated = when {
+        result.mediaType == SimklMediaType.MOVIES ||
+            (result.mediaType == SimklMediaType.ANIME &&
+                (existing?.animeType == "movie" || result.episode == null)) -> existing
             ?.withWatchedMovie(result, committedAt)
             ?: result.toWatchedMovieEntry(committedAt)
-        SimklMediaType.SHOWS, SimklMediaType.ANIME -> existing
+        else -> existing
             ?.withWatchedEpisode(result, committedAt)
             ?: result.toWatchedSeriesEntry(committedAt)
     }
@@ -81,7 +85,8 @@ private fun SimklLibraryEntry.withWatchedMovie(
     result: SimklScrobbleResult,
     committedAt: String,
 ): SimklLibraryEntry = copy(
-    mediaType = SimklMediaType.MOVIES,
+    mediaType = result.mediaType,
+    animeType = if (result.mediaType == SimklMediaType.ANIME) "movie" else animeType,
     lastWatchedAt = committedAt,
     status = SimklListStatus.COMPLETED,
     movie = result.media.mergeMissing(media),
@@ -90,7 +95,8 @@ private fun SimklLibraryEntry.withWatchedMovie(
 
 private fun SimklScrobbleResult.toWatchedMovieEntry(committedAt: String): SimklLibraryEntry =
     SimklLibraryEntry(
-        mediaType = SimklMediaType.MOVIES,
+        mediaType = mediaType,
+        animeType = if (mediaType == SimklMediaType.ANIME) "movie" else null,
         lastWatchedAt = committedAt,
         status = SimklListStatus.COMPLETED,
         movie = media,

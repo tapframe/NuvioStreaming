@@ -80,6 +80,11 @@ data class SimklLibraryEntry(
     fun stableKey(): String? = media?.ids?.stableMediaId()?.let { id ->
         "${mediaType.apiValue}:$id"
     }
+
+    /** True when this entry represents a movie — either a regular movie or an anime movie. */
+    fun isMovieEntry(): Boolean =
+        mediaType == SimklMediaType.MOVIES ||
+            (mediaType == SimklMediaType.ANIME && animeType == "movie")
 }
 
 @Serializable

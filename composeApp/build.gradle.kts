@@ -434,6 +434,9 @@ kotlin {
             implementation("io.coil-kt.coil3:coil-network-ktor3:${libs.versions.coil.get()}") {
                 exclude(group = "org.jetbrains.skiko", module = "skiko")
             }
+            implementation("io.coil-kt.coil3:coil-network-cache-control:${libs.versions.coil.get()}") {
+                exclude(group = "org.jetbrains.skiko", module = "skiko")
+            }
             implementation("io.coil-kt.coil3:coil-svg:${libs.versions.coil.get()}") {
                 exclude(group = "org.jetbrains.skiko", module = "skiko")
             }

@@ -290,7 +290,11 @@ private fun HomeContinueWatchingSectionContent(
     key(dataSourceKey) {
         val disintegration = remember {
             ScopedDisintegrationTracker<WatchProgressSource, String, ContinueWatchingItem>(
-                itemKey = ContinueWatchingItem::videoId,
+                itemKey = { item ->
+                    val season = item.seasonNumber ?: -1
+                    val episode = item.episodeNumber ?: -1
+                    "${item.parentMetaId}:$season:$episode"
+                },
             )
         }
         val displayEntries = disintegration.sync(dataSourceKey, items)
