@@ -80,9 +80,7 @@ import `is`.xyz.mpv.Utils
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
-import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.tanh
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -287,9 +285,6 @@ private fun ExoPlayerSurface(
     var initializedAudioDecoderName by remember(playerSourceKey) { mutableStateOf<String?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
     val volumeBoostAudioProcessor = remember(playerSourceKey) { VolumeBoostAudioProcessor() }
-    LaunchedEffect(volumeBoostAudioProcessor, playerSettings.volumeBoostCompressionEnabled) {
-        volumeBoostAudioProcessor.compressionEnabled = playerSettings.volumeBoostCompressionEnabled
-    }
 
     val initialMediaItem = remember(playerSourceKey, externalSubtitles) {
         val subtitleConfigs = externalSubtitles.mapNotNull { subtitle ->
@@ -886,7 +881,7 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun currentPlayerVolume(): PlayerAudioLevel {
-                    val current = playerVolumeBoostFraction(volumeBoostAudioProcessor.gain)
+                    val current = volumeBoostAudioProcessor.gain.coerceIn(0f, 2f)
                     return PlayerAudioLevel(
                         fraction = current,
                         isMuted = current <= 0.001f,
@@ -894,14 +889,13 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun setPlayerVolume(level: Float): PlayerAudioLevel {
-                    val target = level.coerceIn(0f, PlayerMaxVolumeBoost)
-                    val linearGain = playerVolumeBoostLinearGain(target)
-                    InAppLogger.debug(
-                        "ExoPlayer/Android",
-                        "control volume target=$target linearGain=$linearGain muted=${target <= 0.001f}",
-                    )
+                    val target = level.coerceIn(0f, 2f)
+                    InAppLogger.debug("ExoPlayer/Android", "control volume target=$target muted=${target <= 0.001f}")
+                    // Keep ExoPlayer's own volume at unity and apply gain in the PCM audio processor.
+                    // ExoPlayer#setVolume is effectively a normal 0..1 output volume control on many devices,
+                    // so values above 1 may not create audible amplification.
                     exoPlayer.volume = 1f
-                    volumeBoostAudioProcessor.gain = linearGain
+                    volumeBoostAudioProcessor.gain = target
                     return PlayerAudioLevel(
                         fraction = target,
                         isMuted = target <= 0.001f,
@@ -2549,13 +2543,8 @@ private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
     @Volatile
     var gain: Float = 1f
         set(value) {
-            field = value.coerceIn(0f, PlayerMaxVolumeBoostLinearGain)
+            field = value.coerceIn(0f, 2f)
         }
-
-    @Volatile
-    var compressionEnabled: Boolean = false
-
-    private var envelope = 0f
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         return if (inputAudioFormat.encoding == C.ENCODING_PCM_16BIT) {
@@ -2565,39 +2554,15 @@ private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
         }
     }
 
-    override fun onReset() {
-        envelope = 0f
-    }
-
     override fun queueInput(inputBuffer: ByteBuffer) {
         val inputSize = inputBuffer.remaining()
         val outputBuffer = replaceOutputBuffer(inputSize).order(ByteOrder.nativeOrder())
         val input = inputBuffer.order(ByteOrder.nativeOrder())
         val localGain = gain
-        val localCompression = compressionEnabled && localGain > 1f
-
-        if (localGain == 1f && !localCompression) {
-            outputBuffer.put(input)
-            outputBuffer.flip()
-            return
-        }
 
         while (input.remaining() >= 2) {
-            var sample = input.short.toInt() / SHORT_SCALE
-
-            if (localCompression) {
-                val magnitude = abs(sample)
-                envelope = if (magnitude > envelope) {
-                    magnitude
-                } else {
-                    envelope * ENVELOPE_RELEASE
-                }
-                sample *= compressorGain(envelope)
-            }
-
-            sample *= localGain
-
-            val amplified = (softClip(sample) * SHORT_PEAK)
+            val sample = input.short.toInt()
+            val amplified = (sample * localGain)
                 .toInt()
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
             outputBuffer.putShort(amplified.toShort())
@@ -2605,31 +2570,6 @@ private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
 
         input.position(input.limit())
         outputBuffer.flip()
-    }
-
-    private fun softClip(sample: Float): Float {
-        val magnitude = abs(sample)
-        if (magnitude <= SOFT_KNEE_THRESHOLD) return sample
-        val overshoot = (magnitude - SOFT_KNEE_THRESHOLD) / SOFT_KNEE_RANGE
-        val shaped = SOFT_KNEE_THRESHOLD + SOFT_KNEE_RANGE * tanh(overshoot)
-        return if (sample < 0f) -shaped else shaped
-    }
-
-    private fun compressorGain(level: Float): Float {
-        if (level <= COMPRESSOR_THRESHOLD) return COMPRESSOR_MAKEUP
-        val compressed = COMPRESSOR_THRESHOLD + (level - COMPRESSOR_THRESHOLD) / COMPRESSOR_RATIO
-        return COMPRESSOR_MAKEUP * (compressed / level)
-    }
-
-    private companion object {
-        const val SHORT_SCALE = 32768f
-        const val SHORT_PEAK = 32767f
-        const val SOFT_KNEE_THRESHOLD = 0.6f
-        const val SOFT_KNEE_RANGE = 1f - SOFT_KNEE_THRESHOLD
-        const val ENVELOPE_RELEASE = 0.9995f
-        const val COMPRESSOR_THRESHOLD = 0.25f
-        const val COMPRESSOR_RATIO = 4f
-        const val COMPRESSOR_MAKEUP = 1.6f
     }
 }
 

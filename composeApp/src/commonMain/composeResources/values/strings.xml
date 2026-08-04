@@ -1031,8 +1031,6 @@
     <string name="settings_playback_touch_gestures_description">Allow swipes and double-taps on the player surface to seek, adjust brightness, or adjust volume.</string>
     <string name="settings_playback_invalid_regex_pattern">Invalid regex pattern</string>
     <string name="settings_playback_last_link_cache_duration">Last Link Cache Duration</string>
-    <string name="settings_playback_volume_boost_compression">Volume Boost Compression</string>
-    <string name="settings_playback_volume_boost_compression_description">Even out loud and quiet passages while the volume boost is active. Helps with quiet streams, but flattens dynamics.</string>
     <string name="settings_playback_map_dv7_to_hevc">DV7 - HEVC Fallback</string>
     <string name="settings_playback_map_dv7_to_hevc_description">Map Dolby Vision Profile 7 to standard HEVC for devices without DV hardware support</string>
     <string name="settings_playback_minutes_before_end">Threshold Minutes</string>

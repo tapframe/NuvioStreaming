@@ -152,7 +152,7 @@ actual fun PlatformPlayerSurface(
             }
 
             override fun currentPlayerVolume(): PlayerAudioLevel {
-                val current = bridge.getVolume().coerceIn(0f, PlayerMaxVolumeBoost)
+                val current = bridge.getVolume().coerceIn(0f, 2f)
                 return PlayerAudioLevel(
                     fraction = current,
                     isMuted = current <= 0.001f,
@@ -160,12 +160,8 @@ actual fun PlatformPlayerSurface(
             }
 
             override fun setPlayerVolume(level: Float): PlayerAudioLevel {
-                val target = level.coerceIn(0f, PlayerMaxVolumeBoost)
-                InAppLogger.debug(
-                    "Player/iOS",
-                    "control volume target=$target linearGain=${playerVolumeBoostLinearGain(target)} " +
-                        "muted=${target <= 0.001f}",
-                )
+                val target = level.coerceIn(0f, 2f)
+                InAppLogger.debug("Player/iOS", "control volume target=$target muted=${target <= 0.001f}")
                 bridge.setVolume(target)
                 return PlayerAudioLevel(
                     fraction = target,
@@ -501,7 +497,6 @@ private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettin
             "extendedDynamicRange=${settings.iosExtendedDynamicRangeEnabled} audioOutput=${settings.iosAudioOutputMode.mpvValue}",
     )
     configureAudioOutput(audioOutput = settings.iosAudioOutputMode.mpvValue)
-    setAudioDynamicRangeCompression(enabled = settings.volumeBoostCompressionEnabled)
     configureVideoOutput(
         hardwareDecoder = settings.iosHardwareDecoderMode.mpvValue,
         targetColorspaceHint = settings.iosTargetColorspaceHintEnabled,

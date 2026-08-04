@@ -105,7 +105,6 @@ internal fun LazyListScope.playbackSettingsContent(
     secondaryPreferredSubtitleLanguage: String?,
     streamReuseLastLinkEnabled: Boolean,
     streamReuseLastLinkCacheHours: Int,
-    volumeBoostCompressionEnabled: Boolean,
     androidPlaybackEngine: AndroidPlaybackEngine,
     androidLibmpvVideoOutput: AndroidLibmpvVideoOutput,
     androidLibmpvHardwareDecodingEnabled: Boolean,
@@ -129,7 +128,6 @@ internal fun LazyListScope.playbackSettingsContent(
             secondaryPreferredSubtitleLanguage = secondaryPreferredSubtitleLanguage,
             streamReuseLastLinkEnabled = streamReuseLastLinkEnabled,
             streamReuseLastLinkCacheHours = streamReuseLastLinkCacheHours,
-            volumeBoostCompressionEnabled = volumeBoostCompressionEnabled,
             androidPlaybackEngine = androidPlaybackEngine,
             androidLibmpvVideoOutput = androidLibmpvVideoOutput,
             androidLibmpvHardwareDecodingEnabled = androidLibmpvHardwareDecodingEnabled,
@@ -294,7 +292,6 @@ private fun PlaybackSettingsSection(
     secondaryPreferredSubtitleLanguage: String?,
     streamReuseLastLinkEnabled: Boolean,
     streamReuseLastLinkCacheHours: Int,
-    volumeBoostCompressionEnabled: Boolean,
     androidPlaybackEngine: AndroidPlaybackEngine,
     androidLibmpvVideoOutput: AndroidLibmpvVideoOutput,
     androidLibmpvHardwareDecodingEnabled: Boolean,
@@ -433,15 +430,6 @@ private fun PlaybackSettingsSection(
                     enabled = !autoPlayPlayerSettings.externalPlayerEnabled,
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setTouchGesturesEnabled,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_volume_boost_compression),
-                    description = stringResource(Res.string.settings_playback_volume_boost_compression_description),
-                    checked = volumeBoostCompressionEnabled,
-                    enabled = !autoPlayPlayerSettings.externalPlayerEnabled,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setVolumeBoostCompressionEnabled,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(

@@ -113,9 +113,6 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
     func getVolume() -> Float { playerVC?.getVolume() ?? 1.0 }
     func setVolume(volume: Float) { playerVC?.setVolume(volume) }
-    func setAudioDynamicRangeCompression(enabled: Bool) {
-        playerVC?.setAudioDynamicRangeCompression(enabled)
-    }
     func setMuted(muted: Bool) { playerVC?.setMuted(muted) }
     func setEmbeddedPreviewMode(enabled: Bool) { ensurePlayerViewController().setEmbeddedPreviewMode(enabled) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
@@ -338,8 +335,6 @@ final class MPVPlayerViewController: UIViewController {
     }
     private var _currentErrorMessage: String?
     private var isEmbeddedPreviewMode = false
-    private var audioLimiterAvailable: Bool?
-    private var audioCompressionEnabled = false
 
     init(experimentalSinglePrimaryPictureInPictureEnabled: Bool) {
         self.experimentalSinglePrimaryPictureInPictureEnabled = experimentalSinglePrimaryPictureInPictureEnabled
@@ -816,33 +811,19 @@ final class MPVPlayerViewController: UIViewController {
         primaryRenderSurface?.requestRenderBurst(reason: "speed", count: 2)
     }
 
-    private static let maxVolumeBoostFraction = 2.0
-    private static let maxVolumeBoostLinearGain = 4.0
-    private static let unlimitedVolumeBoostLinearGain = 2.5
-
-    private static func mpvVolume(forLinearGain gain: Double) -> Double {
-        return min(200.0, 100.0 * pow(max(gain, 0.0), 1.0 / 3.0))
-    }
-
-    private static func linearGain(forMpvVolume volume: Double) -> Double {
-        return pow(max(volume, 0.0) / 100.0, 3.0)
-    }
-
     func getVolume() -> Float {
         guard mpv != nil else { return 1.0 }
+        let baseVolume = getDouble("volume") / 100.0
         let gainDb = getDouble("volume-gain")
-        let linear = Self.linearGain(forMpvVolume: getDouble("volume")) * pow(10.0, gainDb / 20.0)
-        if linear <= 1.0 {
-            return Float(max(0.0, linear))
-        }
-        return Float(min(Self.maxVolumeBoostFraction, sqrt(linear)))
+        let gainMultiplier = pow(10.0, gainDb / 20.0)
+        return Float(max(0.0, min(2.0, baseVolume * gainMultiplier)))
     }
 
     func setVolume(_ volume: Float) {
         guard mpv != nil else { return }
-        let fraction = max(0.0, min(Self.maxVolumeBoostFraction, Double(volume)))
+        let clamped = max(0.0, min(2.0, Double(volume)))
 
-        if fraction <= 0.001 {
+        if clamped <= 0.001 {
             var mutedVolume = 0.0
             var neutralGain = 0.0
             checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &mutedVolume))
@@ -850,75 +831,12 @@ final class MPVPlayerViewController: UIViewController {
             return
         }
 
-        var linear = fraction <= 1.0 ? fraction : min(Self.maxVolumeBoostLinearGain, fraction * fraction)
-
-        if linear > Self.unlimitedVolumeBoostLinearGain && !ensureAudioLimiter() {
-            linear = Self.unlimitedVolumeBoostLinearGain
-        }
-
-        var baseVolume = Self.mpvVolume(forLinearGain: linear)
-        var gainDb = 0.0
+        // Keep mpv's base volume at 100 and apply real software amplification through volume-gain.
+        // 2.0x equals about +6.02 dB.
+        var baseVolume = 100.0
+        var gainDb = 20.0 * log10(clamped)
         checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &baseVolume))
         checkError(mpv_set_property(mpv, "volume-gain", MPV_FORMAT_DOUBLE, &gainDb))
-        InAppLogBridge.shared.debug(
-            tag: "MPV/iOS",
-            message: "control volume fraction=\(fraction) linearGain=\(linear) mpvVolume=\(baseVolume)"
-        )
-    }
-
-    func setAudioDynamicRangeCompression(_ enabled: Bool) {
-        guard mpv != nil else { return }
-        guard audioCompressionEnabled != enabled else { return }
-        audioCompressionEnabled = enabled
-        applyAudioFilterChain()
-    }
-
-    @discardableResult
-    private func ensureAudioLimiter() -> Bool {
-        if let cached = audioLimiterAvailable { return cached }
-        let available = applyAudioFilterChain(requireLimiter: true)
-        audioLimiterAvailable = available
-        if !available {
-            InAppLogBridge.shared.warn(
-                tag: "MPV/iOS",
-                message: "alimiter filter unavailable in this ffmpeg build, capping volume boost at "
-                    + "\(Self.unlimitedVolumeBoostLinearGain)x"
-            )
-        }
-        return available
-    }
-
-    @discardableResult
-    private func applyAudioFilterChain(requireLimiter: Bool = false) -> Bool {
-        guard mpv != nil else { return false }
-        let wantsLimiter = requireLimiter || audioLimiterAvailable == true
-        let compressor = "lavfi=[dynaudnorm=f=250:g=15:p=0.85:m=4]"
-        let limiter = "lavfi=[alimiter=limit=0.95:attack=5:release=60:level=disabled]"
-
-        var candidates: [(chain: String, hasLimiter: Bool)] = []
-        switch (audioCompressionEnabled, wantsLimiter) {
-        case (true, true):
-            candidates = [
-                ("\(compressor),\(limiter)", true),
-                (limiter, true),
-                (compressor, false),
-                ("", false),
-            ]
-        case (true, false):
-            candidates = [(compressor, false), ("", false)]
-        case (false, true):
-            candidates = [(limiter, true), ("", false)]
-        case (false, false):
-            candidates = [("", false)]
-        }
-
-        for candidate in candidates {
-            if mpv_set_property_string(mpv, "af", candidate.chain) >= 0 {
-                return candidate.hasLimiter
-            }
-        }
-        InAppLogBridge.shared.warn(tag: "MPV/iOS", message: "Failed to apply audio filter chain")
-        return false
     }
 
 

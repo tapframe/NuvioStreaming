@@ -67,8 +67,6 @@ internal expect object PlayerSettingsStorage {
     fun saveAndroidLibmpvYuv420pEnabled(enabled: Boolean)
     fun loadDecoderPriority(): Int?
     fun saveDecoderPriority(priority: Int)
-    fun loadVolumeBoostCompressionEnabled(): Boolean?
-    fun saveVolumeBoostCompressionEnabled(enabled: Boolean)
     fun loadMapDV7ToHevc(): Boolean?
     fun saveMapDV7ToHevc(enabled: Boolean)
     fun loadTunnelingEnabled(): Boolean?

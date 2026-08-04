@@ -13,19 +13,6 @@ internal const val PlayerRightGestureBoundary = 0.6f
 internal const val PlayerVerticalGestureSensitivity = 0.65f
 internal const val PlayerNormalVolumeCeiling = 1f
 internal const val PlayerMaxVolumeBoost = 2f
-internal const val PlayerMaxVolumeBoostLinearGain = 4f
-
-internal fun playerVolumeBoostLinearGain(fraction: Float): Float {
-    val normalized = fraction.coerceIn(0f, PlayerMaxVolumeBoost)
-    if (normalized <= PlayerNormalVolumeCeiling) return normalized
-    return (normalized * normalized).coerceAtMost(PlayerMaxVolumeBoostLinearGain)
-}
-
-internal fun playerVolumeBoostFraction(linearGain: Float): Float {
-    val normalized = linearGain.coerceIn(0f, PlayerMaxVolumeBoostLinearGain)
-    if (normalized <= PlayerNormalVolumeCeiling) return normalized
-    return kotlin.math.sqrt(normalized).coerceIn(PlayerNormalVolumeCeiling, PlayerMaxVolumeBoost)
-}
 internal const val PlayerVerticalGestureTouchSlopMultiplier = 3f
 internal const val PlayerVerticalGestureMinHeightFraction = 0.06f
 internal const val PlayerVerticalGestureDominanceRatio = 1.2f
@@ -127,6 +114,7 @@ internal fun setCombinedVolumeLevel(
 ): PlayerAudioLevel? {
     val normalized = target.coerceIn(0f, PlayerMaxVolumeBoost)
     return if (normalized <= PlayerNormalVolumeCeiling) {
+        // Normal range: change device/media volume and keep software gain neutral.
         engineController?.setPlayerVolume(PlayerNormalVolumeCeiling)
         systemController?.setVolume(normalized)
             ?: PlayerAudioLevel(
@@ -134,6 +122,7 @@ internal fun setCombinedVolumeLevel(
                 isMuted = normalized <= 0.001f,
             )
     } else {
+        // Boost range: keep device/media volume at maximum and apply software gain above 100%.
         val systemLevel = systemController?.setVolume(PlayerNormalVolumeCeiling)
         val boostedLevel = engineController?.setPlayerVolume(normalized)
         boostedLevel?.copy(

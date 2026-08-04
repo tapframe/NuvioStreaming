@@ -55,7 +55,6 @@ data class PlayerSettingsUiState(
     val androidLibmpvHardwareDecodingEnabled: Boolean = true,
     val androidLibmpvYuv420pEnabled: Boolean = false,
     val decoderPriority: Int = 1,
-    val volumeBoostCompressionEnabled: Boolean = false,
     val mapDV7ToHevc: Boolean = false,
     val tunnelingEnabled: Boolean = false,
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
@@ -122,7 +121,6 @@ object PlayerSettingsRepository {
     private var androidLibmpvHardwareDecodingEnabled = true
     private var androidLibmpvYuv420pEnabled = false
     private var decoderPriority = 1
-    private var volumeBoostCompressionEnabled = false
     private var mapDV7ToHevc = false
     private var tunnelingEnabled = false
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
@@ -194,7 +192,6 @@ object PlayerSettingsRepository {
         androidLibmpvHardwareDecodingEnabled = true
         androidLibmpvYuv420pEnabled = false
         decoderPriority = 1
-        volumeBoostCompressionEnabled = false
         mapDV7ToHevc = false
         tunnelingEnabled = false
         streamAutoPlayMode = StreamAutoPlayMode.MANUAL
@@ -295,7 +292,6 @@ object PlayerSettingsRepository {
         androidLibmpvHardwareDecodingEnabled = PlayerSettingsStorage.loadAndroidLibmpvHardwareDecodingEnabled() ?: true
         androidLibmpvYuv420pEnabled = PlayerSettingsStorage.loadAndroidLibmpvYuv420pEnabled() ?: false
         decoderPriority = PlayerSettingsStorage.loadDecoderPriority() ?: 1
-        volumeBoostCompressionEnabled = PlayerSettingsStorage.loadVolumeBoostCompressionEnabled() ?: false
         mapDV7ToHevc = PlayerSettingsStorage.loadMapDV7ToHevc() ?: false
         tunnelingEnabled = PlayerSettingsStorage.loadTunnelingEnabled() ?: false
         streamAutoPlayMode = PlayerSettingsStorage.loadStreamAutoPlayMode()
@@ -575,14 +571,6 @@ object PlayerSettingsRepository {
         decoderPriority = priority
         publish()
         PlayerSettingsStorage.saveDecoderPriority(priority)
-    }
-
-    fun setVolumeBoostCompressionEnabled(enabled: Boolean) {
-        ensureLoaded()
-        if (volumeBoostCompressionEnabled == enabled) return
-        volumeBoostCompressionEnabled = enabled
-        publish()
-        PlayerSettingsStorage.saveVolumeBoostCompressionEnabled(enabled)
     }
 
     fun setMapDV7ToHevc(enabled: Boolean) {
@@ -945,7 +933,6 @@ object PlayerSettingsRepository {
             androidLibmpvHardwareDecodingEnabled = androidLibmpvHardwareDecodingEnabled,
             androidLibmpvYuv420pEnabled = androidLibmpvYuv420pEnabled,
             decoderPriority = decoderPriority,
-            volumeBoostCompressionEnabled = volumeBoostCompressionEnabled,
             mapDV7ToHevc = mapDV7ToHevc,
             tunnelingEnabled = tunnelingEnabled,
             streamAutoPlayMode = streamAutoPlayMode,
