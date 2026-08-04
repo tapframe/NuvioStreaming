@@ -42,7 +42,7 @@ import kotlinx.coroutines.runBlocking
 object TraktAuthRepository : TrackingAuthProvider {
     private const val BASE_URL = "https://api.trakt.tv"
     private const val AUTHORIZE_URL = "https://trakt.tv/oauth/authorize"
-    private const val ACTIVATE_URL = "https://trakt.tv/activate"
+    internal const val ACTIVATE_URL = "https://trakt.tv/activate"
     private const val API_VERSION = "2"
     private const val DEVICE_CODE_PREFIX = "device:"
     private const val DEVICE_CODE_SEPARATOR = "|"

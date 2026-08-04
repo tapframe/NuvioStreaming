@@ -597,6 +597,15 @@
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
     <string name="settings_appearance_dynamic_artwork_background">Dynamic background color</string>
+    <string name="settings_tracking_connect_with_code">Connect with code</string>
+    <string name="settings_tracking_device_code_title">Sign in with a code</string>
+    <string name="settings_tracking_device_code_instruction">Open %1$s on any device and enter this code.</string>
+    <string name="settings_tracking_device_code_requesting">Requesting a code\u2026</string>
+    <string name="settings_tracking_device_code_waiting">Waiting for approval\u2026</string>
+    <string name="settings_tracking_device_code_copy">Copy code</string>
+    <string name="settings_tracking_device_code_copied">Code copied</string>
+    <string name="settings_tracking_device_code_open_page">Open page</string>
+    <string name="settings_tracking_device_code_cancel">Cancel</string>
     <string name="settings_appearance_tab_bar_behavior">Liquid Glass tab bar</string>
     <string name="settings_appearance_tab_bar_behavior_sheet_title">Liquid Glass tab bar</string>
     <string name="settings_tab_bar_behavior_off">Off</string>
