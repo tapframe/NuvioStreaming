@@ -3,22 +3,17 @@ import UIKit
 import QuartzCore
 
 class MetalLayer: CAMetalLayer {
-    /// Invoked on the thread that presented the drawable, once its contents are on screen.
-    ///
-    /// This is the hook that lets Picture in Picture reuse the frames mpv already rendered, instead
-    /// of running a second, SDR-only render pipeline alongside it. MoltenVK implements its Vulkan
-    /// swapchain on top of `CAMetalLayer.nextDrawable()`, so overriding it here catches every frame
-    /// without mpv needing to know.
     var onDrawablePresented: ((CAMetalDrawable) -> Void)?
 
-    /// Capture is off by default: `framebufferOnly` has to be disabled for the drawable texture to
-    /// be readable, and that costs bandwidth, so it is only paid for when PiP is switched on.
     var isDrawableCaptureArmed = false
 
-    /// Diagnostics. If this stays at zero while PiP is enabled, MoltenVK is not routing through
-    /// this override and the capture approach cannot work on the current toolchain.
     private(set) var capturedDrawableCount: UInt64 = 0
 
+    var capturesWithoutPresentation = false
+
+    private(set) var nextDrawableCallCount: UInt64 = 0
+
+    private var pendingDrawable: CAMetalDrawable?
     private let captureLock = NSLock()
 
     override var drawableSize: CGSize {
@@ -49,16 +44,26 @@ class MetalLayer: CAMetalLayer {
         let drawable = super.nextDrawable()
 
         captureLock.lock()
+        nextDrawableCallCount &+= 1
         let armed = isDrawableCaptureArmed
         let handler = onDrawablePresented
+        let deferred = capturesWithoutPresentation
+        let previous = pendingDrawable
+        pendingDrawable = deferred ? drawable : nil
         captureLock.unlock()
 
         guard armed, let drawable, let handler else { return drawable }
 
-        // Waiting for presentation guarantees mpv's command buffer has completed, so the texture
-        // can be read without any cross-queue synchronisation of our own.
-        // The handler receives an MTLDrawable, which has no texture; capture the CAMetalDrawable
-        // itself. Metal releases presented handlers after firing, so this does not leak.
+        if deferred {
+            if let previous {
+                captureLock.lock()
+                capturedDrawableCount &+= 1
+                captureLock.unlock()
+                handler(previous)
+            }
+            return drawable
+        }
+
         drawable.addPresentedHandler { [weak self] _ in
             guard let self else { return }
             self.captureLock.lock()

@@ -60,13 +60,13 @@ private fun ExperimentalPictureInPictureSettingsItem(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Experimental Picture in Picture renderer",
+                    text = "Experimental Picture in Picture",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Uses a single primary libmpv/OpenGL render pipeline so PiP does not reopen the stream. This changes iOS video output and may cause unexpected behavior. Restart playback after changing this option.",
+                    text = "Uses an experimental Metal-based render pipeline to seamlessly transition into PiP without reopening the stream. This changes the core video output and may cause unexpected behavior.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

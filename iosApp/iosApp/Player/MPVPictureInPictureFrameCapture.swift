@@ -5,18 +5,6 @@ import CoreVideo
 import Metal
 import ComposeApp
 
-/// Feeds Picture in Picture from the frames mpv already rendered to the Metal layer.
-///
-/// The previous approach swapped mpv's video output to `vo=libmpv` on OpenGL ES so it could read
-/// frames back. That works, but OpenGL ES on iOS has no EDR path at all — no `CAMetalLayer`, no
-/// extended-range pixel formats — so enabling PiP silently downgraded *inline* playback to 8-bit
-/// SDR and HDR content came out tone-mapped and washed out.
-///
-/// Here mpv keeps rendering through `gpu-next`/MoltenVK into the EDR-capable `CAMetalLayer`
-/// exactly as before. `MetalLayer` hands us each presented drawable, and we blit it into a
-/// `CVPixelBuffer` for `AVSampleBufferDisplayLayer`. Nothing about the on-screen pipeline changes,
-/// there is no mpv re-init when entering PiP, and because the source is already EDR the PiP window
-/// can carry HDR too.
 final class MPVPictureInPictureFrameCapture {
     private let displayLayer: AVSampleBufferDisplayLayer
     private let metalLayer: MetalLayer
@@ -76,8 +64,6 @@ final class MPVPictureInPictureFrameCapture {
 
         CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &textureCache)
 
-        // Reading back the drawable requires giving up the framebuffer-only optimisation. This is
-        // the only cost the inline pipeline pays for PiP support, and only when it is switched on.
         metalLayer.framebufferOnly = false
         metalLayer.onDrawablePresented = { [weak self] drawable in
             self?.handlePresentedDrawable(drawable)
@@ -95,8 +81,6 @@ final class MPVPictureInPictureFrameCapture {
         stopPictureInPictureRendering(removingDisplayedImage: true)
     }
 
-    /// Kept for source compatibility with the old OpenGL surface: the Metal layer's EDR flag is
-    /// owned by the player, we only need to know which pixel format to allocate for PiP.
     func setExtendedDynamicRangePreferred(_ enabled: Bool) {
         stateLock.lock()
         extendedDynamicRangePreferred = enabled
@@ -109,8 +93,6 @@ final class MPVPictureInPictureFrameCapture {
     }
 
     func setPaused(_ paused: Bool) {
-        // A paused player stops presenting drawables, so grab a few frames to keep the PiP window
-        // showing the current picture rather than whatever was last enqueued.
         if paused { requestRenderBurst(reason: "paused", count: 2) }
     }
 
@@ -118,7 +100,17 @@ final class MPVPictureInPictureFrameCapture {
         requestRenderBurst(reason: "seek", count: 3)
     }
 
-    /// Arms capture for the next `count` presented drawables.
+    func setBackgrounded(_ backgrounded: Bool) {
+        metalLayer.capturesWithoutPresentation = backgrounded
+        InAppLogBridge.shared.info(
+            tag: "PiP/iOS",
+            message: "PiP capture mode=\(backgrounded ? "deferred" : "presented") " +
+                "drawablesRequested=\(metalLayer.nextDrawableCallCount) " +
+                "captured=\(metalLayer.capturedDrawableCount) enqueued=\(enqueuedFrames)"
+        )
+        if backgrounded { requestRenderBurst(reason: "background", count: 4) }
+    }
+
     func requestRenderBurst(reason: String, count: Int = 2) {
         stateLock.lock()
         burstFramesRemaining = max(burstFramesRemaining, count)
@@ -164,8 +156,6 @@ final class MPVPictureInPictureFrameCapture {
         }
     }
 
-    /// Non-zero once MoltenVK has routed at least one drawable through our layer subclass. If this
-    /// stays at zero while PiP is enabled the hook is not firing and PiP will show nothing.
     var capturedDrawableCount: UInt64 { metalLayer.capturedDrawableCount }
 
     var enqueuedFrames: UInt64 {
@@ -205,10 +195,9 @@ final class MPVPictureInPictureFrameCapture {
             stateLock.unlock()
             return
         }
-        // Throttle to the video's own cadence; the layer can present faster than the source.
         let now = CACurrentMediaTime()
         let minimumInterval = 1.0 / (frameRate * max(0.5, playbackRateProvider()))
-        if active && !priming && burst == 0 && (now - lastCaptureTime) < minimumInterval {
+        if active && !priming && burst == 0 && (now - lastCaptureTime) < minimumInterval * 0.5 {
             stateLock.unlock()
             return
         }
@@ -229,14 +218,21 @@ final class MPVPictureInPictureFrameCapture {
             if !alreadyLogged {
                 InAppLogBridge.shared.error(
                     tag: "PiP/iOS",
-                    message: "Unsupported drawable pixel format \(source.pixelFormat.rawValue) for PiP capture"
+                    message: "Unsupported drawable pixel format \(source.pixelFormat) " +
+                        "(raw \(source.pixelFormat.rawValue)) for PiP capture"
                 )
             }
             return
         }
 
+        let region = videoRegion(in: source)
+
         guard
-            let pixelBuffer = makePixelBuffer(width: source.width, height: source.height, format: pixelFormat),
+            let pixelBuffer = makePixelBuffer(
+                width: region.size.width,
+                height: region.size.height,
+                format: pixelFormat
+            ),
             let destination = makeTexture(from: pixelBuffer, pixelFormat: source.pixelFormat)
         else {
             return
@@ -249,7 +245,17 @@ final class MPVPictureInPictureFrameCapture {
             return
         }
 
-        blit.copy(from: source, to: destination)
+        blit.copy(
+            from: source,
+            sourceSlice: 0,
+            sourceLevel: 0,
+            sourceOrigin: region.origin,
+            sourceSize: region.size,
+            to: destination,
+            destinationSlice: 0,
+            destinationLevel: 0,
+            destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0)
+        )
         blit.endEncoding()
         commandBuffer.addCompletedHandler { [weak self] _ in
             self?.enqueueSampleBuffer(for: pixelBuffer)
@@ -257,8 +263,39 @@ final class MPVPictureInPictureFrameCapture {
         commandBuffer.commit()
     }
 
+    private func videoRegion(in texture: MTLTexture) -> (origin: MTLOrigin, size: MTLSize) {
+        let whole = (
+            origin: MTLOrigin(x: 0, y: 0, z: 0),
+            size: MTLSize(width: texture.width, height: texture.height, depth: 1)
+        )
+
+        let video = videoSizeProvider()
+        guard video.width > 0, video.height > 0, texture.width > 0, texture.height > 0 else {
+            return whole
+        }
+
+        let videoAspect = Double(video.width) / Double(video.height)
+        let textureAspect = Double(texture.width) / Double(texture.height)
+        var fittedWidth = Double(texture.width)
+        var fittedHeight = Double(texture.height)
+        if videoAspect > textureAspect {
+            fittedHeight = fittedWidth / videoAspect
+        } else if videoAspect < textureAspect {
+            fittedWidth = fittedHeight * videoAspect
+        }
+
+        let width = max(2, Int(fittedWidth.rounded(.down)) & ~1)
+        let height = max(2, Int(fittedHeight.rounded(.down)) & ~1)
+        guard width <= texture.width, height <= texture.height else { return whole }
+
+        return (
+            origin: MTLOrigin(x: (texture.width - width) / 2, y: (texture.height - height) / 2, z: 0),
+            size: MTLSize(width: width, height: height, depth: 1)
+        )
+    }
+
     private func enqueueSampleBuffer(for pixelBuffer: CVPixelBuffer) {
-        Self.attachColorAttributes(to: pixelBuffer)
+        attachColorAttributes(to: pixelBuffer)
 
         stateLock.lock()
         var description = formatDescription
@@ -386,9 +423,6 @@ final class MPVPictureInPictureFrameCapture {
         return CVMetalTextureGetTexture(cvTexture)
     }
 
-    /// `MTLBlitCommandEncoder` cannot convert between formats, so the destination buffer must match
-    /// the drawable exactly. Anything not listed here is skipped rather than shown with wrong
-    /// colours.
     private static func pixelBufferFormat(for format: MTLPixelFormat) -> OSType? {
         switch format {
         case .bgra8Unorm, .bgra8Unorm_srgb:
@@ -399,38 +433,40 @@ final class MPVPictureInPictureFrameCapture {
             return kCVPixelFormatType_30RGBLEPackedWideGamut
         case .bgra10_xr, .bgra10_xr_srgb:
             return kCVPixelFormatType_64RGBALE
+        case .bgr10a2Unorm:
+            return kCVPixelFormatType_ARGB2101010LEPacked
         default:
             return nil
         }
     }
 
-    /// Without these the display layer has no idea the buffer is BT.2020 PQ and renders it as if it
-    /// were BT.709 — the same washed-out look the OpenGL path produced, just one layer later.
-    private static func attachColorAttributes(to pixelBuffer: CVPixelBuffer) {
-        let isWideGamut: Bool
-        switch CVPixelBufferGetPixelFormatType(pixelBuffer) {
-        case kCVPixelFormatType_64RGBAHalf, kCVPixelFormatType_64RGBALE, kCVPixelFormatType_30RGBLEPackedWideGamut:
-            isWideGamut = true
-        default:
-            isWideGamut = false
+    private func attachColorAttributes(to pixelBuffer: CVPixelBuffer) {
+        if let colorSpace = metalLayer.colorspace {
+            CVBufferSetAttachment(
+                pixelBuffer,
+                kCVImageBufferCGColorSpaceKey,
+                colorSpace,
+                .shouldPropagate
+            )
+            return
         }
 
         CVBufferSetAttachment(
             pixelBuffer,
             kCVImageBufferColorPrimariesKey,
-            isWideGamut ? kCVImageBufferColorPrimaries_ITU_R_2020 : kCVImageBufferColorPrimaries_ITU_R_709_2,
+            kCVImageBufferColorPrimaries_ITU_R_709_2,
             .shouldPropagate
         )
         CVBufferSetAttachment(
             pixelBuffer,
             kCVImageBufferTransferFunctionKey,
-            isWideGamut ? kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ : kCVImageBufferTransferFunction_ITU_R_709_2,
+            kCVImageBufferTransferFunction_ITU_R_709_2,
             .shouldPropagate
         )
         CVBufferSetAttachment(
             pixelBuffer,
             kCVImageBufferYCbCrMatrixKey,
-            isWideGamut ? kCVImageBufferYCbCrMatrix_ITU_R_2020 : kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+            kCVImageBufferYCbCrMatrix_ITU_R_709_2,
             .shouldPropagate
         )
     }

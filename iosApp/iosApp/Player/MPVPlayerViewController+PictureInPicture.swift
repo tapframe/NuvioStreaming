@@ -4,8 +4,6 @@ import CoreMedia
 import Libmpv
 import ComposeApp
 
-// PiP behavior is isolated from MPVPlayerBridge.swift so upstream player changes
-// can be merged without repeatedly touching the PiP state machine.
 extension MPVPlayerViewController {
     func installExperimentalPictureInPictureCaptureIfNeeded() {
         guard experimentalSinglePrimaryPictureInPictureEnabled else { return }
@@ -34,8 +32,6 @@ extension MPVPlayerViewController {
             isPausedProvider: { [weak self] in !(self?.isPlayerPlaying ?? false) }
         )
         primaryRenderSurface = renderSurface
-        // The layer must stay in a visible hierarchy for AVPictureInPictureController to accept
-        // it, so it keeps full alpha and is simply parked behind the opaque Metal layer.
         sampleBufferDisplayView.alpha = 1.0
         view.insertSubview(sampleBufferDisplayView, at: 0)
         sampleBufferDisplayView.pictureInPictureController?.setAutomaticStartEnabled(false)
@@ -45,13 +41,10 @@ extension MPVPlayerViewController {
         guard experimentalSinglePrimaryPictureInPictureEnabled else { return false }
         sampleBufferDisplayView.frame = CGRect(origin: .zero, size: bounds.size)
         primaryRenderSurface?.requestRenderBurst(reason: "layout", count: 2)
-        // The Metal layer still owns the inline picture, so let the normal layout path run.
         return false
     }
 
     func initializeExperimentalPictureInPictureMpvIfNeeded() -> Bool {
-        // mpv is no longer configured differently for PiP: the capture reads the frames
-        // gpu-next/MoltenVK already produced, so the standard setup path applies unchanged.
         return false
     }
 
@@ -200,6 +193,7 @@ extension MPVPlayerViewController {
     }
 
     @objc func enterBackground() {
+        primaryRenderSurface?.setBackgrounded(true)
         guard mpv != nil else { return }
         if experimentalSinglePrimaryPictureInPictureEnabled {
             if isPictureInPictureActive() {
@@ -242,6 +236,7 @@ extension MPVPlayerViewController {
     }
 
     @objc func enterForeground() {
+        primaryRenderSurface?.setBackgrounded(false)
         guard mpv != nil else { return }
         if experimentalSinglePrimaryPictureInPictureEnabled {
             if isPictureInPictureActive() || isPictureInPictureStarting { return }
