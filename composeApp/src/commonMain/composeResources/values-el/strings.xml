@@ -710,7 +710,7 @@
     <string name="settings_tracking_features">ΠΡΟΤΙΜΗΣΕΙΣ ΠΗΓΩΝ</string>
     <string name="settings_tracking_viewing_discovery">Λειτουργίες Trakt</string>
     <string name="settings_tracking_services">Λογαριασμοί</string>
-    <string name="settings_tracking_approval_redirect">Μετά την έγκριση, θα ανακατευθυνθείτε πίσω αυτόματα.</string>
+    <string name="settings_tracking_approval_redirect">Μετά την έγκριση, θα ανακατευθυνθείτε αυτόματα πίσω.</string>
     <string name="settings_tracking_connect_first">Συνδέστε πρώτα το %1$s</string>
     <string name="settings_tracking_disconnect_title">Αποσύνδεση %1$s;</string>
     <string name="settings_tracking_disconnect_description">Αυτό αφαιρεί τη σύνδεση από το Nuvio. Τα δεδομένα σας στο %1$s παραμένουν άθικτα και οι μη διαθέσιμες πηγές βιβλιοθήκης ή προόδου επιστρέφουν προσωρινά στο Nuvio.</string>
