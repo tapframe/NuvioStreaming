@@ -2072,11 +2072,11 @@
     <string name="updates_release_missing_title">Release has no tag or name</string>
     <!-- Continue Watching air date display -->
     <string name="cw_airs_date">Airs %1$s</string>
-    <string name="cw_airs_today">Airs today</string>
-    <string name="cw_airs_tomorrow">Airs tomorrow</string>
+    <string name="cw_airs_today">Airs Today</string>
+    <string name="cw_airs_tomorrow">Airs Tomorrow</string>
     <plurals name="cw_airs_in_days">
-        <item quantity="one">Airs in %1$d day</item>
-        <item quantity="other">Airs in %1$d days</item>
+        <item quantity="one">Airs in %1$d Day</item>
+        <item quantity="other">Airs in %1$d Days</item>
     </plurals>
     <string name="cw_airs_date_short">%1$s</string>
     <string name="cw_airs_today_short">Today</string>
