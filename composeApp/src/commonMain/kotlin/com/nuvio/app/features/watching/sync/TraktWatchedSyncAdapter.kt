@@ -11,9 +11,13 @@ import com.nuvio.app.features.trakt.TraktEpisodeMappingService
 import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.normalizeWatchedMarkedAtEpochMs
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -23,6 +27,71 @@ private const val BASE_URL = "https://api.trakt.tv"
 private const val WATCHED_PAGE_LIMIT = 250
 private const val WATCHED_MAX_PAGES = 1_000
 private const val WATCHED_SHOWS_EXTENDED = "progress"
+internal const val TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES = 8 * 1024 * 1024
+private const val TRAKT_WATCHED_MAX_ATTEMPTS = 2
+private const val TRAKT_WATCHED_MAX_RETRY_DELAY_MS = 60_000L
+
+internal fun interface TraktWatchedHttpEngine {
+    suspend fun get(
+        url: String,
+        headers: Map<String, String>,
+        maxResponseBodyBytes: Int,
+    ): RawHttpResponse
+}
+
+internal class TraktWatchedPageClient(
+    private val engine: TraktWatchedHttpEngine,
+    private val sleep: suspend (Long) -> Unit = { delayMs -> delay(delayMs) },
+) {
+    suspend fun get(url: String, headers: Map<String, String>): RawHttpResponse {
+        repeat(TRAKT_WATCHED_MAX_ATTEMPTS) { attempt ->
+            val response = engine.get(
+                url = url,
+                headers = headers,
+                maxResponseBodyBytes = TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES,
+            )
+            if (response.status in 200..299) return response
+            if (!isTransientTraktWatchedStatus(response.status) || attempt == TRAKT_WATCHED_MAX_ATTEMPTS - 1) {
+                throw TraktWatchedHttpException(response.status)
+            }
+            sleep(
+                traktWatchedRetryDelayMs(
+                    attempt = attempt,
+                    retryAfterSeconds = response.headers.entries
+                        .firstOrNull { (name, _) -> name.equals("retry-after", ignoreCase = true) }
+                        ?.value,
+                ),
+            )
+        }
+        error("Trakt watched request exhausted without a response")
+    }
+}
+
+internal class TraktWatchedHttpException(
+    val status: Int,
+) : Exception("Trakt watched request failed: $status")
+
+internal fun isTransientTraktWatchedStatus(status: Int): Boolean =
+    status == 429 || status in 500..599
+
+internal fun traktWatchedRetryDelayMs(attempt: Int, retryAfterSeconds: String?): Long =
+    retryAfterSeconds
+        ?.trim()
+        ?.toLongOrNull()
+        ?.coerceAtLeast(0L)
+        ?.times(1_000L)
+        ?.coerceAtMost(TRAKT_WATCHED_MAX_RETRY_DELAY_MS)
+        ?: (1_000L shl attempt.coerceIn(0, 5)).coerceAtMost(TRAKT_WATCHED_MAX_RETRY_DELAY_MS)
+
+private val platformTraktWatchedHttpEngine = TraktWatchedHttpEngine { url, headers, maxResponseBodyBytes ->
+    httpRequestRaw(
+        method = "GET",
+        url = url,
+        headers = headers,
+        body = "",
+        maxResponseBodyBytes = maxResponseBodyBytes,
+    )
+}
 
 
 object TraktWatchedSyncAdapter : TrackingWatchedProvider {
@@ -33,13 +102,19 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         encodeDefaults = false
         explicitNulls = false
     }
+    private val pageClient = TraktWatchedPageClient(platformTraktWatchedHttpEngine)
+    private val extraWatchedKeysLock = SynchronizedObject()
+    private val extraWatchedKeysByProfile = mutableMapOf<Int, Set<String>>()
 
     // ── pull ────────────────────────────────────────────────────────────
     override suspend fun pull(
         profileId: Int,
         pageSize: Int,
     ): List<WatchedItem> {
-        val headers = TraktAuthRepository.authorizedHeaders() ?: return emptyList()
+        val headers = TraktAuthRepository.authorizedHeaders() ?: run {
+            setExtraWatchedKeys(profileId, emptySet())
+            return emptyList()
+        }
 
         val (movieItems, showItems) = coroutineScope {
             val movies = async {
@@ -51,49 +126,60 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
             movies.await() to shows.await()
         }
 
-        val result = mutableListOf<WatchedItem>()
+        val candidates = mutableListOf<TraktWatchedProjectionCandidate>()
 
         movieItems.forEach { item ->
             val movie = item.movie ?: return@forEach
-            val id = normalizeId(movie.ids) ?: return@forEach
-            result += WatchedItem(
-                id = id,
-                type = "movie",
-                name = movie.title ?: id,
-                season = null,
-                episode = null,
-                markedAtEpochMs = rankedTimestamp(item.lastWatchedAt),
+            val contentIds = movie.ids.watchedContentIds()
+            val id = contentIds.firstOrNull() ?: return@forEach
+            candidates += TraktWatchedProjectionCandidate(
+                item = WatchedItem(
+                    id = id,
+                    type = "movie",
+                    name = movie.title ?: id,
+                    season = null,
+                    episode = null,
+                    markedAtEpochMs = rankedTimestamp(item.lastWatchedAt),
+                ),
+                contentIds = contentIds,
             )
         }
 
-        showItems.forEach { item ->
+        val showItemsWithIds = showItems.map { item -> item to item.show?.ids.watchedContentIds() }
+        val ambiguousShowIds = ambiguousTraktWatchedShowIds(
+            showItemsWithIds.map { (_, contentIds) -> contentIds },
+        )
+        showItemsWithIds.forEach { (item, contentIds) ->
             val show = item.show ?: return@forEach
-            val showId = normalizeId(show.ids) ?: return@forEach
+            val safeContentIds = contentIds.filterNot(ambiguousShowIds::contains)
+            val showId = safeContentIds.firstOrNull() ?: return@forEach
             val showName = show.title ?: showId
 
-            // Add per-episode watched entries
             item.seasons.orEmpty().forEach seasonLoop@{ season ->
                 val seasonNumber = season.number ?: return@seasonLoop
                 season.episodes.orEmpty().forEach episodeLoop@{ episode ->
                     val episodeNumber = episode.number ?: return@episodeLoop
-                    result += WatchedItem(
-                        id = showId,
-                        type = "series",
-                        name = showName,
-                        season = seasonNumber,
-                        episode = episodeNumber,
-                        markedAtEpochMs = rankedTimestamp(episode.lastWatchedAt ?: item.lastWatchedAt),
+                    if ((episode.plays ?: 1) <= 0) return@episodeLoop
+                    candidates += TraktWatchedProjectionCandidate(
+                        item = WatchedItem(
+                            id = showId,
+                            type = "series",
+                            name = showName,
+                            season = seasonNumber,
+                            episode = episodeNumber,
+                            markedAtEpochMs = rankedTimestamp(episode.lastWatchedAt ?: item.lastWatchedAt),
+                        ),
+                        contentIds = safeContentIds,
                     )
                 }
             }
         }
 
-        // Apply reverse mapping for anime: if Trakt uses absolute numbering (S1E1..S1EN)
-        // but addon uses multi-season, remap pulled episodes to addon numbering.
-        val remappedResult = mutableListOf<WatchedItem>()
-        for (item in result) {
+        val remappedCandidates = mutableListOf<TraktWatchedProjectionCandidate>()
+        for (candidate in candidates) {
+            val item = candidate.item
             if (item.season == null || item.episode == null || item.type != "series") {
-                remappedResult += item
+                remappedCandidates += candidate
                 continue
             }
             val mapped = runCatching {
@@ -105,28 +191,32 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
                 )
             }.getOrNull()
             if (mapped != null && (mapped.season != item.season || mapped.episode != item.episode)) {
-                remappedResult += item.copy(season = mapped.season, episode = mapped.episode)
+                remappedCandidates += candidate.copy(
+                    item = item.copy(season = mapped.season, episode = mapped.episode),
+                )
             } else {
-                remappedResult += item
+                remappedCandidates += candidate
             }
         }
 
-        return remappedResult
+        val projection = buildTraktWatchedProjection(remappedCandidates)
+        setExtraWatchedKeys(profileId, projection.extraWatchedKeys)
+        return projection.items
     }
+
+    override suspend fun pullExtraWatchedKeys(profileId: Int): Set<String> =
+        synchronized(extraWatchedKeysLock) { extraWatchedKeysByProfile[profileId].orEmpty() }
+
+    override fun observeExtraWatchedKeys(profileId: Int) = emptyFlow<Set<String>>()
 
     private suspend fun fetchWatchedMoviePages(headers: Map<String, String>): List<TraktWatchedMovieDto> {
         val items = mutableListOf<TraktWatchedMovieDto>()
         var page = 1
         while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
+            val response = pageClient.get(
                 url = "$BASE_URL/sync/watched/movies?page=$page&limit=$WATCHED_PAGE_LIMIT",
                 headers = headers,
-                body = "",
             )
-            if (response.status !in 200..299) {
-                error("Trakt watched movies request failed: ${response.status}")
-            }
             val pageItems = json.decodeFromString<List<TraktWatchedMovieDto>>(response.body)
             if (pageItems.isEmpty()) break
             items.addAll(pageItems)
@@ -144,15 +234,10 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
         val items = mutableListOf<TraktWatchedShowDto>()
         var page = 1
         while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
+            val response = pageClient.get(
                 url = "$BASE_URL/sync/watched/shows?page=$page&limit=$WATCHED_PAGE_LIMIT&extended=$WATCHED_SHOWS_EXTENDED",
                 headers = headers,
-                body = "",
             )
-            if (response.status !in 200..299) {
-                error("Trakt watched shows request failed: ${response.status}")
-            }
             val pageItems = json.decodeFromString<List<TraktWatchedShowDto>>(response.body)
             if (pageItems.isEmpty()) break
             items.addAll(pageItems)
@@ -505,12 +590,18 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
 
     // ── helpers ─────────────────────────────────────────────────────────
 
-    private fun normalizeId(ids: TraktSyncIdsDto?): String? {
-        if (ids == null) return null
-        ids.imdb?.takeIf { it.isNotBlank() }?.let { return it }
-        ids.tmdb?.let { return "tmdb:$it" }
-        ids.trakt?.let { return "trakt:$it" }
-        return null
+    private fun TraktSyncIdsDto?.watchedContentIds(): List<String> = traktWatchedContentIds(
+        imdb = this?.imdb,
+        tmdb = this?.tmdb,
+        tvdb = this?.tvdb,
+        trakt = this?.trakt,
+        slug = this?.slug,
+    )
+
+    private fun setExtraWatchedKeys(profileId: Int, keys: Set<String>) {
+        synchronized(extraWatchedKeysLock) {
+            extraWatchedKeysByProfile[profileId] = keys
+        }
     }
 
     private fun parseIds(rawId: String): TraktSyncIdsDto? {
@@ -524,14 +615,20 @@ object TraktWatchedSyncAdapter : TrackingWatchedProvider {
             val value = trimmed.substringAfter(':').toIntOrNull() ?: return null
             return TraktSyncIdsDto(tmdb = value)
         }
+        if (trimmed.startsWith("tvdb:", ignoreCase = true)) {
+            val value = trimmed.substringAfter(':').toIntOrNull() ?: return null
+            return TraktSyncIdsDto(tvdb = value)
+        }
         if (trimmed.startsWith("trakt:", ignoreCase = true)) {
             val value = trimmed.substringAfter(':').toIntOrNull() ?: return null
             return TraktSyncIdsDto(trakt = value)
         }
-
         val numeric = trimmed.substringBefore(':').toIntOrNull()
         if (numeric != null) {
             return TraktSyncIdsDto(trakt = numeric)
+        }
+        if (':' !in trimmed) {
+            return TraktSyncIdsDto(slug = trimmed)
         }
 
         return null

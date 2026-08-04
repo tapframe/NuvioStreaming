@@ -1,0 +1,405 @@
+name: Update AltStore sources
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-altstore-sources
+  cancel-in-progress: false
+
+env:
+  SOURCE_REPO: ${{ github.repository }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  EXPECTED_BUNDLE_ID: com.nuvio.media
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update AltStore sources
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_ID: ${{ github.event.release.id }}
+        run: |
+          python3 - <<'PY'
+          import io
+          import json
+          import os
+          import plistlib
+          import re
+          import sys
+          import time
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          REPO = os.environ["SOURCE_REPO"]
+          EXPECTED_BUNDLE_ID = os.environ["EXPECTED_BUNDLE_ID"]
+          EVENT_NAME = os.environ.get("EVENT_NAME", "")
+          RELEASE_ID = os.environ.get("RELEASE_ID", "").strip()
+
+          SOURCES = {
+              "Full": {
+                  "path": Path("NuvioFull.json"),
+                  "asset_pattern": re.compile(
+                      r"^Nuvio-v.+-Full\.ipa$", re.IGNORECASE
+                  ),
+              },
+              "Enhanced": {
+                  "path": Path("NuvioEnhanced.json"),
+                  "asset_pattern": re.compile(
+                      r"^Nuvio-v.+-Enhanced\.ipa$", re.IGNORECASE
+                  ),
+              },
+          }
+
+          API_HEADERS = {
+              "User-Agent": "nuvio-altstore-updater",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+
+          token = os.environ.get("GITHUB_TOKEN")
+          if token:
+              API_HEADERS["Authorization"] = f"Bearer {token}"
+
+
+          def request_json(url):
+              req = urllib.request.Request(url, headers=API_HEADERS)
+              with urllib.request.urlopen(req, timeout=60) as response:
+                  return json.load(response)
+
+
+          def download_asset(asset):
+              headers = dict(API_HEADERS)
+              headers["Accept"] = "application/octet-stream"
+              req = urllib.request.Request(asset["url"], headers=headers)
+              with urllib.request.urlopen(req, timeout=600) as response:
+                  return response.read()
+
+
+          def get_release():
+              if EVENT_NAME == "release" and RELEASE_ID:
+                  url = f"https://api.github.com/repos/{REPO}/releases/{RELEASE_ID}"
+              else:
+                  url = f"https://api.github.com/repos/{REPO}/releases/latest"
+
+              release = request_json(url)
+
+              if release.get("draft"):
+                  sys.exit("Draft releases are not published to AltStore sources.")
+              if release.get("prerelease"):
+                  sys.exit("Prereleases are intentionally skipped.")
+
+              return url, release
+
+
+          def find_assets(release):
+              found = {}
+              for variant, config in SOURCES.items():
+                  matches = [
+                      asset
+                      for asset in release.get("assets", [])
+                      if config["asset_pattern"].fullmatch(asset.get("name", ""))
+                  ]
+                  if len(matches) > 1:
+                      names = ", ".join(a["name"] for a in matches)
+                      sys.exit(
+                          f"Multiple {variant} IPA assets matched: {names}"
+                      )
+                  if matches:
+                      found[variant] = matches[0]
+              return found
+
+
+          def wait_for_assets(release_url, release):
+              for attempt in range(21):
+                  found = find_assets(release)
+                  missing = [name for name in SOURCES if name not in found]
+                  if not missing:
+                      return release, found
+
+                  if attempt == 20:
+                      sys.exit(
+                          "Missing required release assets after waiting: "
+                          + ", ".join(missing)
+                      )
+
+                  print(
+                      f"Waiting for assets ({', '.join(missing)} missing), "
+                      f"attempt {attempt + 1}/20..."
+                  )
+                  time.sleep(30)
+                  release = request_json(release_url)
+
+              raise AssertionError("unreachable")
+
+
+          def inspect_ipa(data):
+              with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                  plist_paths = [
+                      name
+                      for name in archive.namelist()
+                      if re.fullmatch(
+                          r"Payload/[^/]+\.app/Info\.plist", name
+                      )
+                  ]
+                  if len(plist_paths) != 1:
+                      sys.exit(
+                          "Expected exactly one main app Info.plist, found "
+                          f"{len(plist_paths)}."
+                      )
+
+                  plist = plistlib.loads(archive.read(plist_paths[0]))
+
+              metadata = {
+                  "bundleIdentifier": plist.get("CFBundleIdentifier"),
+                  "version": plist.get("CFBundleShortVersionString"),
+                  "buildVersion": plist.get("CFBundleVersion"),
+                  "minOSVersion": plist.get("MinimumOSVersion"),
+              }
+
+              missing = [
+                  key
+                  for key in ("bundleIdentifier", "version", "buildVersion")
+                  if not metadata.get(key)
+              ]
+              if missing:
+                  sys.exit(
+                      "IPA Info.plist is missing: " + ", ".join(missing)
+                  )
+
+              return {
+                  key: str(value) if value is not None else None
+                  for key, value in metadata.items()
+              }
+
+
+          def load_source(path):
+              if not path.exists():
+                  sys.exit(f"{path} is missing. Commit the seed source first.")
+
+              with path.open(encoding="utf-8") as file:
+                  source = json.load(file)
+
+              apps = source.get("apps")
+              if not isinstance(apps, list) or len(apps) != 1:
+                  sys.exit(f"{path} must contain exactly one app.")
+
+              app = apps[0]
+              if app.get("bundleIdentifier") != EXPECTED_BUNDLE_ID:
+                  sys.exit(
+                      f"{path}: expected bundleIdentifier "
+                      f"{EXPECTED_BUNDLE_ID}, found "
+                      f"{app.get('bundleIdentifier')!r}."
+                  )
+
+              return source, app
+
+
+          def update_source(variant, path, release, asset):
+              source, app = load_source(path)
+              blob = download_asset(asset)
+              metadata = inspect_ipa(blob)
+
+              if metadata["bundleIdentifier"] != EXPECTED_BUNDLE_ID:
+                  sys.exit(
+                      f"{variant} IPA bundle ID is "
+                      f"{metadata['bundleIdentifier']!r}, expected "
+                      f"{EXPECTED_BUNDLE_ID!r}."
+                  )
+
+              version = metadata["version"]
+              build_version = metadata["buildVersion"]
+              download_url = asset["browser_download_url"]
+              versions = app.get("versions") or []
+
+              required_version_fields = {
+                  "version",
+                  "buildVersion",
+                  "date",
+                  "downloadURL",
+                  "size",
+              }
+              clean_versions = []
+              removed_legacy = False
+              for index, old in enumerate(versions):
+                  missing = sorted(required_version_fields - old.keys())
+                  if missing:
+                      print(
+                          f"~ {variant}: dropping legacy versions[{index}] "
+                          f"missing {', '.join(missing)}"
+                      )
+                      removed_legacy = True
+                      continue
+                  clean_versions.append(old)
+
+              versions = clean_versions
+              app["versions"] = versions
+              current = versions[0] if versions else None
+
+              if (
+                  current
+                  and current.get("downloadURL") == download_url
+                  and current.get("version") == version
+                  and current.get("buildVersion") == build_version
+              ):
+                  if removed_legacy:
+                      with path.open("w", encoding="utf-8") as file:
+                          json.dump(source, file, indent=2, ensure_ascii=False)
+                          file.write("\n")
+                  print(
+                      f"- {variant}: already current "
+                      f"({version} build {build_version})"
+                  )
+                  return removed_legacy
+
+              if (
+                  current
+                  and current.get("downloadURL") != download_url
+                  and current.get("version") == version
+                  and current.get("buildVersion") == build_version
+              ):
+                  sys.exit(
+                      f"{variant}: asset changed but version/build remained "
+                      f"{version} ({build_version}). Increment CFBundleVersion."
+                  )
+
+              notes = (release.get("body") or "").strip()
+              if not notes:
+                  notes = f"Nuvio {variant} {version}."
+
+              entry = {
+                  "version": version,
+                  "buildVersion": build_version,
+                  "date": release["published_at"],
+                  "localizedDescription": notes[:3000],
+                  "downloadURL": download_url,
+                  "size": int(asset.get("size") or len(blob)),
+              }
+
+              if metadata.get("minOSVersion"):
+                  entry["minOSVersion"] = metadata["minOSVersion"]
+
+              history = []
+              for old in versions:
+                  same_build = (
+                      old.get("version") == version
+                      and old.get("buildVersion") == build_version
+                  )
+                  same_url = old.get("downloadURL") == download_url
+                  if not same_build and not same_url:
+                      history.append(old)
+
+              app["versions"] = [entry] + history
+
+              with path.open("w", encoding="utf-8") as file:
+                  json.dump(source, file, indent=2, ensure_ascii=False)
+                  file.write("\n")
+
+              print(
+                  f"+ {variant}: {version} build {build_version} "
+                  f"({asset['name']})"
+              )
+              return True
+
+
+          def validate_source(path):
+              with path.open(encoding="utf-8") as file:
+                  source = json.load(file)
+
+              apps = source.get("apps")
+              if not isinstance(apps, list) or len(apps) != 1:
+                  sys.exit(f"{path}: source must contain exactly one app.")
+
+              app = apps[0]
+              if app.get("bundleIdentifier") != EXPECTED_BUNDLE_ID:
+                  sys.exit(f"{path}: incorrect bundleIdentifier.")
+
+              versions = app.get("versions")
+              if not isinstance(versions, list) or not versions:
+                  sys.exit(f"{path}: versions must not be empty.")
+
+              required = {
+                  "version",
+                  "buildVersion",
+                  "date",
+                  "downloadURL",
+                  "size",
+              }
+              seen = set()
+
+              for index, version in enumerate(versions):
+                  missing = sorted(required - version.keys())
+                  if missing:
+                      sys.exit(
+                          f"{path}: versions[{index}] is missing "
+                          + ", ".join(missing)
+                      )
+
+                  key = (
+                      str(version["version"]),
+                      str(version["buildVersion"]),
+                  )
+                  if key in seen:
+                      sys.exit(
+                          f"{path}: duplicate version/build pair {key}."
+                      )
+                  seen.add(key)
+
+              print(f"✓ {path} passed validation.")
+
+
+          release_url, release = get_release()
+          release, assets = wait_for_assets(release_url, release)
+
+          changed = False
+          for variant, config in SOURCES.items():
+              changed |= update_source(
+                  variant,
+                  config["path"],
+                  release,
+                  assets[variant],
+              )
+
+          for config in SOURCES.values():
+              validate_source(config["path"])
+
+          print("Sources updated." if changed else "No source changes.")
+          PY
+
+      - name: Commit and push changes
+        run: |
+          if git diff --quiet -- NuvioFull.json NuvioEnhanced.json; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add NuvioFull.json NuvioEnhanced.json
+          git commit -m \
+            "chore: update AltStore sources $(date -u +%Y-%m-%dT%H:%MZ)"
+
+          git pull --rebase origin "$DEFAULT_BRANCH"
+          git push origin "HEAD:$DEFAULT_BRANCH"

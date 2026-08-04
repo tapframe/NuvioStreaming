@@ -6,7 +6,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.nuvio.app.MainActivity
 import kotlin.math.abs
 
 class EpisodeReleaseNotificationWorker(

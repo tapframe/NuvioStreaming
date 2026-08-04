@@ -161,6 +161,14 @@ fun SettingsScreen(
         }
         val selectedAppLanguage by remember { ThemeSettingsRepository.selectedAppLanguage }.collectAsStateWithLifecycle()
         val navBarStyle by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
+        val appIconState by remember {
+            AppIconRepository.ensureLoaded()
+            AppIconRepository.state
+        }.collectAsStateWithLifecycle()
+        val appIconScope = rememberCoroutineScope()
+        val onAppIconSelected: (AppIconOption) -> Unit = { icon ->
+            appIconScope.launch { AppIconRepository.select(icon) }
+        }
         val tmdbSettings by remember {
             TmdbSettingsRepository.ensureLoaded()
             TmdbSettingsRepository.uiState
@@ -406,6 +414,9 @@ fun SettingsScreen(
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                 tabBarBehavior = tabBarBehavior,
                 onTabBarBehaviorSelected = ThemeSettingsRepository::setTabBarBehavior,
+                appIconState = appIconState,
+                onAppIconSelected = onAppIconSelected,
+                onAppIconFailureDismissed = AppIconRepository::clearFailure,
                 selectedAppLanguage = selectedAppLanguage,
                 onAppLanguageSelected = ThemeSettingsRepository::setAppLanguage,
                 navBarStyle = navBarStyle,
@@ -471,6 +482,9 @@ fun SettingsScreen(
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                 tabBarBehavior = tabBarBehavior,
                 onTabBarBehaviorSelected = ThemeSettingsRepository::setTabBarBehavior,
+                appIconState = appIconState,
+                onAppIconSelected = onAppIconSelected,
+                onAppIconFailureDismissed = AppIconRepository::clearFailure,
                 selectedAppLanguage = selectedAppLanguage,
                 onAppLanguageSelected = ThemeSettingsRepository::setAppLanguage,
                 navBarStyle = navBarStyle,
@@ -546,6 +560,9 @@ private fun MobileSettingsScreen(
     liquidGlassNativeTabBarSupported: Boolean,
     tabBarBehavior: NuvioTabBarBehavior,
     onTabBarBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
+    appIconState: AppIconSettingsState,
+    onAppIconSelected: (AppIconOption) -> Unit,
+    onAppIconFailureDismissed: () -> Unit,
     selectedAppLanguage: AppLanguage,
     onAppLanguageSelected: (AppLanguage) -> Unit,
     navBarStyle: NavBarStyle,
@@ -760,6 +777,9 @@ private fun MobileSettingsScreen(
                     liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                     tabBarBehavior = tabBarBehavior,
                     onTabBarBehaviorSelected = onTabBarBehaviorSelected,
+                    appIconState = appIconState,
+                    onAppIconSelected = onAppIconSelected,
+                    onAppIconFailureDismissed = onAppIconFailureDismissed,
                     selectedAppLanguage = selectedAppLanguage,
                     onAppLanguageSelected = onAppLanguageSelected,
                     selectedNavBarStyle = navBarStyle,
@@ -931,6 +951,9 @@ private fun TabletSettingsScreen(
     liquidGlassNativeTabBarSupported: Boolean,
     tabBarBehavior: NuvioTabBarBehavior,
     onTabBarBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
+    appIconState: AppIconSettingsState,
+    onAppIconSelected: (AppIconOption) -> Unit,
+    onAppIconFailureDismissed: () -> Unit,
     selectedAppLanguage: AppLanguage,
     onAppLanguageSelected: (AppLanguage) -> Unit,
     navBarStyle: NavBarStyle,
@@ -1200,6 +1223,9 @@ private fun TabletSettingsScreen(
                         liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                         tabBarBehavior = tabBarBehavior,
                         onTabBarBehaviorSelected = onTabBarBehaviorSelected,
+                        appIconState = appIconState,
+                        onAppIconSelected = onAppIconSelected,
+                        onAppIconFailureDismissed = onAppIconFailureDismissed,
                         selectedAppLanguage = selectedAppLanguage,
                         onAppLanguageSelected = onAppLanguageSelected,
                         selectedNavBarStyle = navBarStyle,

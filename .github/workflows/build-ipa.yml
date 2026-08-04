@@ -1,5 +1,7 @@
 name: Build IPA
 
+run-name: Build IPA - ${{ inputs.description }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -11,6 +13,11 @@ on:
           - full
           - enhanced
         default: full
+
+      description:
+        description: Run description
+        required: true
+        type: string
 
 jobs:
   build-ipa:

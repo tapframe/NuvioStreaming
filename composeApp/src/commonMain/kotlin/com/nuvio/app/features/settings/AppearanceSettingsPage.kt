@@ -55,6 +55,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_poster_customi
 import nuvio.composeapp.generated.resources.compose_settings_page_streams
 import nuvio.composeapp.generated.resources.settings_appearance_app_language
 import nuvio.composeapp.generated.resources.settings_appearance_app_language_sheet_title
+import nuvio.composeapp.generated.resources.settings_appearance_app_icon
 import nuvio.composeapp.generated.resources.settings_appearance_tab_bar_behavior
 import nuvio.composeapp.generated.resources.settings_appearance_tab_bar_behavior_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_nav_bar_style
@@ -90,6 +91,9 @@ internal fun LazyListScope.appearanceSettingsContent(
     liquidGlassNativeTabBarSupported: Boolean,
     tabBarBehavior: NuvioTabBarBehavior,
     onTabBarBehaviorSelected: (NuvioTabBarBehavior) -> Unit,
+    appIconState: AppIconSettingsState,
+    onAppIconSelected: (AppIconOption) -> Unit,
+    onAppIconFailureDismissed: () -> Unit,
     selectedAppLanguage: AppLanguage,
     onAppLanguageSelected: (AppLanguage) -> Unit,
     selectedNavBarStyle: NavBarStyle,
@@ -156,6 +160,7 @@ internal fun LazyListScope.appearanceSettingsContent(
         var showLanguageSheet by remember { mutableStateOf(false) }
         var showNavBarStyleSheet by remember { mutableStateOf(false) }
         var showTabBarBehaviorSheet by remember { mutableStateOf(false) }
+        var showAppIconPicker by remember { mutableStateOf(false) }
         SettingsSection(
             title = stringResource(Res.string.settings_appearance_section_display),
             isTablet = isTablet,
@@ -187,6 +192,24 @@ internal fun LazyListScope.appearanceSettingsContent(
                         onClick = { showTabBarBehaviorSheet = true },
                     )
                 }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_appearance_app_icon),
+                    description = stringResource(appIconState.selected.labelResource),
+                    enabled = appIconState.pending == null,
+                    isTablet = isTablet,
+                    trailingContent = {
+                        AppIconThumbnail(
+                            icon = appIconState.selected,
+                            modifier = Modifier.size(if (isTablet) 44.dp else 40.dp),
+                            cornerRadius = if (isTablet) 11.dp else 10.dp,
+                        )
+                    },
+                    onClick = {
+                        onAppIconFailureDismissed()
+                        showAppIconPicker = true
+                    },
+                )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_language),
@@ -228,6 +251,18 @@ internal fun LazyListScope.appearanceSettingsContent(
                     showTabBarBehaviorSheet = false
                 },
                 onDismiss = { showTabBarBehaviorSheet = false },
+            )
+        }
+
+        if (showAppIconPicker) {
+            AppIconPicker(
+                isTablet = isTablet,
+                state = appIconState,
+                onSelected = onAppIconSelected,
+                onDismiss = {
+                    onAppIconFailureDismissed()
+                    showAppIconPicker = false
+                },
             )
         }
 
