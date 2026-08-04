@@ -115,6 +115,7 @@ internal fun SimklSyncSnapshot.animeAlternateWatchedKeys(): Set<String> {
     val extraKeys = linkedSetOf<String>()
     entries.forEach { entry ->
         if (entry.mediaType != SimklMediaType.ANIME) return@forEach
+        if (entry.isMovieEntry()) return@forEach
         val media = entry.media ?: return@forEach
         val contentId = media.canonicalContentId() ?: return@forEach
         val contentType = "series"
