@@ -38,6 +38,7 @@ internal data class SimklStoredAuthState(
     val tokenExpiresAtEpochMs: Long? = null,
     val pendingAuthorizationState: String? = null,
     val pendingAuthorizationStartedAtEpochMs: Long? = null,
+    val authenticationMethod: String? = null,
 ) {
     val hasPendingAuthorization: Boolean
         get() = !pendingAuthorizationState.isNullOrBlank()
