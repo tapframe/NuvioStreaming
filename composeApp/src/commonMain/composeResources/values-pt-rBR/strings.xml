@@ -763,6 +763,13 @@
     <string name="settings_playback_option_device_language">Idioma do dispositivo</string>
     <string name="settings_playback_option_forced">Forçada</string>
     <string name="settings_playback_option_none">Nenhuma</string>
+    <string name="settings_playback_addon_subtitle_startup_all">Todas as legendas</string>
+    <string name="settings_playback_addon_subtitle_startup_all_description">Busca todas antes de iniciar, mais lento</string>
+    <string name="settings_playback_addon_subtitle_startup_fast">Início rápido</string>
+    <string name="settings_playback_addon_subtitle_startup_fast_description">Início imediato, mas pode causar um breve reinício do player.</string>
+    <string name="settings_playback_addon_subtitle_startup_mode">Carregamento de legendas</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred">Idiomas preferidos</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred_description">Busca idiomas preferidos antes de iniciar</string>
     <string name="settings_playback_prefer_binge_group">Preferir Grupo de Maratona (Próximo Episódio)</string>
     <string name="settings_playback_prefer_binge_group_description">Tentar o mesmo perfil de fonte primeiro (mesmo addon/grupo de qualidade) antes das regras normais de reprodução automática.</string>
     <string name="settings_playback_reuse_binge_group">Reutilizar Grupo de Maratona</string>

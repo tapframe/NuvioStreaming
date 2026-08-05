@@ -200,51 +200,61 @@ fun SubtitleModal(
                         }
                     }
 
-                    AnimatedVisibility(
-                        visible = activeLanguageKey != SubtitleOffLanguageKey,
-                        enter = fadeIn(),
-                        exit = fadeOut(),
+                    SubtitleRail(
+                        title = stringResource(Res.string.compose_player_subtitles),
+                        width = 300.dp,
                     ) {
-                        SubtitleRail(
-                            title = stringResource(Res.string.compose_player_subtitles),
-                            width = 300.dp,
-                        ) {
-                            when {
-                                options.isEmpty() && isLoadingAddonSubtitles -> {
-                                    PlayerModalLoading(modifier = Modifier.padding(vertical = 24.dp))
-                                }
-
-                                options.isEmpty() -> {
-                                    SubtitleRailEmptyState(
-                                        text = stringResource(Res.string.compose_player_fetch_subtitles),
-                                        onClick = onFetchAddonSubtitles,
+                        when {
+                            options.isEmpty() -> {
+                                when (
+                                    subtitleOptionsRailEmptyContent(
+                                        selectedLanguageKey = activeLanguageKey,
+                                        hasAvailableLanguages = languageItems.size > 1,
+                                        isLoadingAddonSubtitles = isLoadingAddonSubtitles,
                                     )
+                                ) {
+                                    SubtitleOptionsRailEmptyContent.NONE -> {
+                                        SubtitleRailEmptyState(
+                                            text = stringResource(Res.string.compose_player_none),
+                                        )
+                                    }
+
+                                    SubtitleOptionsRailEmptyContent.LOADING -> {
+                                        PlayerModalLoading(modifier = Modifier.padding(vertical = 24.dp))
+                                    }
+
+                                    SubtitleOptionsRailEmptyContent.FETCH -> {
+                                        SubtitleRailEmptyState(
+                                            text = stringResource(Res.string.compose_player_fetch_subtitles),
+                                            onClick = onFetchAddonSubtitles,
+                                        )
+                                    }
                                 }
+                            }
 
-                                else -> {
-                                    LazyColumn(
-                                        modifier = Modifier.heightIn(max = railMaxHeight),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                        contentPadding = PaddingValues(vertical = 8.dp),
-                                    ) {
-                                        items(options, key = { it.id }) { option ->
-                                            SubtitleOptionRow(
-                                                option = option,
-                                                selected = option.id == selectedOptionId,
-                                                onClick = {
-                                                    pendingOptionId = option.id
-                                                    when (option) {
-                                                        is SubtitleSelectionOption.BuiltIn -> {
-                                                            onBuiltInTrackSelected(option.track.index)
-                                                        }
-
-                                                        is SubtitleSelectionOption.Addon -> {
-                                                            onAddonSubtitleSelected(option.subtitle)
-                                                        }
+                            else -> {
+                                LazyColumn(
+                                    modifier = Modifier.heightIn(max = railMaxHeight),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    contentPadding = PaddingValues(vertical = 8.dp),
+                                ) {
+                                    items(options, key = { it.id }) { option ->
+                                        SubtitleOptionRow(
+                                            option = option,
+                                            selected = option.id == selectedOptionId,
+                                            onClick = {
+                                                pendingOptionId = option.id
+                                                when (option) {
+                                                    is SubtitleSelectionOption.BuiltIn -> {
+                                                        onBuiltInTrackSelected(option.track.index)
                                                     }
-                                                },
-                                            )
-                                        }
+
+                                                    is SubtitleSelectionOption.Addon -> {
+                                                        onAddonSubtitleSelected(option.subtitle)
+                                                    }
+                                                }
+                                            },
+                                        )
                                     }
                                 }
                             }
@@ -475,7 +485,7 @@ private fun SubtitleSourceChip(
 @Composable
 private fun SubtitleRailEmptyState(
     text: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
 
@@ -483,17 +493,19 @@ private fun SubtitleRailEmptyState(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .then(onClick?.let { Modifier.clickable(onClick = it) } ?: Modifier)
             .padding(horizontal = 6.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Rounded.CloudDownload,
-            contentDescription = null,
-            tint = tokens.colors.textMuted,
-            modifier = Modifier.size(20.dp),
-        )
+        if (onClick != null) {
+            Icon(
+                imageVector = Icons.Rounded.CloudDownload,
+                contentDescription = null,
+                tint = tokens.colors.textMuted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Text(
             text = text,
             color = tokens.colors.textMuted,
