@@ -28,7 +28,7 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
     entries.forEach { entry ->
         val media = entry.media ?: return@forEach
         val contentId = media.canonicalContentId() ?: return@forEach
-        val contentType = if (entry.mediaType == SimklMediaType.MOVIES) "movie" else "series"
+        val contentType = if (entry.isMovieEntry()) "movie" else "series"
         val title = media.title?.takeIf(String::isNotBlank) ?: contentId
         val poster = entry.resolvedPosterUrl()
         val trackingProviderItemId = media.simklTrackingProviderItemId()
@@ -37,7 +37,7 @@ internal fun SimklSyncSnapshot.toSimklWatchedProjection(): SimklWatchedProjectio
             ?: parseSimklUtcEpochMs(entry.addedToWatchlistAt)
             ?: 0L
 
-        if (entry.mediaType == SimklMediaType.MOVIES) {
+        if (entry.isMovieEntry()) {
             if (entry.lastWatchedAt != null || entry.status == SimklListStatus.COMPLETED) {
                 watchedItems += WatchedItem(
                     id = contentId,
@@ -115,6 +115,7 @@ internal fun SimklSyncSnapshot.animeAlternateWatchedKeys(): Set<String> {
     val extraKeys = linkedSetOf<String>()
     entries.forEach { entry ->
         if (entry.mediaType != SimklMediaType.ANIME) return@forEach
+        if (entry.isMovieEntry()) return@forEach
         val media = entry.media ?: return@forEach
         val contentId = media.canonicalContentId() ?: return@forEach
         val contentType = "series"
@@ -150,7 +151,7 @@ internal fun SimklSyncSnapshot.animeAlternateWatchedKeys(): Set<String> {
 internal fun SimklSyncSnapshot.movieAlternateWatchedKeys(): Set<String> {
     val extraKeys = linkedSetOf<String>()
     entries.forEach { entry ->
-        if (entry.mediaType != SimklMediaType.MOVIES) return@forEach
+        if (!entry.isMovieEntry()) return@forEach
         if (entry.lastWatchedAt == null && entry.status != SimklListStatus.COMPLETED) return@forEach
         val media = entry.media ?: return@forEach
         val contentId = media.canonicalContentId() ?: return@forEach
@@ -379,7 +380,8 @@ internal fun parseSimklUtcEpochMs(value: String?): Long? {
 internal fun SimklPlaybackSession.toWatchProgressEntry(): WatchProgressEntry? {
     val media = media ?: return null
     val parentId = media.canonicalContentId() ?: return null
-    val isMovie = mediaType == SimklMediaType.MOVIES
+    val isMovie = mediaType == SimklMediaType.MOVIES ||
+        (mediaType == SimklMediaType.ANIME && episode == null)
     val season = episode?.tvdbSeason ?: episode?.season
     val episodeNumber = episode?.tvdbNumber ?: episode?.number
     if (!isMovie && episodeNumber == null) return null

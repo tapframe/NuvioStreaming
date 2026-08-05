@@ -667,6 +667,13 @@
     <string name="settings_playback_option_device_language">Gerätesprache</string>
     <string name="settings_playback_option_forced">Erzwungen</string>
     <string name="settings_playback_option_none">Keine</string>
+    <string name="settings_playback_addon_subtitle_startup_all">Alle Addon-Untertitel</string>
+    <string name="settings_playback_addon_subtitle_startup_all_description">Alle Add-on-Untertitel vor der Wiedergabe vorab laden und anhängen. Langsamster Start.</string>
+    <string name="settings_playback_addon_subtitle_startup_fast">Schneller Start</string>
+    <string name="settings_playback_addon_subtitle_startup_fast_description">Wiedergabe sofort starten. Durch die Auswahl von Addon-Untertiteln wird der Player möglicherweise einmal neu geladen.</string>
+    <string name="settings_playback_addon_subtitle_startup_mode">Addon-Untertitel laden</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred">Bevorzugte Sprachen</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred_description">Add-on-Untertitel vor der Wiedergabe vorab laden und bevorzugte/sekundäre Sprachspuren anhängen.</string>
     <string name="settings_playback_prefer_binge_group">Binge-Gruppe bevorzugen</string>
     <string name="settings_playback_prefer_binge_group_description">Bei automatischer Wiedergabe einen Stream aus derselben Binge-Gruppe wie den aktuellen bevorzugen.</string>
     <string name="settings_playback_preferred_audio_language">Bevorzugte Audiosprache</string>

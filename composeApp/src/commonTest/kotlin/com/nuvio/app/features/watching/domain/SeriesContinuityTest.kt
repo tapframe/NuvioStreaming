@@ -286,6 +286,26 @@ class SeriesContinuityTest {
     }
 
     @Test
+    fun nextReleasedEpisodeAfter_keeps_dated_unavailable_episode_on_release_day() {
+        val episodes = listOf(
+            WatchingReleasedEpisode(videoId = "s1e1", seasonNumber = 1, episodeNumber = 1, title = "Episode 1", releasedDate = "2026-07-01"),
+            WatchingReleasedEpisode(videoId = "s1e2", seasonNumber = 1, episodeNumber = 2, title = "Episode 2", releasedDate = "2026-07-12T20:00:00", available = false),
+        )
+
+        val nextEpisode = nextReleasedEpisodeAfter(
+            content = show,
+            episodes = episodes,
+            seasonNumber = 1,
+            episodeNumber = 1,
+            todayIsoDate = "2026-07-12",
+            showUnairedNextUp = true,
+        )
+
+        assertNotNull(nextEpisode)
+        assertEquals("s1e2", nextEpisode.videoId)
+    }
+
+    @Test
     fun decideSeriesPrimaryAction_falls_back_to_specials_when_no_main_season() {
         val specialsOnly = listOf(
             WatchingReleasedEpisode(videoId = "sp1", seasonNumber = 0, episodeNumber = 1, title = "Special 1", releasedDate = "2026-01-01"),

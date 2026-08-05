@@ -73,7 +73,7 @@ internal class PlayerScreenRuntime(
     var watchProgressUiState: WatchProgressUiState = WatchProgressUiState()
     var liveTvUiState: LiveTvUiState = LiveTvUiState()
     var sourceStreamsState by mutableStateOf(StreamsUiState())
-    var episodeStreamsRepoState: StreamsUiState = StreamsUiState()
+    var episodeStreamsRepoState by mutableStateOf(StreamsUiState())
     var metaUiState: MetaDetailsUiState = MetaDetailsUiState()
     var addonsUiState: AddonsUiState = AddonsUiState()
     var addonSubtitles: List<AddonSubtitle> = emptyList()
