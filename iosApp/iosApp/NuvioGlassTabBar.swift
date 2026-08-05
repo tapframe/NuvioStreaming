@@ -32,11 +32,15 @@ struct NuvioGlassTabBar: View {
 
     private static let barGlassID = "nuvio.tabbar"
 
-    static let portraitBottomInset: CGFloat = 12
-    static let landscapeBottomInset: CGFloat = 6
+    static let portraitBottomInset: CGFloat = 20
+    static let landscapeBottomInset: CGFloat = 16
 
     var bottomInset: CGFloat {
-        verticalSizeClass == .compact ? Self.landscapeBottomInset : Self.portraitBottomInset
+        isCompactLayout ? Self.landscapeBottomInset : Self.portraitBottomInset
+    }
+
+    private var isCompactLayout: Bool {
+        verticalSizeClass == .compact
     }
 
     private var isExpanded: Bool {
@@ -71,23 +75,26 @@ struct NuvioGlassTabBar: View {
         return Button {
             handleTap(on: tab)
         } label: {
-            VStack(spacing: 3) {
-                icon(for: tab, selected: selected)
-
-                if isExpanded {
-                    Text(appCoordinator.title(for: tab))
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .foregroundStyle(
-                            selected ? AnyShapeStyle(Color(uiColor: iconStore.accentColor)) : AnyShapeStyle(.secondary)
-                        )
-                        .legibleOverGlass(enabled: !selected)
+            Group {
+                if isCompactLayout {
+                    HStack(spacing: 6) {
+                        icon(for: tab, selected: selected)
+                        if isExpanded {
+                            label(for: tab, selected: selected)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 3) {
+                        icon(for: tab, selected: selected)
+                        if isExpanded {
+                            label(for: tab, selected: selected)
+                        }
+                    }
                 }
             }
-            .padding(.vertical, 7)
-            .padding(.horizontal, isExpanded ? 4 : 10)
-            .frame(maxWidth: isExpanded ? .infinity : nil)
+            .padding(.vertical, isCompactLayout ? 6 : 7)
+            .padding(.horizontal, isCompactLayout ? 12 : (isExpanded ? 4 : 10))
+            .frame(maxWidth: (isExpanded && !isCompactLayout) ? .infinity : nil)
             .background {
                 if selected && isExpanded {
                     Color.clear.glassEffect(.regular, in: Capsule())
@@ -98,6 +105,17 @@ struct NuvioGlassTabBar: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text(appCoordinator.title(for: tab)))
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private func label(for tab: NuvioAppTab, selected: Bool) -> some View {
+        Text(appCoordinator.title(for: tab))
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .foregroundStyle(
+                selected ? AnyShapeStyle(Color(uiColor: iconStore.accentColor)) : AnyShapeStyle(Color.white)
+            )
+            .legibleOverGlass(enabled: !selected)
     }
 
     private func icon(for tab: NuvioAppTab, selected: Bool) -> some View {
@@ -120,7 +138,7 @@ struct NuvioGlassTabBar: View {
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white)
             }
         }
         .frame(width: 24, height: 24)
