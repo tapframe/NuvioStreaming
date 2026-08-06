@@ -14,6 +14,7 @@ class SyncManagerTest {
     fun `source prerequisites finish before source dependent pulls`() = runBlocking {
         val events = mutableListOf<String>()
         var profileSettingsApplied = false
+        var credentialsApplied = false
 
         runOrderedProfileSync(
             profileId = 7,
@@ -27,12 +28,19 @@ class SyncManagerTest {
                     profileSettingsApplied = true
                     events += "settings:end"
                 },
+                syncProviderCredentials = {
+                    assertTrue(profileSettingsApplied)
+                    credentialsApplied = true
+                    events += "credentials"
+                },
                 pullLibrary = {
                     assertTrue(profileSettingsApplied)
+                    assertTrue(credentialsApplied)
                     events += "library"
                 },
                 refreshActiveWatchSource = {
                     assertTrue(profileSettingsApplied)
+                    assertTrue(credentialsApplied)
                     events += "active-watch-source"
                 },
                 pullCollections = { events += "collections" },
@@ -42,6 +50,7 @@ class SyncManagerTest {
         )
 
         val lastPrerequisite = events.indexOf("settings:end")
+        assertTrue(events.indexOf("credentials") > lastPrerequisite)
         assertTrue(events.indexOf("library") > lastPrerequisite)
         assertTrue(events.indexOf("active-watch-source") > lastPrerequisite)
         assertEquals(1, events.count { it == "active-watch-source" })
@@ -60,6 +69,7 @@ class SyncManagerTest {
 
         assertTrue("plugins" !in events)
         assertTrue(events.indexOf("settings") < events.indexOf("library"))
+        assertTrue(events.indexOf("credentials") < events.indexOf("library"))
         assertTrue(events.indexOf("settings") < events.indexOf("active-watch-source"))
     }
 
@@ -169,6 +179,7 @@ class SyncManagerTest {
             pullAddons = { events += "addons" },
             pullPlugins = { events += "plugins" },
             pullProfileSettings = { events += "settings" },
+            syncProviderCredentials = { events += "credentials" },
             pullLibrary = { events += "library" },
             refreshActiveWatchSource = { events += "active-watch-source" },
             pullCollections = { events += "collections" },
