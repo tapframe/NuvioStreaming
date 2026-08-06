@@ -973,13 +973,13 @@
     <string name="settings_playback_option_original_hint">Requires TMDB enrichment to be enabled</string>
     <string name="settings_playback_option_forced">Forced</string>
     <string name="settings_playback_option_none">None</string>
-    <string name="settings_playback_addon_subtitle_startup_all">All subtitles</string>
-    <string name="settings_playback_addon_subtitle_startup_all_description">Fetch and show every addon subtitle for the video.</string>
+    <string name="settings_playback_addon_subtitle_startup_all">All addon subtitles</string>
+    <string name="settings_playback_addon_subtitle_startup_all_description">Prefetch and attach all addon subtitles before playback. Slowest startup.</string>
     <string name="settings_playback_addon_subtitle_startup_fast">Fast startup</string>
-    <string name="settings_playback_addon_subtitle_startup_fast_description">Skip automatic addon subtitle fetch until you request it in the player.</string>
-    <string name="settings_playback_addon_subtitle_startup_mode">Addon Subtitle Startup</string>
-    <string name="settings_playback_addon_subtitle_startup_preferred">Preferred only</string>
-    <string name="settings_playback_addon_subtitle_startup_preferred_description">Fetch addon subtitles, but only show preferred-language matches.</string>
+    <string name="settings_playback_addon_subtitle_startup_fast_description">Start playback immediately. Selecting addon subtitles may reload the player once.</string>
+    <string name="settings_playback_addon_subtitle_startup_mode">Addon Subtitle Loading</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred">Preferred languages</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred_description">Prefetch addon subtitles before playback and attach preferred/secondary language tracks.</string>
     <string name="settings_playback_prefer_binge_group">Prefer Binge Group (Next Episode)</string>
     <string name="settings_playback_prefer_binge_group_description">Try the same source profile first (same addon/quality group) before normal auto-play rules.</string>
     <string name="settings_playback_reuse_binge_group">Reuse Binge Group</string>
@@ -2072,11 +2072,11 @@
     <string name="updates_release_missing_title">Release has no tag or name</string>
     <!-- Continue Watching air date display -->
     <string name="cw_airs_date">Airs %1$s</string>
-    <string name="cw_airs_today">Airs today</string>
-    <string name="cw_airs_tomorrow">Airs tomorrow</string>
+    <string name="cw_airs_today">Airs Today</string>
+    <string name="cw_airs_tomorrow">Airs Tomorrow</string>
     <plurals name="cw_airs_in_days">
-        <item quantity="one">Airs in %1$d day</item>
-        <item quantity="other">Airs in %1$d days</item>
+        <item quantity="one">Airs in %1$d Day</item>
+        <item quantity="other">Airs in %1$d Days</item>
     </plurals>
     <string name="cw_airs_date_short">%1$s</string>
     <string name="cw_airs_today_short">Today</string>

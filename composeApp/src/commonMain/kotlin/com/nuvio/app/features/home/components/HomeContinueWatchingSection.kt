@@ -638,12 +638,12 @@ private fun ContinueWatchingCard(
         )
     }
     val todayIsoDate = CurrentDateProvider.todayIsoDate()
-    val compactAirDateText = if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
-        computeAirDateBadgeText(item.released, todayIsoDate, compact = true)
+    val airDateText = if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
+        computeAirDateBadgeText(item.released, todayIsoDate)
     } else {
         null
     }
-    val preferBackdropForNextUp = item.isNextUp && compactAirDateText != null && !item.isReleaseAlert
+    val preferBackdropForNextUp = item.isNextUp && airDateText != null && !item.isReleaseAlert
     val imageUrl = item.continueWatchingCardArtworkUrl(
         useEpisodeThumbnails = useEpisodeThumbnails,
         preferBackdropForNextUp = preferBackdropForNextUp,
@@ -654,8 +654,8 @@ private fun ContinueWatchingCard(
     } else {
         null
     }
-    val episodeTitle = item.episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: compactAirDateText
-    val badgeText = continueWatchingCardBadgeText(item = item, compactAirDateText = compactAirDateText)
+    val episodeTitle = item.episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: airDateText
+    val badgeText = continueWatchingCardBadgeText(item = item, airDateText = airDateText)
     val backgroundColor = MaterialTheme.colorScheme.background
     val badgeBackground = when {
         item.isNewSeasonRelease -> ContinueWatchingNewSeasonBadgeColor
@@ -800,7 +800,7 @@ private fun ContinueWatchingCard(
 @Composable
 private fun continueWatchingCardBadgeText(
     item: ContinueWatchingItem,
-    compactAirDateText: String?,
+    airDateText: String?,
 ): String {
     if (item.progressFraction > 0f) {
         if (item.durationMs <= 0L) {
@@ -827,7 +827,7 @@ private fun continueWatchingCardBadgeText(
     return when {
         item.isReleaseAlert && item.isNewSeasonRelease -> stringResource(Res.string.cw_new_season)
         item.isReleaseAlert -> stringResource(Res.string.cw_new_episode)
-        compactAirDateText != null -> compactAirDateText
+        airDateText != null -> airDateText
         else -> stringResource(Res.string.home_continue_watching_up_next)
     }
 }
@@ -903,7 +903,7 @@ private fun ContinueWatchingWideCard(
                                 else stringResource(Res.string.cw_new_episode)
                             }
                             else -> {
-                                computeAirDateBadgeText(item.released, todayIsoDate, compact = isCompact)
+                                computeAirDateBadgeText(item.released, todayIsoDate)
                                     ?: stringResource(Res.string.home_continue_watching_up_next)
                             }
                         }
@@ -1018,7 +1018,7 @@ private fun ContinueWatchingPosterCard(
                             else stringResource(Res.string.cw_new_episode)
                         }
                         else -> {
-                            computeAirDateBadgeText(item.released, todayIsoDate, compact = true)
+                            computeAirDateBadgeText(item.released, todayIsoDate)
                                 ?: stringResource(Res.string.home_continue_watching_up_next)
                         }
                     }
