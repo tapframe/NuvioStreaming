@@ -69,7 +69,7 @@ class SimklProjectionsTest {
             "https://simkl.com/movies/53536/terminator-3-rise-of-the-machines",
             item.trackingSourceUrl,
         )
-        assertTrue(item.poster.orEmpty().contains("simkl.in/posters/12/poster_ca.webp"))
+        assertTrue(item.poster.orEmpty().contains("simkl.in/posters/12/poster_m.webp"))
         assertFalse(item.poster.orEmpty().contains("_w.webp"))
         assertEquals(1_700_000_000_000L, item.savedAtEpochMs)
         assertEquals(
@@ -212,7 +212,7 @@ class SimklProjectionsTest {
         assertEquals("simkl", entry.trackingProviderId)
         assertEquals("simkl:39687", entry.trackingProviderItemId)
         assertEquals("https://simkl.com/tv/39687", entry.trackingSourceUrl)
-        assertTrue(entry.poster.orEmpty().contains("simkl.in/posters/12/poster_ca.webp"))
+        assertTrue(entry.poster.orEmpty().contains("simkl.in/posters/12/poster_m.webp"))
         assertFalse(entry.isCompleted)
         assertEquals(1_714_515_180_250L, entry.lastUpdatedEpochMs)
     }

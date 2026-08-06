@@ -334,7 +334,7 @@ internal fun simklPosterUrl(path: String?): String? =
         ?.trim()
         ?.trim('/')
         ?.takeIf(String::isNotBlank)
-        ?.let { normalized -> "https://wsrv.nl/?url=https://simkl.in/posters/${normalized}_ca.webp&q=90" }
+        ?.let { normalized -> "https://wsrv.nl/?url=https://simkl.in/posters/${normalized}_m.webp&q=90" }
 
 internal fun SimklLibraryEntry.resolvedPosterUrl(): String? =
     simklPosterUrl(media?.poster) ?: localPosterUrl?.trim()?.takeIf(String::isNotBlank)
