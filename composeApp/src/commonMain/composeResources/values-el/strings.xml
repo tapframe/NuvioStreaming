@@ -1181,6 +1181,10 @@
     <string name="library_trakt_empty_title">Η βιβλιοθήκη Trakt σας είναι κενή</string>
     <string name="library_trakt_load_failed">Αδυναμία φόρτωσης βιβλιοθήκης Trakt</string>
     <string name="library_trakt_title">Βιβλιοθήκη Trakt</string>
+    <string name="library_simkl_empty_message">Προσθέστε τίτλους στη λίστα «Προγραμματισμένα για παρακολούθηση» του Simkl για να τους δείτε εδώ.</string>
+    <string name="library_simkl_empty_title">Η λίστα παρακολούθησης Simkl σας είναι κενή</string>
+    <string name="library_simkl_load_failed">Αδυναμία φόρτωσης λίστας παρακολούθησης Simkl</string>
+    <string name="library_simkl_title">Λίστα παρακολούθησης Simkl</string>
     <string name="media_anime">Anime</string>
     <string name="media_channels">Κανάλια</string>
     <string name="media_movies">Ταινίες</string>
