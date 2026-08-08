@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="about_supporters_contributors_subtitle">Δημόσια αναγνώριση και συντελεστές του έργου</string>
     <string name="action_back">Πίσω</string>
@@ -223,7 +223,7 @@
     <string name="settings_appearance_section_detail_page">ΟΘΌΝΗ ΜΕΤΑΔΕΔΟΜΈΝΩΝ</string>
     <string name="compose_settings_page_notifications">Ειδοποιήσεις</string>
     <string name="compose_settings_page_playback">Αναπαραγωγή</string>
-    <string name="compose_settings_page_plugins">Πρόσθετα εφαρμογών</string>
+    <string name="compose_settings_page_plugins">Αποθετήρια πρόσθετων</string>
     <string name="compose_settings_page_poster_customization">Προσαρμογή αφίσας</string>
     <string name="compose_settings_page_privacy_policy">Πολιτική απορρήτου</string>
     <string name="compose_settings_page_root">Ρυθμίσεις</string>
@@ -2108,7 +2108,7 @@
     <string name="updates_download_file_missing">Το αρχείο ενημέρωσης που λήφθηκε λείπει.</string>
     <string name="updates_downloaded_file_missing">Το αρχείο ενημέρωσης που λήφθηκε λείπει.</string>
     <string name="updates_empty_download_body">Κενό περιεχόμενο λήψης</string>
-    <string name="updates_github_api_error">GitHub releases API Σφάλμα: %1$d</string>
+    <string name="updates_github_api_error">Σφάλμα API GitHub releases: %1$d</string>
     <string name="updates_no_channel_release">Δεν έχει δημοσιευθεί ακόμα κάποια ενημέρωση.</string>
     <string name="updates_release_missing_title">Η έκδοση κυκλοφορίας δεν έχει ετικέτα ή όνομα</string>
     <plurals name="entity_browse_title_count">
