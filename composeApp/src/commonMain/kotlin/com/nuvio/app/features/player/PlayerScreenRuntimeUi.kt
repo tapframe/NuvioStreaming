@@ -462,7 +462,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             useCustomSubtitles = false
             persistInternalSubtitlePreference(subtitleTracks.firstOrNull { it.index == index })
             if (wasCustom) {
-                playerController?.clearExternalSubtitleAndSelect(index)
+                playerController?.selectSubtitleTrackPreservingExternal(index)
             } else {
                 playerController?.selectSubtitleTrack(index)
             }
@@ -472,7 +472,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             selectedSubtitleIndex = -1
             useCustomSubtitles = true
             persistAddonSubtitlePreference(addon)
-            playerController?.setSubtitleUri(addon.url)
+            playerController?.selectAddonSubtitle(addon)
         },
         onFetchAddonSubtitles = { fetchAddonSubtitlesForActiveItem() },
         onSubtitleStyleChanged = PlayerSettingsRepository::setSubtitleStyle,
