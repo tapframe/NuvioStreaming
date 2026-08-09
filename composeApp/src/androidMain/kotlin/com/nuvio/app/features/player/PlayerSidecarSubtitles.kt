@@ -207,14 +207,18 @@ internal fun parseSidecarTimedCuesRobust(rawText: String, sourceUrl: String): Si
         }
     }
 
-    val lenient = parseSidecarTimedCuesLenient(cleaned, sourceUrl)
+    val sniffedMime = PlayerSubtitleUtils.sniffSubtitleMimeType(cleaned, sourceUrl)
+    val lenient = if (sniffedMime == MimeTypes.TEXT_SSA || sniffedMime == MimeTypes.APPLICATION_TTML) {
+        emptyList()
+    } else {
+        parseSidecarTimedCuesLenient(cleaned, sourceUrl)
+    }
     if (lenient.isNotEmpty()) {
-        val mime = PlayerSubtitleUtils.sniffSubtitleMimeType(cleaned, sourceUrl)
         val fixed = PlayerSubtitleRtlFix.fixTimedCues(lenient, isBuiltInSubtitle = false)
-        val normalized = if (mime == MimeTypes.TEXT_VTT) normalizeTimedCuePositions(fixed) else fixed
+        val normalized = if (sniffedMime == MimeTypes.TEXT_VTT) normalizeTimedCuePositions(fixed) else fixed
         return SidecarParseResult(
             normalized,
-            mime,
+            sniffedMime,
             source = "lenient"
         )
     }
