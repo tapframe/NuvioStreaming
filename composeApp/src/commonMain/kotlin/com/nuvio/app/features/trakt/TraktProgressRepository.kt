@@ -48,9 +48,6 @@ private const val TRAKT_COMPLETION_PERCENT_THRESHOLD = 90f
 private const val HISTORY_PAGE_LIMIT = 1000
 private const val HISTORY_MAX_PAGES = 5
 private const val HISTORY_MAX_PAGES_ALL = 20
-private const val WATCHED_PAGE_LIMIT = 250
-private const val WATCHED_MAX_PAGES = 1_000
-private const val WATCHED_SHOWS_EXTENDED = "progress"
 private const val MAX_RECENT_EPISODE_HISTORY_ENTRIES = 300
 private const val METADATA_FETCH_TIMEOUT_MS = 3_500L
 private const val METADATA_FETCH_CONCURRENCY = 5
@@ -807,7 +804,7 @@ object TraktProgressRepository {
     ): List<WatchProgressEntry> = withContext(Dispatchers.Default) {
         ContinueWatchingPreferencesRepository.ensureLoaded()
         val useFurthestEpisode = ContinueWatchingPreferencesRepository.uiState.value.upNextFromFurthestEpisode
-        val watchedShows = fetchWatchedShowPages(headers)
+        val watchedShows = TraktWatchedShowSnapshotRepository.get(headers)
         updateWatchedShowCaches(watchedShows)
         val mapped = fixAmbiguousWatchedShowSeeds(
             watchedShows.mapNotNull { item ->
@@ -821,39 +818,11 @@ object TraktProgressRepository {
         mapped
     }
 
-    private suspend fun fetchWatchedShowPages(
-        headers: Map<String, String>,
-    ): List<TraktWatchedShowItem> {
-        val items = mutableListOf<TraktWatchedShowItem>()
-        var page = 1
-        while (page <= WATCHED_MAX_PAGES) {
-            val response = httpRequestRaw(
-                method = "GET",
-                url = "$BASE_URL/sync/watched/shows?page=$page&limit=$WATCHED_PAGE_LIMIT&extended=$WATCHED_SHOWS_EXTENDED",
-                headers = headers,
-                body = "",
-            )
-            if (response.status !in 200..299) {
-                error("Trakt watched shows request failed: ${response.status}")
-            }
-            val pageItems = json.decodeFromString<List<TraktWatchedShowItem>>(response.body)
-            if (pageItems.isEmpty()) break
-            items.addAll(pageItems)
-            val pageCount = response.headerInt("x-pagination-page-count")
-            if (pageCount != null && page >= pageCount) break
-            page += 1
-        }
-        if (page > WATCHED_MAX_PAGES) {
-            error("Trakt watched shows exceeded max pages")
-        }
-        return items
-    }
-
-    private fun updateWatchedShowCaches(items: List<TraktWatchedShowItem>) {
+    private fun updateWatchedShowCaches(items: List<TraktWatchedShowSnapshotItem>) {
         val siblingsMap = mutableMapOf<String, MutableSet<String>>()
 
         items.forEach { item ->
-            val keys = watchedShowLookupKeys(item.show?.ids)
+            val keys = watchedShowLookupKeys(item.show?.ids?.toExternalIds())
             if (keys.size <= 1) return@forEach
             for (key in keys) {
                 val existing = siblingsMap[key]
@@ -874,7 +843,7 @@ object TraktProgressRepository {
         val pathIdsByKey = mutableMapOf<String, String>()
 
         items.forEach { item ->
-            val ids = item.show?.ids ?: return@forEach
+            val ids = item.show?.ids?.toExternalIds() ?: return@forEach
             val keys = watchedShowLookupKeys(ids).filter { it !in ambiguousIds }
             if (keys.isEmpty()) return@forEach
 
@@ -1439,11 +1408,11 @@ object TraktProgressRepository {
     }
 
     private fun mapWatchedShowSeed(
-        item: TraktWatchedShowItem,
+        item: TraktWatchedShowSnapshotItem,
         useFurthestEpisode: Boolean,
     ): WatchProgressEntry? {
         val show = item.show ?: return null
-        val parentMetaId = normalizeTraktContentId(show.ids, fallback = show.title)
+        val parentMetaId = normalizeTraktContentId(show.ids?.toExternalIds(), fallback = show.title)
         if (parentMetaId.isBlank()) return null
 
         val completedEpisode = item.seasons.orEmpty()
@@ -1633,26 +1602,6 @@ private data class TraktHistoryEpisodeItem(
 private data class TraktHistoryMovieItem(
     @SerialName("watched_at") val watchedAt: String? = null,
     @SerialName("movie") val movie: TraktMedia? = null,
-)
-
-@Serializable
-private data class TraktWatchedShowItem(
-    @SerialName("last_watched_at") val lastWatchedAt: String? = null,
-    @SerialName("show") val show: TraktMedia? = null,
-    @SerialName("seasons") val seasons: List<TraktWatchedShowSeason>? = null,
-)
-
-@Serializable
-private data class TraktWatchedShowSeason(
-    @SerialName("number") val number: Int? = null,
-    @SerialName("episodes") val episodes: List<TraktWatchedShowEpisode>? = null,
-)
-
-@Serializable
-private data class TraktWatchedShowEpisode(
-    @SerialName("number") val number: Int? = null,
-    @SerialName("plays") val plays: Int? = null,
-    @SerialName("last_watched_at") val lastWatchedAt: String? = null,
 )
 
 private data class TraktWatchedShowEpisodeSeed(
