@@ -103,6 +103,11 @@ internal fun extraWatchedKeysChanged(
     current: Set<String>,
 ): Boolean = previous.orEmpty() != current
 
+private const val maxRestorableWatchedPayloadChars = 4 * 1024 * 1024
+
+internal fun shouldRestoreWatchedPayload(payloadLength: Int): Boolean =
+    payloadLength <= maxRestorableWatchedPayloadChars
+
 object WatchedRepository {
     private data class WatchedRefreshOperation(
         val profileId: Int,
@@ -122,7 +127,7 @@ object WatchedRepository {
     private val log = Logger.withTag("WatchedRepository")
     private val json = Json {
         ignoreUnknownKeys = true
-        encodeDefaults = true
+        encodeDefaults = false
     }
 
     private val _uiState = MutableStateFlow(WatchedUiState())
@@ -229,9 +234,14 @@ object WatchedRepository {
 
         val payload = WatchedStorage.loadPayload(profileId).orEmpty().trim()
         if (payload.isNotEmpty()) {
-            val storedPayload = runCatching {
-                json.decodeFromString<StoredWatchedPayload>(payload)
-            }.getOrDefault(StoredWatchedPayload())
+            val storedPayload = if (shouldRestoreWatchedPayload(payload.length)) {
+                runCatching {
+                    json.decodeFromString<StoredWatchedPayload>(payload)
+                }.getOrDefault(StoredWatchedPayload())
+            } else {
+                WatchedStorage.savePayload(profileId, "")
+                StoredWatchedPayload()
+            }
             lastSuccessfulPushEpochMs = storedPayload.lastSuccessfulPushEpochMs
             deltaCursorEventId = storedPayload.deltaCursorEventId
             deltaInitialized = storedPayload.deltaInitialized
@@ -245,7 +255,7 @@ object WatchedRepository {
                 nuvioItems.putAll(restoredItems)
                 dirtyNuvioKeys += storedPayload.dirtyWatchedKeys.filter { key -> key in restoredItems }
                 restoredProviderPayloads.forEach { (providerId, providerPayload) ->
-                    val providerItemsByKey = providerPayload.items
+                    val providerItemsByKey = (providerPayload.items + expandProviderWatchedItems(providerPayload.itemGroups))
                         .map(WatchedItem::normalizedMarkedAt)
                         .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
                     providerItems[providerId] = providerItemsByKey.toMutableMap()
@@ -257,7 +267,8 @@ object WatchedRepository {
             expandedSiblingKeys = storedPayload.expandedSiblingKeys
             restoredProviderPayloads.forEach { (providerId, providerPayload) ->
                 providerFullyWatchedSeriesKeys[providerId] = providerPayload.fullyWatchedSeriesKeys
-                providerExtraWatchedKeys[providerId] = providerPayload.extraWatchedKeys
+                providerExtraWatchedKeys[providerId] =
+                    providerPayload.extraWatchedKeys + expandExtraWatchedKeys(providerPayload.extraWatchedKeyGroups)
             }
             loadedProviders += restoredProviderPayloads.keys
         } else {
@@ -923,8 +934,8 @@ object WatchedRepository {
         meta: MetaDetails,
         todayIsoDate: String,
         isEpisodeWatched: (MetaVideo) -> Boolean = { episode ->
-            val key = watchedItemKey(meta.type, meta.id, episode.season, episode.episode)
-            if (key in _uiState.value.watchedKeys) {
+            val keys = watchedItemKeys(meta.type, meta.id, episode.season, episode.episode)
+            if (keys.any(_uiState.value.watchedKeys::contains)) {
                 true
             } else {
                 val episodeNumber = episode.episode
@@ -939,15 +950,30 @@ object WatchedRepository {
     ): Boolean {
         if (!meta.type.isSeriesLikeWatchedType()) return false
 
-        ensureLoaded()
-        val shouldMarkSeriesWatched = meta.hasWatchedAllMainSeasonEpisodes(todayIsoDate) { episode ->
-            isEpisodeWatched(episode) || isEpisodeCompleted(episode)
-        }
-        updateFullyWatchedSeriesKey(
-            key = watchedItemKey(meta.type, meta.id),
-            isFullyWatched = shouldMarkSeriesWatched,
+        val shouldMarkSeriesWatched = calculateFullyWatchedSeriesState(
+            meta = meta,
+            todayIsoDate = todayIsoDate,
+            isEpisodeWatched = isEpisodeWatched,
+            isEpisodeCompleted = isEpisodeCompleted,
+        )
+        updateFullyWatchedSeriesStates(
+            mapOf(watchedItemKey(meta.type, meta.id) to shouldMarkSeriesWatched),
         )
         return shouldMarkSeriesWatched
+    }
+
+    internal fun calculateFullyWatchedSeriesState(
+        meta: MetaDetails,
+        todayIsoDate: String,
+        isEpisodeWatched: (MetaVideo) -> Boolean,
+        isEpisodeCompleted: (MetaVideo) -> Boolean,
+    ): Boolean {
+        if (!meta.type.isSeriesLikeWatchedType()) return false
+
+        ensureLoaded()
+        return meta.hasWatchedAllMainSeasonEpisodes(todayIsoDate) { episode ->
+            isEpisodeWatched(episode) || isEpisodeCompleted(episode)
+        }
     }
 
     fun updateFullyWatchedSeries(
@@ -967,9 +993,19 @@ object WatchedRepository {
         key: String,
         isFullyWatched: Boolean,
     ) {
+        updateFullyWatchedSeriesStates(mapOf(key to isFullyWatched))
+    }
+
+    internal fun updateFullyWatchedSeriesStates(states: Map<String, Boolean>) {
+        if (states.isEmpty()) return
+        ensureLoaded()
         val source = activeSource
         val current = fullyWatchedSeriesKeysForSource(source)
-        val updated = if (isFullyWatched) current + key else current - key
+        val updated = current.toMutableSet().apply {
+            states.forEach { (key, isFullyWatched) ->
+                if (isFullyWatched) add(key) else remove(key)
+            }
+        }
         if (updated == current) return
         setFullyWatchedSeriesKeysForSource(source = source, keys = updated)
         publish()
@@ -977,6 +1013,7 @@ object WatchedRepository {
     }
 
     fun setExpandedFullyWatchedSeriesKeys(keys: Set<String>) {
+        if (expandedSiblingKeys == keys) return
         expandedSiblingKeys = keys
         publish()
         persist()
@@ -1164,14 +1201,16 @@ object WatchedRepository {
                 deltaInitialized = deltaInitialized,
                 dirtyWatchedKeys = dirtyNuvioKeys.toSet(),
                 providerPayloads = providerIds.associate { providerId ->
+                    val items = providerItems[providerId]
+                        .orEmpty()
+                        .values
+                        .map(WatchedItem::normalizedMarkedAt)
                     providerId.storageId to StoredProviderWatchedPayload(
-                        items = providerItems[providerId]
-                            .orEmpty()
-                            .values
-                            .map(WatchedItem::normalizedMarkedAt)
-                            .sortedByDescending { it.markedAtEpochMs },
+                        itemGroups = compactProviderWatchedItems(items),
                         fullyWatchedSeriesKeys = providerFullyWatchedSeriesKeys[providerId].orEmpty(),
-                        extraWatchedKeys = providerExtraWatchedKeys[providerId].orEmpty(),
+                        extraWatchedKeyGroups = compactExtraWatchedKeys(
+                            providerExtraWatchedKeys[providerId].orEmpty(),
+                        ),
                         dirtyWatchedKeys = dirtyProviderKeys[providerId].orEmpty(),
                     )
                 },
