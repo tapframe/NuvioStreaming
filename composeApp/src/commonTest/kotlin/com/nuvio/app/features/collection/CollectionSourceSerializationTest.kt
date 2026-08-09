@@ -58,6 +58,59 @@ class CollectionSourceSerializationTest {
     }
 
     @Test
+    fun tmdbExclusionFiltersRoundTripAndBuildDiscoverQuery() {
+        val filters = TmdbCollectionFilters(
+            withoutGenres = "16",
+            withoutKeywords = "9715|818",
+            withoutCompanies = "420",
+            withoutWatchProviders = "8|337",
+        )
+        val collection = Collection(
+            id = "collection-1",
+            title = "Live Action",
+            folders = listOf(
+                CollectionFolder(
+                    id = "folder-1",
+                    title = "Movies",
+                    sources = listOf(
+                        CollectionSource(
+                            provider = "tmdb",
+                            tmdbSourceType = TmdbCollectionSourceType.DISCOVER.name,
+                            title = "Without Animation",
+                            mediaType = TmdbCollectionMediaType.MOVIE.name,
+                            filters = filters,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val encoded = json.encodeToString(listOf(collection))
+        val decodedSource = json.decodeFromString<List<Collection>>(encoded)
+            .single()
+            .folders
+            .single()
+            .resolvedSources
+            .single()
+        assertEquals(filters, decodedSource.filters)
+
+        val query = TmdbCollectionSourceResolver.buildDiscoverQuery(
+            source = decodedSource,
+            sourceType = TmdbCollectionSourceType.DISCOVER,
+            mediaType = TmdbCollectionMediaType.MOVIE,
+            language = "en-US",
+            page = 1,
+            filters = decodedSource.filters ?: TmdbCollectionFilters(),
+        )
+        assertEquals("16", query["without_genres"])
+        assertEquals("9715|818", query["without_keywords"])
+        assertEquals("420", query["without_companies"])
+        assertEquals("8|337", query["without_watch_providers"])
+        assertEquals("US", query["watch_region"])
+        assertFalse("with_watch_monetization_types" in query)
+    }
+
+    @Test
     fun importedTraktSourceWithoutListIdIsRejected() {
         val payload = """
             [
