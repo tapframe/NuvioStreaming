@@ -531,6 +531,10 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
     var onLongPress: (() -> Void)?
     private(set) var isHandlingLongPress = false
     private(set) var suppressesProfileSelection = false
+    func setSuppressesProfileSelection(_ enabled: Bool) {
+        suppressesProfileSelection = enabled
+    }
+
     private weak var tabBarController: UITabBarController?
     private var selectedIndexBeforeLongPress: Int?
     private let competingRecognizers = NSHashTable<UIGestureRecognizer>.weakObjects()
