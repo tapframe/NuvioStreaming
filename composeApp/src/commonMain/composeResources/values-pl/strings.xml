@@ -767,6 +767,8 @@
     <string name="settings_playback_anime_skip_description">Wyszukuj również w AnimeSkip znaczniki pomijania (wymaga ID klienta).</string>
     <string name="settings_playback_auto_play_next_episode">Automatyczne odtwarzanie następnego odcinka</string>
     <string name="settings_playback_auto_play_next_episode_description">Automatycznie znajdź i odtwórz następny odcinek po osiągnięciu progu.</string>
+    <string name="settings_playback_auto_play_next_episode_fallback">Fallback gdy grupa binge nie zostanie znaleziona</string>
+    <string name="settings_playback_auto_play_next_episode_fallback_description">Automatycznie wybierz pierwszy dostępny strumień jeśli grupa binge nie zostanie znaleziona. Gdy wyłączone, wyświetla wybór źródła.</string>
     <string name="settings_playback_decoder_device_only">Tylko urządzenie</string>
     <string name="settings_playback_decoder_prefer_app">Preferuj aplikację (FFmpeg)</string>
     <string name="settings_playback_decoder_prefer_device">Preferuj urządzenie</string>
