@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -125,8 +126,18 @@ fun SubtitleModal(
         buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, addonSubtitles)
     }
     val selectedOptionId = pendingOptionId ?: playbackOptionId
+    val optionsListState = rememberLazyListState()
     val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
         selectedOptionId != null && options.any { it.id == selectedOptionId }
+
+    LaunchedEffect(visible, activeLanguageKey) {
+        if (visible && selectedOptionId != null) {
+            val selectedIndex = options.indexOfFirst { it.id == selectedOptionId }
+            if (selectedIndex >= 0) {
+                optionsListState.scrollToItem(selectedIndex)
+            }
+        }
+    }
 
     LaunchedEffect(languageItems) {
         if (languageItems.none { it.key == activeLanguageKey }) {
@@ -234,6 +245,7 @@ fun SubtitleModal(
 
                             else -> {
                                 LazyColumn(
+                                    state = optionsListState,
                                     modifier = Modifier.heightIn(max = railMaxHeight),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                     contentPadding = PaddingValues(vertical = 8.dp),
