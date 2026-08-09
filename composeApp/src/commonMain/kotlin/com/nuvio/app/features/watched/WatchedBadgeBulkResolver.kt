@@ -41,6 +41,7 @@ suspend fun resolveWatchedBadgesBulk(
                 add(entry.parentMetaId)
             }
         }
+        WatchedRepository.baseFullyWatchedSeriesKeys().mapNotNullTo(this, ::extractContentIdFromWatchedKey)
     }
     if (touchedSeriesIds.isEmpty()) return
 

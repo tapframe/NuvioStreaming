@@ -24,11 +24,13 @@ class WatchedItemsStoreTest {
                             name = key,
                             markedAtEpochMs = index.toLong(),
                         )
-                        store.update { nuvioItems, providerItems, dirtyNuvioKeys ->
+                        store.update { nuvioItems, providerItems, dirtyNuvioKeys, dirtyProviderKeys ->
                             nuvioItems[key] = item
                             providerItems
                                 .getOrPut(TrackingProviderId.TRAKT, ::mutableMapOf)[key] = item
                             dirtyNuvioKeys += key
+                            dirtyProviderKeys
+                                .getOrPut(TrackingProviderId.TRAKT, ::mutableSetOf) += key
                         }
                     }
                 }
@@ -36,20 +38,22 @@ class WatchedItemsStoreTest {
             repeat(4) {
                 launch(Dispatchers.Default) {
                     repeat(500) {
-                        store.read { nuvioItems, providerItems, dirtyNuvioKeys ->
+                        store.read { nuvioItems, providerItems, dirtyNuvioKeys, dirtyProviderKeys ->
                             val nuvioKeys = nuvioItems.keys.toSet()
                             assertEquals(nuvioKeys, providerItems[TrackingProviderId.TRAKT].orEmpty().keys)
                             assertEquals(nuvioKeys, dirtyNuvioKeys)
+                            assertEquals(nuvioKeys, dirtyProviderKeys[TrackingProviderId.TRAKT])
                         }
                     }
                 }
             }
         }
 
-        store.read { nuvioItems, providerItems, dirtyNuvioKeys ->
+        store.read { nuvioItems, providerItems, dirtyNuvioKeys, dirtyProviderKeys ->
             assertEquals(2_000, nuvioItems.size)
             assertEquals(nuvioItems.keys, providerItems[TrackingProviderId.TRAKT].orEmpty().keys)
             assertEquals(nuvioItems.keys, dirtyNuvioKeys)
+            assertEquals(nuvioItems.keys, dirtyProviderKeys[TrackingProviderId.TRAKT])
         }
     }
 }
