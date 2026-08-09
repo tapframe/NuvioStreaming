@@ -15,6 +15,12 @@ import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
     @Test
+    fun oversizedLegacyPayload_isNotRestored() {
+        assertTrue(shouldRestoreWatchedPayload(4 * 1024 * 1024))
+        assertFalse(shouldRestoreWatchedPayload(4 * 1024 * 1024 + 1))
+    }
+
+    @Test
     fun emptyProviderExtraKeys_doNotTriggerInitialRefresh() {
         assertFalse(extraWatchedKeysChanged(previous = null, current = emptySet()))
     }
