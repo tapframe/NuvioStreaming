@@ -177,6 +177,9 @@
     <string name="collections_editor_tmdb_genres_helper">Use TMDB genre numbers. Separate multiple with commas for AND, or pipes for OR.</string>
     <string name="collections_editor_tmdb_genres_movie_placeholder">28,12</string>
     <string name="collections_editor_tmdb_genres_series_placeholder">18,35</string>
+    <string name="collections_editor_tmdb_without_genres">Excluded genre IDs</string>
+    <string name="collections_editor_tmdb_without_genres_helper">Exclude titles matching these TMDB genre numbers.</string>
+    <string name="collections_editor_tmdb_without_genres_placeholder">16 for Animation</string>
     <string name="collections_editor_tmdb_date_from">Release or air date from</string>
     <string name="collections_editor_tmdb_date_to">Release or air date to</string>
     <string name="collections_editor_tmdb_date_helper">Use YYYY-MM-DD, for example 2024-01-01.</string>
@@ -199,9 +202,15 @@
     <string name="collections_editor_tmdb_keywords">Keyword IDs</string>
     <string name="collections_editor_tmdb_keywords_helper">Use TMDB keyword numbers. Quick chips fill common examples.</string>
     <string name="collections_editor_tmdb_keywords_placeholder">9715 for superhero</string>
+    <string name="collections_editor_tmdb_without_keywords">Excluded keyword IDs</string>
+    <string name="collections_editor_tmdb_without_keywords_helper">Exclude titles matching these TMDB keyword numbers.</string>
+    <string name="collections_editor_tmdb_without_keywords_placeholder">9715</string>
     <string name="collections_editor_tmdb_companies">Company IDs</string>
     <string name="collections_editor_tmdb_companies_helper">Use studio/company IDs. Quick chips fill common examples.</string>
     <string name="collections_editor_tmdb_companies_placeholder">420 for Marvel Studios</string>
+    <string name="collections_editor_tmdb_without_companies">Excluded company IDs</string>
+    <string name="collections_editor_tmdb_without_companies_helper">Exclude titles associated with these TMDB company numbers.</string>
+    <string name="collections_editor_tmdb_without_companies_placeholder">420</string>
     <string name="collections_editor_tmdb_networks">Network IDs</string>
     <string name="collections_editor_tmdb_networks_helper">For series only. Use network IDs like Netflix 213 or HBO 49.</string>
     <string name="collections_editor_tmdb_networks_placeholder">213 for Netflix</string>
@@ -282,6 +291,9 @@
     <string name="collections_editor_tmdb_watch_providers">Watch provider IDs</string>
     <string name="collections_editor_tmdb_watch_providers_helper">Use TMDB watch provider IDs. Separate multiple with commas for AND, or pipes for OR.</string>
     <string name="collections_editor_tmdb_watch_providers_placeholder">8|337|350</string>
+    <string name="collections_editor_tmdb_without_watch_providers">Excluded watch provider IDs</string>
+    <string name="collections_editor_tmdb_without_watch_providers_helper">Exclude titles available from these TMDB watch provider numbers in the selected region.</string>
+    <string name="collections_editor_tmdb_without_watch_providers_placeholder">8|337|350</string>
     <string name="collections_editor_tmdb_quick_watch_providers">Quick watch providers</string>
     <string name="collections_editor_tmdb_watch_provider_netflix">Netflix</string>
     <string name="collections_editor_tmdb_watch_provider_prime">Prime Video</string>

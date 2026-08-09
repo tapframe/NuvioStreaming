@@ -312,7 +312,7 @@ object TmdbCollectionSourceResolver {
         )
     }
 
-    private fun buildDiscoverQuery(
+    internal fun buildDiscoverQuery(
         source: CollectionSource,
         sourceType: TmdbCollectionSourceType,
         mediaType: TmdbCollectionMediaType,
@@ -331,18 +331,26 @@ object TmdbCollectionSourceResolver {
             val companyId = source.tmdbId?.toString().takeIf { sourceType == TmdbCollectionSourceType.COMPANY }
             val networkId = source.tmdbId?.toString().takeIf { sourceType == TmdbCollectionSourceType.NETWORK }
             putIfNotBlank("with_companies", companyId ?: filters.withCompanies)
+            putIfNotBlank("without_companies", filters.withoutCompanies)
             putIfNotBlank("with_networks", networkId ?: filters.withNetworks)
             putIfNotBlank("with_genres", filters.withGenres)
+            putIfNotBlank("without_genres", filters.withoutGenres)
             putIfNotBlank("vote_count.gte", filters.voteCountGte?.toString())
             putIfNotBlank("vote_average.gte", filters.voteAverageGte?.toString())
             putIfNotBlank("vote_average.lte", filters.voteAverageLte?.toString())
             putIfNotBlank("with_original_language", filters.withOriginalLanguage)
             putIfNotBlank("with_origin_country", filters.withOriginCountry)
             putIfNotBlank("with_keywords", filters.withKeywords)
-            if (!filters.withWatchProviders.isNullOrBlank()) {
-                put("with_watch_providers", filters.withWatchProviders)
+            putIfNotBlank("without_keywords", filters.withoutKeywords)
+            val withWatchProviders = filters.withWatchProviders?.takeIf { it.isNotBlank() }
+            val withoutWatchProviders = filters.withoutWatchProviders?.takeIf { it.isNotBlank() }
+            if (withWatchProviders != null || withoutWatchProviders != null) {
+                putIfNotBlank("with_watch_providers", withWatchProviders)
+                putIfNotBlank("without_watch_providers", withoutWatchProviders)
                 put("watch_region", filters.watchRegion?.takeIf { it.isNotBlank() } ?: "US")
-                put("with_watch_monetization_types", "flatrate|free|ads|rent|buy")
+                if (withWatchProviders != null) {
+                    put("with_watch_monetization_types", "flatrate|free|ads|rent|buy")
+                }
             }
             putIfNotBlank("year", filters.year?.takeIf { mediaType == TmdbCollectionMediaType.MOVIE }?.toString())
             putIfNotBlank("first_air_date_year", filters.year?.takeIf { mediaType == TmdbCollectionMediaType.TV }?.toString())
