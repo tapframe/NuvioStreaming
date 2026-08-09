@@ -192,17 +192,10 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     LaunchedEffect(
         activeSourceUrl,
         addonSubtitleFetchKey,
-        playerSettingsUiState.addonSubtitleStartupMode,
         playerController,
         playerControllerSourceUrl,
     ) {
         val fetchKey = addonSubtitleFetchKey ?: return@LaunchedEffect
-        val playerInitialized = playerController != null && playerControllerSourceUrl == activeSourceUrl
-        val canFetch = canAutomaticallyFetchAddonSubtitles(
-            mode = playerSettingsUiState.addonSubtitleStartupMode,
-            playerInitialized = playerInitialized,
-        )
-        if (!canFetch) return@LaunchedEffect
         if (autoFetchedAddonSubtitlesForKey == fetchKey) return@LaunchedEffect
         autoFetchedAddonSubtitlesForKey = fetchKey
         fetchAddonSubtitlesForActiveItem()
