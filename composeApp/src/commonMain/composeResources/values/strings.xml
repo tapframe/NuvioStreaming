@@ -940,6 +940,8 @@
     <string name="settings_playback_anime_skip_description">Also search AnimeSkip for skip timestamps (requires client ID).</string>
     <string name="settings_playback_auto_play_next_episode">Auto-play Next Episode</string>
     <string name="settings_playback_auto_play_next_episode_description">Start next episode automatically when prompt appears.</string>
+    <string name="settings_playback_auto_play_next_episode_fallback">Fallback when binge group fails</string>
+    <string name="settings_playback_auto_play_next_episode_fallback_description">Auto-select first available stream if binge group is not found. When off, shows the stream picker instead.</string>
     <string name="settings_playback_decoder_device_only">Device decoders only</string>
     <string name="settings_playback_decoder_prefer_app">Prefer app decoders (FFmpeg)</string>
     <string name="settings_playback_decoder_prefer_device">Prefer device decoders</string>
