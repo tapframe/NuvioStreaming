@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="about_licenses_attributions_subtitle">مصادر البيانات والإقرارات وتراخيص المنصة</string>
     <string name="about_supporters_contributors_subtitle">تقدير مفتوح وشكر للمساهمين في المشروع</string>
@@ -31,33 +32,33 @@
     <string name="addons_badge_refreshing">جارٍ التحديث</string>
     <string name="addons_badge_resources">%1$d مورد</string>
     <string name="addons_badge_unavailable">غير متاح</string>
-    <string name="addons_configure">إعداد الإضافة</string>
-    <string name="addons_delete">حذف الإضافة</string>
+    <string name="addons_configure">إعداد الملحق</string>
+    <string name="addons_delete">حذف الملحق</string>
     <string name="addons_appstore_add_description">أضف مكتبتك إلى Nuvio باستخدام الإضافات التي تستخدمها.</string>
-    <string name="addons_appstore_empty_subtitle">أضف إضافة لبدء بناء مكتبتك.</string>
+    <string name="addons_appstore_empty_subtitle">أضف ملحقًا لبدء بناء مكتبتك.</string>
     <string name="addons_appstore_empty_title">اجعل Nuvio كما تريد.</string>
-    <string name="addons_appstore_input_placeholder">رابط الإضافة</string>
-    <string name="addons_appstore_install_button">إضافة إضافة</string>
+    <string name="addons_appstore_input_placeholder">رابط الملحق</string>
+    <string name="addons_appstore_install_button">إضافة ملحق</string>
     <string name="store_empty_unavailable_title">لا يوجد شيء هنا بعد</string>
     <string name="store_empty_unavailable_message">لا تحتوي إضافاتك الحالية على شيء لعرضه هنا.</string>
     <string name="addons_empty_subtitle">أضف رابط Manifest لبدء تحميل القوائم والبيانات الوصفية ومصادر البث أو الترجمات إلى Nuvio.</string>
     <string name="addons_empty_title">لا توجد إضافات مثبتة بعد.</string>
-    <string name="addons_error_enter_url">أدخل رابط إضافة.</string>
-    <string name="addons_input_placeholder">رابط الإضافة</string>
-    <string name="addons_install_button">تثبيت إضافة</string>
+    <string name="addons_error_enter_url">أدخل رابط الملحق.</string>
+    <string name="addons_input_placeholder">رابط الملحق</string>
+    <string name="addons_install_button">تثبيت الملحق</string>
     <string name="addons_loading_manifest_details">جارٍ تحميل تفاصيل Manifest...</string>
     <string name="addons_modal_checking_message">جارٍ التحقق من رابط Manifest وتحميل تفاصيل الإضافة قبل التثبيت.</string>
-    <string name="addons_modal_checking_title">جارٍ فحص الإضافة</string>
+    <string name="addons_modal_checking_title">جارٍ فحص الملحق</string>
     <string name="addons_modal_failure_title">فشل التثبيت</string>
     <string name="addons_modal_success_message">تم التحقق من %1$s وإضافته بنجاح.</string>
-    <string name="addons_modal_success_title">تم تثبيت الإضافة</string>
-    <string name="addons_move_down">نقل الإضافة إلى أسفل</string>
-    <string name="addons_move_up">نقل الإضافة إلى أعلى</string>
+    <string name="addons_modal_success_title">تم تثبيت الملحق</string>
+    <string name="addons_move_down">نقل الملحق إلى أسفل</string>
+    <string name="addons_move_up">نقل الملحق إلى أعلى</string>
     <string name="addons_overview_active">نشط</string>
     <string name="addons_overview_addons">الإضافات</string>
     <string name="addons_overview_catalogs">القوائم</string>
-    <string name="addons_refresh">تحديث الإضافة</string>
-    <string name="addons_section_add_addon">إضافة إضافة</string>
+    <string name="addons_refresh">تحديث الملحق</string>
+    <string name="addons_section_add_addon">إضافة ملحق</string>
     <string name="addons_section_installed">الإضافات المثبتة</string>
     <string name="addons_section_overview">نظرة عامة</string>
     <string name="addons_summary_id_rules">%1$d قاعدة للمعرّفات</string>
@@ -65,7 +66,7 @@
     <string name="cd_selected">محدد</string>
     <string name="collections_copy_json">نسخ JSON</string>
     <string name="collections_count_summary">%1$d مجموعة، %2$d مجلد</string>
-    <string name="collections_delete_message">حذف &quot;%1$s&quot;؟ لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="collections_delete_message">حذف "%1$s"؟ لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="collections_delete_title">حذف المجموعة</string>
     <string name="collections_editor_add_catalog">إضافة قائمة</string>
     <string name="collections_editor_add_folder">إضافة مجلد</string>
@@ -110,7 +111,7 @@
     <string name="collections_editor_shape_square">مربع</string>
     <string name="collections_editor_shape_wide">عريض</string>
     <string name="collections_editor_show_all_tab_desc">دمج جميع القوائم في علامة تبويب واحدة</string>
-    <string name="collections_editor_show_all_tab">عرض علامة &quot;الكل&quot;</string>
+    <string name="collections_editor_show_all_tab">عرض علامة "الكل"</string>
     <string name="collections_editor_show_gif_when_configured_desc">شغّل صورة GIF المضبوطة بدل الغلاف الثابت عند توفرها.</string>
     <string name="collections_editor_show_gif_when_configured">إظهار GIF عند ضبطه</string>
     <string name="collections_editor_source_count">%1$d مصدر · %2$s</string>
@@ -398,7 +399,7 @@
     <string name="compose_player_seek_forward_10">تقديم 10 ثوانٍ</string>
     <string name="compose_player_sources">المصادر</string>
     <string name="compose_player_style">النمط</string>
-    <string name="compose_player_select_addon_subtitle_first">اختر ترجمة من إضافة أولًا</string>
+    <string name="compose_player_select_addon_subtitle_first">اختر ترجمة من ملحق أولًا</string>
     <string name="compose_player_subs">الترجمات</string>
     <string name="compose_player_subtitle_delay">تأخير الترجمة</string>
     <string name="compose_player_subtitles">الترجمات</string>
@@ -1220,9 +1221,9 @@
     <string name="trakt_watch_progress_source_nuvio">مزامنة Nuvio</string>
     <string name="trakt_watch_progress_trakt_selected">تم تعيين Trakt كمصدر لتقدم المشاهدة</string>
     <string name="trakt_watch_progress_nuvio_selected">تم تعيين Nuvio Sync كمصدر لتقدم المشاهدة</string>
-    <string name="trakt_more_like_this_source_title">مصدر &quot;مقترحات مشابهة&quot;</string>
+    <string name="trakt_more_like_this_source_title">مصدر "مقترحات مشابهة"</string>
     <string name="trakt_more_like_this_source_subtitle">اختر مصدر التوصيات في صفحات التفاصيل</string>
-    <string name="trakt_more_like_this_source_dialog_title">مصدر &quot;مقترحات مشابهة&quot;</string>
+    <string name="trakt_more_like_this_source_dialog_title">مصدر "مقترحات مشابهة"</string>
     <string name="trakt_more_like_this_source_dialog_subtitle">حدد مصدر التوصيات المعروضة بصفحة التفاصيل.</string>
     <string name="trakt_more_like_this_source_trakt">Trakt</string>
     <string name="trakt_more_like_this_source_tmdb">TMDB</string>
@@ -1439,7 +1440,7 @@
     <string name="profile_custom_avatar_url">رابط صورة رمزية مخصصة</string>
     <string name="profile_custom_avatar_url_description">الصق رابط صورة، أو اترك هذا الحقل فارغًا لاستخدام قائمة الصور الرمزية المدمجة.</string>
     <string name="profile_custom_avatar_url_placeholder">https://example.com/avatar.png</string>
-    <string name="profile_delete_confirm_message">سيتم حذف جميع بيانات &quot;%1$s&quot; نهائيًا.</string>
+    <string name="profile_delete_confirm_message">سيتم حذف جميع بيانات "%1$s" نهائيًا.</string>
     <string name="profile_delete_title">حذف الملف الشخصي</string>
     <string name="profile_edit_add_title">إضافة ملف شخصي</string>
     <string name="profile_edit_edit_title">تعديل الملف الشخصي</string>
@@ -1534,8 +1535,8 @@
     <string name="updates_title_allow_installs">اسمح بالتثبيت للمتابعة</string>
     <string name="updates_title_available">يتوفر تحديث</string>
     <string name="updates_title_status">حالة التحديث</string>
-    <string name="addon_already_installed">هذه الإضافة مثبتة بالفعل.</string>
-    <string name="addon_invalid_url">أدخل رابط إضافة صالح</string>
+    <string name="addon_already_installed">هذا الملحق مثبت بالفعل.</string>
+    <string name="addon_invalid_url">أدخل رابط ملحق صالحًا</string>
     <string name="addon_load_manifest_failed">تعذر تحميل Manifest</string>
     <string name="app_brand_name">Nuvio</string>
     <string name="auth_account_deletion_failed">فشل حذف الحساب</string>
@@ -1605,7 +1606,6 @@
     <string name="trakt_sign_in_complete_failed">فشل إكمال تسجيل الدخول إلى Trakt</string>
     <string name="trakt_user_fallback">مستخدم Trakt</string>
     <string name="trakt_watchlist">قائمة المشاهدة</string>
-    <!-- Trakt library sync errors -->
     <string name="trakt_error_authorization_expired">انتهت صلاحية تفويض Trakt</string>
     <string name="trakt_error_list_not_found">لم يتم العثور على قائمة Trakt</string>
     <string name="trakt_error_list_limit_reached">تم بلوغ حد قوائم Trakt</string>
@@ -1637,21 +1637,21 @@
     <string name="tmdb_sources_person_not_found">لم يتم العثور على شخصية TMDB</string>
     <string name="generic_trailer">الإعلان</string>
     <string name="generic_unknown">غير معروف</string>
-    <string name="generic_addon">إضافة</string>
+    <string name="generic_addon">ملحق</string>
     <string name="action_saved">محفوظ</string>
     <string name="action_play_episode">تشغيل %1$s</string>
     <string name="action_resume_episode">استئناف %1$s</string>
     <string name="collections_import_error_empty_json">ملف JSON فارغ.</string>
     <string name="collections_import_error_collection_blank_id">المجموعة %1$d لا تحتوي على معرّف.</string>
-    <string name="collections_import_error_collection_duplicate_id">معرّف المجموعة &apos;%1$s&apos; مستخدم أكثر من مرة.</string>
-    <string name="collections_import_error_collection_blank_title">المجموعة &apos;%1$s&apos; لا تحتوي على عنوان.</string>
-    <string name="collections_import_error_folder_blank_id">المجلد %1$d في &apos;%2$s&apos; لا يحتوي على معرّف.</string>
-    <string name="collections_import_error_folder_duplicate_id">معرّف المجلد &apos;%1$s&apos; مستخدم أكثر من مرة في &apos;%2$s&apos;.</string>
-    <string name="collections_import_error_folder_blank_title">المجلد &apos;%1$s&apos; في &apos;%2$s&apos; لا يحتوي على عنوان.</string>
-    <string name="collections_import_error_source_blank_fields">المصدر %1$d في المجلد &apos;%2$s&apos; يحتوي على حقول فارغة.</string>
-    <string name="collections_import_error_trakt_list_id">المصدر %1$d في المجلد &apos;%2$s&apos; لا يحتوي على معرّف قائمة Trakt.</string>
+    <string name="collections_import_error_collection_duplicate_id">معرّف المجموعة '%1$s' مستخدم أكثر من مرة.</string>
+    <string name="collections_import_error_collection_blank_title">المجموعة '%1$s' لا تحتوي على عنوان.</string>
+    <string name="collections_import_error_folder_blank_id">المجلد %1$d في '%2$s' لا يحتوي على معرّف.</string>
+    <string name="collections_import_error_folder_duplicate_id">معرّف المجلد '%1$s' مستخدم أكثر من مرة في '%2$s'.</string>
+    <string name="collections_import_error_folder_blank_title">المجلد '%1$s' في '%2$s' لا يحتوي على عنوان.</string>
+    <string name="collections_import_error_source_blank_fields">المصدر %1$d في المجلد '%2$s' يحتوي على حقول فارغة.</string>
+    <string name="collections_import_error_trakt_list_id">المصدر %1$d في المجلد '%2$s' لا يحتوي على معرّف قائمة Trakt.</string>
     <string name="collections_import_error_invalid_json">JSON غير صالح: %1$s</string>
-    <string name="collections_folder_addon_not_found">لم يتم العثور على الإضافة: %1$s</string>
+    <string name="collections_folder_addon_not_found">لم يتم العثور على الملحق: %1$s</string>
     <string name="collections_folder_trakt_movie_list">قائمة أفلام Trakt</string>
     <string name="collections_folder_trakt_series_list">قائمة مسلسلات Trakt</string>
     <string name="date_month_january">يناير</string>
@@ -1737,10 +1737,10 @@
     <string name="library_simkl_load_failed">تعذر تحميل قائمة مشاهدة Simkl</string>
     <string name="library_simkl_title">قائمة مشاهدة Simkl</string>
     <string name="cloud_library_connect_action">ربط الحساب</string>
-    <string name="cloud_library_connect_message">قم بربط حسابك في إعدادات &quot;الخدمات المتصلة&quot; لتصفح وتشغيل الملفات من مكتبتك السحابية.</string>
+    <string name="cloud_library_connect_message">قم بربط حسابك في إعدادات "الخدمات المتصلة" لتصفح وتشغيل الملفات من مكتبتك السحابية.</string>
     <string name="cloud_library_connect_title">لا يوجد حساب سحابي متصل</string>
     <string name="cloud_library_disabled_action">فتح الخدمات المتصلة</string>
-    <string name="cloud_library_disabled_message">قم بتفعيل &quot;المكتبة السحابية&quot; من إعدادات الخدمات المتصلة لتصفح ملفات الحسابات المربوطة.</string>
+    <string name="cloud_library_disabled_message">قم بتفعيل "المكتبة السحابية" من إعدادات الخدمات المتصلة لتصفح ملفات الحسابات المربوطة.</string>
     <string name="cloud_library_disabled_title">المكتبة السحابية معطلة</string>
     <string name="cloud_library_empty_message">لا توجد ملفات قابلة للتشغيل تطابق فلاتر البحث الحالية.</string>
     <string name="cloud_library_empty_title">لا يوجد شيء هنا بعد</string>
@@ -1794,12 +1794,9 @@
     <string name="unit_bytes_kb">KB</string>
     <string name="unit_bytes_mb">MB</string>
     <string name="unit_bytes_gb">GB</string>
-    <!-- PlayerControls a11y -->
     <string name="player_action_submit_intro">إرسال المقدمة</string>
     <string name="player_action_video_settings">إعدادات الفيديو</string>
-    <!-- CloudLibrary -->
     <string name="cloud_library_provider_unavailable">المكتبة السحابية غير متوفرة لـ %1$s.</string>
-    <!-- Player iOS video settings modal -->
     <string name="player_video_settings_title">الفيديو</string>
     <string name="player_video_settings_reset_tuning">إعادة ضبط التعديلات</string>
     <string name="player_video_settings_output_preset">إعداد إخراج مسبق</string>
@@ -1814,7 +1811,6 @@
     <string name="player_video_settings_contrast">التباين</string>
     <string name="player_video_settings_saturation">التشبع</string>
     <string name="player_video_settings_gamma">غاما</string>
-    <!-- iOS video output presets -->
     <string name="player_ios_preset_native_edr_label">EDR أصلي</string>
     <string name="player_ios_preset_native_edr_desc">الأفضل لأجهزة iPhone وiPad التي تدعم HDR.</string>
     <string name="player_ios_preset_sdr_tone_mapped_label">SDR مع تعيين النطاق اللوني</string>
@@ -1824,7 +1820,6 @@
     <string name="player_ios_preset_custom_label">مخصص</string>
     <string name="player_ios_preset_custom_desc">استخدم القيم المتقدمة أدناه.</string>
     <string name="player_ios_hardware_decoder_off">معطل</string>
-    <!-- Playback settings iOS video output -->
     <string name="settings_playback_ios_video_output">إخراج فيديو iOS</string>
     <string name="settings_playback_ios_hardware_decoder">فك الترميز العتادي</string>
     <string name="settings_playback_ios_extended_dynamic_range">النطاق الديناميكي الممتد</string>
@@ -1833,13 +1828,11 @@
     <string name="settings_playback_ios_display_color_hint_desc">السماح لـ mpv باستهداف مساحة ألوان الشاشة النشطة افتراضيًا.</string>
     <string name="settings_playback_ios_target_primaries">الألوان الأساسية المستهدفة</string>
     <string name="settings_playback_ios_target_transfer">دالة النقل المستهدفة</string>
-    <!-- Playback settings iOS audio output -->
     <string name="settings_playback_ios_audio_output_section">إخراج صوت iOS</string>
     <string name="settings_playback_ios_audio_output">إخراج الصوت</string>
     <string name="settings_playback_ios_audio_output_auto_desc">استخدام AudioUnit أثناء تعطيل إخراج AVFoundation مؤقتًا.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">دعم تجريبي للصوت المكاني والإخراج متعدد القنوات.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">استخدام إخراج AudioUnit القديم.</string>
-    <!-- Debrid Result Management section -->
     <string name="settings_debrid_section_result_management">إدارة النتائج</string>
     <string name="settings_debrid_max_results">أقصى النتائج</string>
     <string name="settings_debrid_max_results_desc">تحديد عدد النتائج التي تظهر.</string>
@@ -1851,83 +1844,69 @@
     <string name="settings_debrid_per_quality_limit_desc">تقليل تكرار إصدارات (BluRay، WEB-DL، REMUX) بعد الترتيب.</string>
     <string name="settings_debrid_size_range">حجم الملفات المسموح</string>
     <string name="settings_debrid_size_range_desc">تصفية النتائج حسب حجم الملف.</string>
-    <!-- Debrid misc -->
     <string name="settings_debrid_learn_more">معرفة المزيد</string>
     <string name="settings_debrid_template_default_format">التنسيق الافتراضي</string>
     <string name="settings_debrid_template_original_format">التنسيق الأصلي</string>
     <string name="settings_debrid_release_groups_hint">اكتب اسم كل فريق في سطر مستقل.</string>
-    <!-- Debrid sort profiles -->
     <string name="settings_debrid_sort_original">الترتيب الأصلي</string>
     <string name="settings_debrid_sort_best_quality">الأعلى جودة</string>
     <string name="settings_debrid_sort_largest">الأكبر حجماً</string>
     <string name="settings_debrid_sort_smallest">الأصغر حجماً</string>
     <string name="settings_debrid_sort_best_audio">الأفضل صوتاً</string>
     <string name="settings_debrid_sort_language">حسب اللغة</string>
-    <!-- Debrid selection labels -->
     <string name="settings_debrid_selection_any">أي حجم</string>
     <string name="settings_debrid_selection_count">تم تحديد %1$d</string>
-    <!-- Debrid result count labels -->
     <string name="settings_debrid_results_all">كل النتائج</string>
     <string name="settings_debrid_results_count">%1$d نتيجة</string>
-    <!-- Debrid size range labels -->
     <string name="settings_debrid_size_up_to">حتى %1$d جيجابايت</string>
     <string name="settings_debrid_size_min">%1$d جيجابايت فما فوق</string>
     <string name="settings_debrid_size_range_value">%1$d-%2$d جيجابايت</string>
-    <!-- Debrid rule rows: resolutions -->
     <string name="settings_debrid_rule_preferred_resolutions">الدقة المفضلة</string>
     <string name="settings_debrid_rule_preferred_resolutions_desc">فرز جودة الدقة المحددة أولاً، بالترتيب الافتراضي.</string>
     <string name="settings_debrid_rule_required_resolutions">الدقات الإلزامية</string>
     <string name="settings_debrid_rule_required_resolutions_desc">إظهار الدقات المحددة فقط.</string>
     <string name="settings_debrid_rule_excluded_resolutions">الدقات المستبعدة</string>
     <string name="settings_debrid_rule_excluded_resolutions_desc">إخفاء الدقات المحددة.</string>
-    <!-- Debrid rule rows: qualities -->
     <string name="settings_debrid_rule_preferred_qualities">الجودات المفضلة</string>
     <string name="settings_debrid_rule_preferred_qualities_desc">فرز الجودات المحددة أولاً، بالترتيب الافتراضي.</string>
     <string name="settings_debrid_rule_required_qualities">الجودات الإلزامية</string>
     <string name="settings_debrid_rule_required_qualities_desc">إظهار الجودات المحددة فقط.</string>
     <string name="settings_debrid_rule_excluded_qualities">الجودات المستبعدة</string>
     <string name="settings_debrid_rule_excluded_qualities_desc">إخفاء الجودات المحددة.</string>
-    <!-- Debrid rule rows: visual tags -->
     <string name="settings_debrid_rule_preferred_visual_tags">الوسوم المرئية المفضلة</string>
     <string name="settings_debrid_rule_preferred_visual_tags_desc">فرز وسوم DV، وHDR، و10bit، وIMAX والوسوم المماثلة.</string>
     <string name="settings_debrid_rule_required_visual_tags">الوسوم المرئية الإلزامية</string>
     <string name="settings_debrid_rule_required_visual_tags_desc">اشتراط وسوم DV، وHDR، و10bit، وIMAX، وSDR والوسوم المماثلة.</string>
     <string name="settings_debrid_rule_excluded_visual_tags">الوسوم المرئية المستبعدة</string>
     <string name="settings_debrid_rule_excluded_visual_tags_desc">إخفاء وسوم DV، وHDR، و10bit، و3D والوسوم المماثلة.</string>
-    <!-- Debrid rule rows: audio tags -->
     <string name="settings_debrid_rule_preferred_audio_tags">الوسوم الصوتية المفضلة</string>
     <string name="settings_debrid_rule_preferred_audio_tags_desc">فرز وسوم Atmos، وTrueHD، وDTS، وAAC والوسوم المماثلة.</string>
     <string name="settings_debrid_rule_required_audio_tags">الوسوم الصوتية الإلزامية</string>
     <string name="settings_debrid_rule_required_audio_tags_desc">اشتراط وسوم Atmos، وTrueHD، وDTS، وAAC والوسوم المماثلة.</string>
     <string name="settings_debrid_rule_excluded_audio_tags">الوسوم الصوتية المستبعدة</string>
     <string name="settings_debrid_rule_excluded_audio_tags_desc">إخفاء الوسوم الصوتية المحددة.</string>
-    <!-- Debrid rule rows: channels -->
     <string name="settings_debrid_rule_preferred_channels">القنوات المفضلة</string>
     <string name="settings_debrid_rule_preferred_channels_desc">فرز توزيعات القنوات الصوتية المفضلة أولاً.</string>
     <string name="settings_debrid_rule_required_channels">القنوات الإلزامية</string>
     <string name="settings_debrid_rule_required_channels_desc">إظهار توزيعات القنوات الصوتية المحددة فقط.</string>
     <string name="settings_debrid_rule_excluded_channels">القنوات المستبعدة</string>
     <string name="settings_debrid_rule_excluded_channels_desc">إخفاء توزيعات القنوات الصوتية المحددة.</string>
-    <!-- Debrid rule rows: encodes -->
     <string name="settings_debrid_rule_preferred_encodes">طرق التكويد المفضلة</string>
     <string name="settings_debrid_rule_preferred_encodes_desc">فرز تكويدات AV1، وHEVC، وAVC والتكويدات المماثلة.</string>
     <string name="settings_debrid_rule_required_encodes">طرق التكويد الإلزامية</string>
     <string name="settings_debrid_rule_required_encodes_desc">اشتراط تكويدات AV1، وHEVC، وAVC والتكويدات المماثلة.</string>
     <string name="settings_debrid_rule_excluded_encodes">طرق التكويد المستبعدة</string>
     <string name="settings_debrid_rule_excluded_encodes_desc">إخفاء تكويدات الفيديو المحددة.</string>
-    <!-- Debrid rule rows: languages -->
     <string name="settings_debrid_rule_preferred_languages">اللغات المفضلة</string>
     <string name="settings_debrid_rule_preferred_languages_desc">فرز لغات الصوت المفضلة أولاً.</string>
     <string name="settings_debrid_rule_required_languages">اللغات الإلزامية</string>
     <string name="settings_debrid_rule_required_languages_desc">إظهار النتائج التي تحتوي على اللغات المحددة فقط.</string>
     <string name="settings_debrid_rule_excluded_languages">اللغات المستبعدة</string>
     <string name="settings_debrid_rule_excluded_languages_desc">إخفاء النتائج عندما تكون جميع لغاتها ضمن اللغات المستبعدة.</string>
-    <!-- Debrid rule rows: release groups -->
     <string name="settings_debrid_rule_required_release_groups">مجموعات الإصدار الإلزامية</string>
     <string name="settings_debrid_rule_required_release_groups_desc">إظهار مجموعات الإصدار (Release Groups) المحددة فقط.</string>
     <string name="settings_debrid_rule_excluded_release_groups">مجموعات الإصدار المستبعدة</string>
     <string name="settings_debrid_rule_excluded_release_groups_desc">إخفاء مجموعات الإصدار المحددة.</string>
-    <!-- Submit intro/recap/outro dialog -->
     <string name="submit_intro_title">إرسال التوقيتات</string>
     <string name="submit_intro_segment_type">نوع المقطع</string>
     <string name="submit_intro_segment_intro">المقدمة</string>
@@ -1937,33 +1916,26 @@
     <string name="submit_intro_end_time">وقت النهاية (MM:SS)</string>
     <string name="submit_intro_submit">إرسال</string>
     <string name="submit_intro_capture">التقاط</string>
-    <!-- iOS advanced playback -->
     <string name="settings_playback_ios_hw_decoder_dialog">فك الترميز العتادي</string>
     <string name="settings_playback_ios_audio_output_dialog">إخراج الصوت</string>
     <string name="settings_playback_ios_target_primaries_dialog">الألوان الأساسية المستهدفة</string>
     <string name="settings_playback_ios_target_transfer_dialog">دالة النقل المستهدفة</string>
-    <!-- Collection editor -->
     <string name="collections_editor_resolved_trakt_list">قائمة Trakt محللة</string>
     <string name="collections_editor_tmdb_discover">استكشاف TMDB</string>
     <string name="collections_editor_watch_region_placeholder">US, KR, JP, SA</string>
-    <!-- Collection editor error messages -->
     <string name="collections_editor_trakt_input_required">أدخل اسم أو رابط أو معرف قائمة Trakt</string>
     <string name="collections_editor_tmdb_invalid_id_error">أدخل معرف أو رابط TMDB صالح</string>
     <string name="collections_editor_tmdb_load_error">تعذر تحميل مصدر TMDB</string>
     <string name="collections_editor_trakt_id_url_required">أدخل معرف أو رابط قائمة Trakt</string>
     <string name="collections_editor_trakt_load_error">تعذر تحميل قائمة Trakt</string>
-    <!-- Collection editor TMDB country chips -->
     <string name="collections_editor_tmdb_country_ca">كندا</string>
     <string name="collections_editor_tmdb_country_au">أستراليا</string>
     <string name="collections_editor_tmdb_country_de">ألمانيا</string>
-    <!-- Collection editor media type suffixes (appended to source titles) -->
     <string name="collections_editor_media_movies_suffix">أفلام</string>
     <string name="collections_editor_media_series_suffix">مسلسلات</string>
-    <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">المكتبة السحابية معطلة.</string>
-    <!-- IntroDB settings -->
     <string name="settings_playback_introdb_invalid_api_key">مفتاح API غير صالح أو فشل الاتصال</string>
-    <string name="addons_manifest_missing_field">Manifest يفتقد &quot;%1$s&quot;</string>
+    <string name="addons_manifest_missing_field">Manifest يفتقد "%1$s"</string>
     <string name="collections_editor_tmdb_collection_title_format">مجموعة TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">مخرج TMDB %1$s</string>
     <string name="collections_editor_tmdb_discover_title">استكشاف TMDB</string>
@@ -2082,7 +2054,6 @@
     <string name="updates_github_api_error">خطأ في واجهة API لإصدارات GitHub: %1$d</string>
     <string name="updates_no_channel_release">لم يتم نشر أي تحديث بعد.</string>
     <string name="updates_release_missing_title">الإصدار لا يحتوي على وسم أو اسم</string>
-    <!-- Continue Watching air date display -->
     <string name="cw_airs_date">يُعرض في %1$s</string>
     <string name="cw_airs_today">يُعرض اليوم</string>
     <string name="cw_airs_tomorrow">يُعرض غداً</string>
@@ -2099,11 +2070,10 @@
     </plurals>
     <string name="cw_new_episode">حلقة جديدة</string>
     <string name="cw_new_season">موسم جديد</string>
-    <!-- Pass 4 — platform stubs and dynamic title fallbacks -->
     <string name="collections_editor_trakt_list_title_format">قائمة Trakt %1$s</string>
     <string name="external_player_android_system">مشغّل نظام Android</string>
     <string name="p2p_consent_title">تشغيل ملفات التورنت</string>
-    <string name="p2p_consent_body">يستخدم هذا البث تقنية الند للند (P2P). بتفعيل P2P، فإنك تقر وتوافق على ما يلي:\n\n• سيكون عنوان IP الخاص بك مرئيًا للنظراء الآخرين في الشبكة\n• أنت وحدك مسؤول عن المحتوى الذي تصل إليه\n• تؤكد أن لديك الحق القانوني في بث هذا المحتوى ضمن نطاقك القضائي\n• لا يستضيف Nuvio أي محتوى P2P ولا يوزعه أو يتحكم فيه\n• لا يتحمل Nuvio أي مسؤولية عن العواقب القانونية الناتجة عن استخدامك لبث P2P\n\nتستخدم هذه الميزة بالكامل على مسؤوليتك الخاصة. يمكنك تعطيل P2P في أي وقت من الإعدادات.</string>
+    <string name="p2p_consent_body">يستخدم هذا البث تقنية الند للند (P2P). بتفعيل P2P، فإنك تقر وتوافق على ما يلي:\n\n• سيكون عنوان IP الخاص بك مرئيًا للمستخدمين الآخرين المتصلين بالتورنت\n• أنت وحدك مسؤول عن المحتوى الذي تصل إليه\n• تؤكد أن لديك الحق القانوني في بث هذا المحتوى ضمن نطاقك القضائي\n• لا يستضيف Nuvio أي محتوى P2P ولا يوزعه أو يتحكم فيه\n• لا يتحمل Nuvio أي مسؤولية عن العواقب القانونية الناتجة عن استخدامك لبث P2P\n\nتستخدم هذه الميزة بالكامل على مسؤوليتك الخاصة. يمكنك تعطيل P2P في أي وقت من الإعدادات.</string>
     <string name="p2p_consent_enable">تفعيل التورنت</string>
     <string name="p2p_consent_cancel">إلغاء</string>
     <string name="p2p_error_unknown">خطأ تورنت غير معروف</string>
@@ -2118,7 +2088,7 @@
     <string name="settings_p2p_profile_fast">سريع</string>
     <string name="settings_p2p_profile_soft_description">يستخدم اتصالات أقل بالنظراء لتقليل استهلاك البطارية والشبكة</string>
     <string name="settings_p2p_profile_balanced_description">توازن موصى به بين سرعة بدء التشغيل واستقرار الاتصال</string>
-    <string name="settings_p2p_profile_fast_description">يستخدم اتصالات أكثر بالنظراء للتورنتات الصعبة أو ذات معدل البت المرتفع</string>
+    <string name="settings_p2p_profile_fast_description">يستخدم اتصالات أكثر بالـ Peers للتورنتات الصعبة أو ذات معدل البت المرتفع</string>
     <string name="settings_p2p_cache_size_title">حجم ذاكرة التخزين المؤقت للتورنت</string>
     <string name="settings_p2p_cache_none">بدون تخزين مؤقت دائم</string>
     <string name="settings_p2p_cache_2_gb">2 GB</string>
@@ -2131,11 +2101,11 @@
     <string name="settings_p2p_clear_cache_playback_active">أوقف تشغيل P2P قبل مسح ذاكرة التخزين المؤقت</string>
     <string name="settings_p2p_clear_cache_done">تم مسح %1$s من بيانات التورنت غير النشطة</string>
     <string name="settings_p2p_clear_cache_failed">تعذر مسح ذاكرة التورنت المؤقتة</string>
-    <string name="player_torrent_peer_info">%1$d بذور · %2$d نظراء</string>
+    <string name="player_torrent_peer_info">%1$d Seeders · %2$d Peers</string>
     <string name="player_torrent_buffered_status">تم تخزين %1$s مؤقتًا · %2$s · %3$s</string>
     <string name="player_torrent_status">%1$s · %2$s</string>
-    <string name="player_torrent_stats">%1$d نظراء · %2$d بذور · %3$d%%</string>
-    <string name="player_torrent_connecting_peers">جارٍ الاتصال بالنظراء…</string>
+    <string name="player_torrent_stats">%1$d Peers · %2$d Seeders · %3$d%%</string>
+    <string name="player_torrent_connecting_peers">جارٍ الاتصال بالـ Peers…</string>
     <string name="player_torrent_starting_engine">جاري تشغيل محرك P2P…</string>
     <string name="player_torrent_fetching_metadata">جارٍ جلب بيانات التورنت الوصفية…</string>
     <string name="player_torrent_preparing_stream">جارٍ تحضير بث التورنت…</string>
@@ -2143,7 +2113,6 @@
     <string name="player_torrent_loading_status">تم تنزيل %1$s · %2$s · %3$s</string>
     <string name="player_error_failed_start_torrent">تعذر بدء ملف التورنت %1$s</string>
     <string name="player_error_torrent">خطأ في التورنت: %1$s</string>
-    <!-- Person & TMDB entity detail (pass7) -->
     <string name="person_detail_born">الميلاد</string>
     <string name="person_detail_place_of_birth">مكان الميلاد</string>
     <string name="person_detail_credits">طاقم العمل</string>
