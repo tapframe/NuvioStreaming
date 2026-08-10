@@ -2,8 +2,13 @@ package com.nuvio.app.features.watching.sync
 
 import com.nuvio.app.features.addons.DefaultRawHttpResponseMaxBytes
 import com.nuvio.app.features.addons.RawHttpResponse
+import com.nuvio.app.features.trakt.TRAKT_WATCHED_MAX_RESPONSE_BODY_BYTES
+import com.nuvio.app.features.trakt.TraktWatchedHttpEngine
+import com.nuvio.app.features.trakt.TraktWatchedHttpException
+import com.nuvio.app.features.trakt.TraktWatchedPageClient
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.watchedItemKey
+import com.nuvio.app.features.watched.watchedItemKeys
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +34,7 @@ class TraktWatchedSyncAdapterTest {
     }
 
     @Test
-    fun `movie projection emits poster keys for every Trakt identity`() {
+    fun `movie projection emits one canonical key for every Trakt identity`() {
         val item = watchedItem(id = "tt1234567", type = "movie")
 
         val projection = buildTraktWatchedProjection(
@@ -45,12 +50,15 @@ class TraktWatchedSyncAdapterTest {
         assertTrue(watchedItemKey("movie", "tmdb:123") in projection.extraWatchedKeys)
         assertTrue(watchedItemKey("movie", "trakt:789") in projection.extraWatchedKeys)
         assertTrue(watchedItemKey("movie", "example-movie") in projection.extraWatchedKeys)
-        assertTrue(watchedItemKey("film", "tt1234567") in projection.extraWatchedKeys)
+        assertFalse(watchedItemKey("film", "tt1234567") in projection.extraWatchedKeys)
         assertFalse(watchedItemKey("movie", "tt1234567") in projection.extraWatchedKeys)
+        assertTrue(
+            watchedItemKeys("film", "tmdb:123").any(projection.extraWatchedKeys::contains),
+        )
     }
 
     @Test
-    fun `episode projection emits aliases with matching coordinates and content types`() {
+    fun `episode projection emits canonical aliases with matching coordinates`() {
         val projection = buildTraktWatchedProjection(
             listOf(
                 TraktWatchedProjectionCandidate(
@@ -66,9 +74,12 @@ class TraktWatchedSyncAdapterTest {
         )
 
         assertTrue(watchedItemKey("series", "tmdb:321", 2, 4) in projection.extraWatchedKeys)
-        assertTrue(watchedItemKey("tv", "tt7654321", 2, 4) in projection.extraWatchedKeys)
-        assertTrue(watchedItemKey("show", "trakt:987", 2, 4) in projection.extraWatchedKeys)
-        assertTrue(watchedItemKey("tvshow", "example-show", 2, 4) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("series", "trakt:987", 2, 4) in projection.extraWatchedKeys)
+        assertTrue(watchedItemKey("series", "example-show", 2, 4) in projection.extraWatchedKeys)
+        assertFalse(watchedItemKey("tv", "tt7654321", 2, 4) in projection.extraWatchedKeys)
+        assertTrue(
+            watchedItemKeys("tvshow", "example-show", 2, 4).any(projection.extraWatchedKeys::contains),
+        )
     }
 
     @Test

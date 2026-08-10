@@ -112,6 +112,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     override fun clearLocalState() {
         devicePollingJob?.cancel()
         devicePollingJob = null
+        TraktWatchedShowSnapshotRepository.clear()
         hasLoaded = false
         currentProfileId = 1
         profileGeneration += 1L
@@ -566,7 +567,6 @@ object TraktAuthRepository : TrackingAuthProvider {
             }
         }
 
-        TraktCredentialSync.deleteRemote(profileId)
         authState = TraktAuthState()
         persist(profileId)
         publish(
@@ -644,7 +644,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         true
     }
 
-    private suspend fun invalidateCredentials(profileId: Int) {
+    private fun invalidateCredentials(profileId: Int) {
         authState = TraktAuthState()
         persist(profileId)
         publish(
@@ -652,7 +652,6 @@ object TraktAuthRepository : TrackingAuthProvider {
             statusMessage = null,
             errorMessage = localizedString(Res.string.trakt_authorization_expired_reconnect),
         )
-        TraktCredentialSync.deleteRemote(profileId)
     }
 
     private fun loadFromDisk(profileId: Int) {
