@@ -47,7 +47,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -69,6 +68,7 @@ import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.core.ui.spoilerBlur
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaVideo
@@ -99,6 +99,7 @@ fun DetailSeriesContent(
     horizontalScrollPadding: Dp = 0.dp,
     preferredSeasonNumber: Int? = null,
     preferredEpisodeNumber: Int? = null,
+    isEpisodePositionReady: Boolean = true,
     episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
     progressByVideoId: Map<String, WatchProgressEntry> = emptyMap(),
     watchedKeys: Set<String> = emptySet(),
@@ -172,9 +173,24 @@ fun DetailSeriesContent(
         ?.takeIf { it in groupedEpisodes }
         ?: seasons.first()
     var selectedSeasonOverride by rememberSaveable(meta.id) { mutableStateOf<Int?>(null) }
-    val currentSeason = selectedSeasonOverride
-        ?.takeIf { it in groupedEpisodes }
-        ?: defaultSeason
+    var initialSeasonSnapshot by rememberSaveable(meta.id) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(isEpisodePositionReady, defaultSeason, seasons) {
+        val nextSnapshot = captureInitialSeasonSnapshot(
+            isReady = isEpisodePositionReady,
+            capturedSeason = initialSeasonSnapshot,
+            defaultSeason = defaultSeason,
+            availableSeasons = seasons,
+        )
+        if (nextSnapshot != initialSeasonSnapshot) {
+            initialSeasonSnapshot = nextSnapshot
+        }
+    }
+    val currentSeason = resolveCurrentSeason(
+        selectedSeasonOverride = selectedSeasonOverride,
+        initialSeasonSnapshot = initialSeasonSnapshot,
+        defaultSeason = defaultSeason,
+        availableSeasons = seasons,
+    )
 
     var seasonViewMode by remember {
         mutableStateOf(SeasonViewModeStorage.load() ?: SeasonViewMode.Posters)
@@ -300,7 +316,12 @@ fun DetailSeriesContent(
                             progressByVideoId = progressByVideoId,
                             episodeRatings = episodeRatings,
                             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
-                            preferredEpisodeNumber = preferredEpisodeNumber,
+                            preferredEpisodeNumber = preferredEpisodeNumberForSeason(
+                                currentSeason = seasonForContent,
+                                preferredSeasonNumber = preferredSeasonNumber,
+                                preferredEpisodeNumber = preferredEpisodeNumber,
+                            ),
+                            isEpisodePositionReady = isEpisodePositionReady,
                             onEpisodeClick = onEpisodeClick,
                             onEpisodeLongPress = onEpisodeLongPress,
                         )
@@ -603,26 +624,30 @@ private fun EpisodeHorizontalRow(
     episodeRatings: Map<Pair<Int, Int>, Double>,
     blurUnwatchedEpisodes: Boolean,
     preferredEpisodeNumber: Int? = null,
+    isEpisodePositionReady: Boolean,
     onEpisodeClick: ((MetaVideo) -> Unit)?,
     onEpisodeLongPress: ((MetaVideo) -> Unit)?,
 ) {
     val rowMetrics = rememberEpisodeHorizontalCardMetrics(maxWidthDp)
     val listState = rememberLazyListState()
-    var hasPositioned by remember(episodes) { mutableStateOf(false) }
+    val seasonNumber = episodes.firstOrNull()?.season
+    var hasPositioned by remember(parentMetaId, seasonNumber) { mutableStateOf(false) }
 
-    LaunchedEffect(episodes, preferredEpisodeNumber) {
+    LaunchedEffect(episodes, preferredEpisodeNumber, isEpisodePositionReady) {
+        // The preferred episode advances when an episode is marked watched. Keep the user's row
+        // position after the initial placement instead of scrolling the selected card off-screen.
+        if (!shouldInitializeEpisodeRowPosition(isEpisodePositionReady, hasPositioned)) {
+            return@LaunchedEffect
+        }
+        hasPositioned = true
+
         val targetIndex = if (preferredEpisodeNumber != null) {
             episodes.indexOfFirst { it.episode == preferredEpisodeNumber }
         } else {
             -1
         }
         if (targetIndex >= 0) {
-            if (hasPositioned) {
-                listState.animateScrollToItem(targetIndex)
-            } else {
-                listState.scrollToItem(targetIndex)
-                hasPositioned = true
-            }
+            listState.scrollToItem(targetIndex)
         }
     }
 
@@ -686,6 +711,8 @@ private fun EpisodeHorizontalCard(
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
     val imageUrl = video.thumbnail ?: fallbackImage
+    val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
+    val zoomImageUrl = if (shouldBlurArtwork) fallbackImage else imageUrl
     Box(
         modifier = Modifier
             .width(metrics.cardWidth)
@@ -700,18 +727,17 @@ private fun EpisodeHorizontalCard(
             .posterCardClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,
-                zoomImageUrl = imageUrl,
+                zoomImageUrl = zoomImageUrl,
                 zoomCornerRadius = metrics.cornerRadius,
             ),
     ) {
-        val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = video.title,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
+                    .spoilerBlur(active = blurUnwatchedEpisodes, blurred = shouldBlurArtwork),
                 contentScale = ContentScale.Crop,
             )
         }
@@ -837,6 +863,42 @@ private fun EpisodeHorizontalCard(
             }
     }
 }
+
+internal fun preferredEpisodeNumberForSeason(
+    currentSeason: Int,
+    preferredSeasonNumber: Int?,
+    preferredEpisodeNumber: Int?,
+): Int? = preferredEpisodeNumber?.takeIf {
+    preferredSeasonNumber == null ||
+        normalizeSeasonNumber(preferredSeasonNumber) == currentSeason
+}
+
+internal fun shouldInitializeEpisodeRowPosition(
+    isReady: Boolean,
+    hasPositioned: Boolean,
+): Boolean = isReady && !hasPositioned
+
+internal fun captureInitialSeasonSnapshot(
+    isReady: Boolean,
+    capturedSeason: Int?,
+    defaultSeason: Int,
+    availableSeasons: Collection<Int>,
+): Int? = when {
+    !isReady -> capturedSeason?.takeIf { it in availableSeasons }
+    capturedSeason != null && capturedSeason in availableSeasons -> capturedSeason
+    defaultSeason in availableSeasons -> defaultSeason
+    else -> null
+}
+
+internal fun resolveCurrentSeason(
+    selectedSeasonOverride: Int?,
+    initialSeasonSnapshot: Int?,
+    defaultSeason: Int,
+    availableSeasons: Collection<Int>,
+): Int = selectedSeasonOverride
+    ?.takeIf { it in availableSeasons }
+    ?: initialSeasonSnapshot?.takeIf { it in availableSeasons }
+    ?: defaultSeason
 
 private data class EpisodeHorizontalCardMetrics(
     val rowHorizontalPadding: Dp,
@@ -1089,7 +1151,7 @@ private fun EpisodeListCard(
                         contentDescription = video.title,
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
+                            .spoilerBlur(active = blurUnwatchedEpisodes, blurred = shouldBlurArtwork),
                         contentScale = ContentScale.Crop,
                     )
                 } else {

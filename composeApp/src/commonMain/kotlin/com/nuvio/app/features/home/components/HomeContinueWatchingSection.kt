@@ -32,7 +32,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -59,6 +58,7 @@ import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.spoilerBlur
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.tracking.WatchProgressSource
@@ -219,6 +219,14 @@ private fun ContinueWatchingItem.continueWatchingCardArtworkUrl(
 
 private fun firstNonBlank(vararg values: String?): String? =
     values.firstOrNull { value -> !value.isNullOrBlank() }?.trim()
+
+internal fun ContinueWatchingItem.shouldProtectNextUpArtwork(
+    blurNextUp: Boolean,
+    useEpisodeThumbnails: Boolean,
+): Boolean = blurNextUp && useEpisodeThumbnails && isNextUp
+
+internal fun ContinueWatchingItem.spoilerSafeArtworkUrl(): String? =
+    firstNonBlank(poster, background)
 
 @Composable
 internal fun HomeContinueWatchingSection(
@@ -648,7 +656,9 @@ private fun ContinueWatchingCard(
         useEpisodeThumbnails = useEpisodeThumbnails,
         preferBackdropForNextUp = preferBackdropForNextUp,
     )
-    val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
+    val shouldProtectArtwork = item.shouldProtectNextUpArtwork(blurNextUp, useEpisodeThumbnails)
+    val shouldBlurArtwork = shouldProtectArtwork && imageUrl == firstNonBlank(item.episodeThumbnail)
+    val zoomImageUrl = if (shouldProtectArtwork) item.spoilerSafeArtworkUrl() else imageUrl
     val episodeCode = if (item.seasonNumber != null && item.episodeNumber != null) {
         stringResource(Res.string.streams_episode_badge, item.seasonNumber, item.episodeNumber)
     } else {
@@ -676,7 +686,7 @@ private fun ContinueWatchingCard(
             .posterCardClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                zoomImageUrl = imageUrl,
+                zoomImageUrl = zoomImageUrl,
                 zoomCornerRadius = cardMetrics.cornerRadius,
             ),
     ) {
@@ -686,7 +696,7 @@ private fun ContinueWatchingCard(
                 contentDescription = item.title,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier)
+                    .spoilerBlur(active = blurNextUp && useEpisodeThumbnails, blurred = shouldBlurArtwork)
                     .drawWithContent {
                         drawContent()
 
@@ -859,11 +869,14 @@ private fun ContinueWatchingWideCard(
                 onLongClick = onLongClick,
             ),
     ) {
-        val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
         val artworkUrl = item.continueWatchingArtworkUrl(useEpisodeThumbnails)
+        val shouldProtectArtwork = item.shouldProtectNextUpArtwork(blurNextUp, useEpisodeThumbnails)
+        val shouldBlurArtwork = shouldProtectArtwork &&
+            artworkUrl == firstNonBlank(item.episodeThumbnail)
         ArtworkPanel(
             imageUrl = artworkUrl,
             width = layout.widePosterStripWidth,
+            blurActive = blurNextUp && useEpisodeThumbnails,
             blurred = shouldBlurArtwork,
             contentScale = if (item.isCloudLibraryItem()) ContentScale.Fit else ContentScale.Crop,
             modifier = Modifier.fillMaxHeight(),
@@ -970,6 +983,10 @@ private fun ContinueWatchingPosterCard(
     onLongClick: (() -> Unit)?,
 ) {
     val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
+    val shouldProtectArtwork = item.shouldProtectNextUpArtwork(blurNextUp, useEpisodeThumbnails)
+    val shouldBlurArtwork = shouldProtectArtwork &&
+        imageUrl == firstNonBlank(item.episodeThumbnail)
+    val zoomImageUrl = if (shouldProtectArtwork) item.spoilerSafeArtworkUrl() else imageUrl
     Column(
         modifier = Modifier.width(layout.posterCardWidth),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -987,21 +1004,17 @@ private fun ContinueWatchingPosterCard(
                 .posterCardClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,
-                    zoomImageUrl = imageUrl,
+                    zoomImageUrl = zoomImageUrl,
                     zoomCornerRadius = layout.cardRadius,
                 ),
         ) {
-            val shouldBlurArtwork = blurNextUp &&
-                useEpisodeThumbnails &&
-                item.isNextUp &&
-                imageUrl == firstNonBlank(item.episodeThumbnail)
             if (imageUrl != null) {
                 AsyncImage(
                     model = cloudLibraryDisplayArtworkUrl(imageUrl),
                     contentDescription = item.title,
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
+                        .spoilerBlur(active = blurNextUp && useEpisodeThumbnails, blurred = shouldBlurArtwork),
                     contentScale = if (item.isCloudLibraryItem()) ContentScale.Fit else ContentScale.Crop,
                 )
             }
@@ -1092,6 +1105,7 @@ private fun ContinueWatchingPosterCard(
 private fun ArtworkPanel(
     imageUrl: String?,
     width: Dp,
+    blurActive: Boolean = false,
     blurred: Boolean = false,
     contentScale: ContentScale = ContentScale.Crop,
     modifier: Modifier = Modifier,
@@ -1107,7 +1121,7 @@ private fun ArtworkPanel(
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (blurred) Modifier.blur(18.dp) else Modifier),
+                    .spoilerBlur(active = blurActive, blurred = blurred),
                 contentScale = contentScale,
             )
         }

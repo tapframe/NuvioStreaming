@@ -157,6 +157,8 @@ import com.nuvio.app.features.tmdb.TmdbEntityKind
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeScreen
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.components.shouldProtectNextUpArtwork
+import com.nuvio.app.features.home.components.spoilerSafeArtworkUrl
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.LibrarySection
@@ -3423,8 +3425,17 @@ private fun MainAppContent(
                     key(item.videoId, anchor) {
                         val showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                         val showDetailsOption = !item.isCloudLibraryContinueWatchingItem()
+                        val shouldProtectArtwork = item.shouldProtectNextUpArtwork(
+                            blurNextUp = continueWatchingPreferencesUiState.blurNextUp,
+                            useEpisodeThumbnails = continueWatchingPreferencesUiState.useEpisodeThumbnails,
+                        )
+                        val actionArtworkUrl = if (shouldProtectArtwork) {
+                            anchor.imageUrl ?: item.spoilerSafeArtworkUrl()
+                        } else {
+                            anchor.imageUrl ?: item.poster ?: item.imageUrl
+                        }
                         NuvioPosterZoomActionOverlay(
-                            imageUrl = cloudLibraryDisplayArtworkUrl(anchor.imageUrl ?: item.poster ?: item.imageUrl),
+                            imageUrl = cloudLibraryDisplayArtworkUrl(actionArtworkUrl),
                             title = item.title,
                             subtitle = localizedContinueWatchingSubtitle(item),
                             depthSurface = NuvioCardDepthSurface.ContinueWatching,
