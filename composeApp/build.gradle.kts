@@ -464,6 +464,11 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        val androidHostTest by getting {
+            dependencies {
+                implementation(libs.robolectric)
+            }
+        }
     }
 }
 
