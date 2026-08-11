@@ -16,6 +16,7 @@ internal actual object PlatformLocalAccountDataCleaner {
     private val profilePinCachePrefixes = listOf("profile_pin_cache_")
     private val profileIndexedPrefixes = listOf(
         "installed_manifest_urls_",
+        "installed_manifest_name_overrides_",
         "plugins_state_",
         "library_payload_",
         "watched_payload_",

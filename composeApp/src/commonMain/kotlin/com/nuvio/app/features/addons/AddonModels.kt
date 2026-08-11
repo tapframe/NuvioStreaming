@@ -1,9 +1,23 @@
 package com.nuvio.app.features.addons
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.generic_addon
 import org.jetbrains.compose.resources.getString
+
+@Serializable
+private data class StoredAddonNameOverride(
+    val url: String,
+    val name: String,
+)
+
+private val addonNameOverridesJson = Json {
+    ignoreUnknownKeys = true
+}
 
 data class AddonManifest(
     val id: String,
@@ -84,6 +98,28 @@ internal fun List<ManagedAddon>.toOverview(): AddonOverview =
 
 internal fun List<ManagedAddon>.enabledAddons(): List<ManagedAddon> =
     filter { it.enabled }
+
+internal fun List<ManagedAddon>.encodeNameOverrides(): String =
+    addonNameOverridesJson.encodeToString(
+        mapNotNull { addon ->
+            addon.userSetName
+                ?.takeIf { it.isNotBlank() }
+                ?.let { name -> StoredAddonNameOverride(url = addon.manifestUrl, name = name) }
+        },
+    )
+
+internal fun decodeAddonNameOverrides(payload: String): Map<String, String> {
+    if (payload.isBlank()) return emptyMap()
+    return runCatching {
+        addonNameOverridesJson.decodeFromString<List<StoredAddonNameOverride>>(payload)
+    }.getOrDefault(emptyList())
+        .mapNotNull { override ->
+            val url = override.url.trim().takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val name = override.name.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            url to name
+        }
+        .toMap()
+}
 
 sealed interface AddAddonResult {
     data class Success(val manifest: AddonManifest) : AddAddonResult
