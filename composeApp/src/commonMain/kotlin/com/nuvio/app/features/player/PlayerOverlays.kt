@@ -338,12 +338,21 @@ internal fun GestureFeedbackPill(
                 .background(iconBackgroundColor),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(16.dp),
-            )
+            if (feedback.icon == GestureFeedbackIcon.Speed) {
+                val speedVal = messageText.replace("x", "").replace(" ", "").toFloatOrNull() ?: 1.0f
+                SpeedometerGaugeIcon(
+                    speed = speedVal,
+                    modifier = Modifier.size(18.dp),
+                    tint = iconTint,
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
         Text(
             text = messageText,

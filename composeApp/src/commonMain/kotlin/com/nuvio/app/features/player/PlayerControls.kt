@@ -1,5 +1,18 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -35,6 +48,7 @@ import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.VideoLibrary
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.nuvio
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -548,9 +562,19 @@ private fun ProgressControls(
                         painter = aspectRatioPainter,
                         onClick = onResizeModeClick,
                     )
+                    val isSpeedActive = kotlin.math.abs(playbackSnapshot.playbackSpeed - 1.0f) > 0.05f
+                    val speedActiveColor = if (isSpeedActive) MaterialTheme.nuvio.colors.accent else Color.White
+
                     PlayerActionPillButton(
                         label = formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed),
-                        icon = Icons.Rounded.Speed,
+                        customIcon = {
+                            SpeedometerGaugeIcon(
+                                speed = playbackSnapshot.playbackSpeed,
+                                modifier = Modifier.size(20.dp),
+                                tint = speedActiveColor,
+                            )
+                        },
+                        labelColor = speedActiveColor,
                         onClick = onSpeedClick,
                     )
                     PlayerActionPillButton(
@@ -707,11 +731,122 @@ private fun TimePill(
 }
 
 @Composable
+internal fun SpeedometerGaugeIcon(
+    speed: Float,
+    modifier: Modifier = Modifier,
+    tint: Color = Color.White,
+) {
+    val rotationDeg = when {
+        speed <= 0.25f -> -102f
+        speed <= 0.50f -> -68f
+        speed <= 0.75f -> -34f
+        speed <= 1.00f -> 0f
+        speed <= 1.25f -> 34f
+        speed <= 1.50f -> 68f
+        speed <= 1.75f -> 85f
+        else -> 102f
+    }
+    val animatedRotation by animateFloatAsState(
+        targetValue = rotationDeg,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+    )
+
+    Canvas(modifier = modifier) {
+        val scale = size.width / 24f
+        val strokePx = 2.2f * scale
+
+        val centerX = 12.0f * scale
+        val centerY = 13.5f * scale
+        val radius = 8.0f * scale
+
+        val arcTopLeft = Offset(centerX - radius, centerY - radius)
+        val arcSize = Size(radius * 2f, radius * 2f)
+
+        val rad = animatedRotation * (PI.toFloat() / 180f)
+        val cosA = cos(rad)
+        val sinA = sin(rad)
+
+        fun rotX(px: Float, py: Float): Float = centerX + (px - centerX) * cosA - (py - centerY) * sinA
+        fun rotY(px: Float, py: Float): Float = centerY + (px - centerX) * sinA + (py - centerY) * cosA
+
+        val p1x = 9.3f * scale;  val p1y = 1.5f * scale
+        val p2x = 14.7f * scale; val p2y = 1.5f * scale
+        val p3x = 14.7f * scale; val p3y = 9.0f * scale
+        val p4x = 9.3f * scale;  val p4y = 9.0f * scale
+
+        val maskPath = androidx.compose.ui.graphics.Path().apply {
+            moveTo(rotX(p1x, p1y), rotY(p1x, p1y))
+            lineTo(rotX(p2x, p2y), rotY(p2x, p2y))
+            lineTo(rotX(p3x, p3y), rotY(p3x, p3y))
+            lineTo(rotX(p4x, p4y), rotY(p4x, p4y))
+            close()
+        }
+
+        clipPath(maskPath, clipOp = ClipOp.Difference) {
+            val tubPath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(4.0f * scale, 13.5f * scale)
+                cubicTo(
+                    4.0f * scale, 16.8f * scale,
+                    6.0f * scale, 18.8f * scale,
+                    8.8f * scale, 18.8f * scale
+                )
+                lineTo(15.2f * scale, 18.8f * scale)
+                cubicTo(
+                    18.0f * scale, 18.8f * scale,
+                    20.0f * scale, 16.8f * scale,
+                    20.0f * scale, 13.5f * scale
+                )
+            }
+            drawPath(
+                path = tubPath,
+                color = tint,
+                style = Stroke(width = strokePx, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round),
+            )
+
+            drawArc(
+                color = tint,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = strokePx, cap = StrokeCap.Round),
+            )
+        }
+
+        rotate(degrees = animatedRotation, pivot = Offset(centerX, centerY)) {
+            val needlePath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(10.9f * scale, 13.5f * scale)
+                lineTo(11.5f * scale, 4.8f * scale)
+                cubicTo(
+                    11.8f * scale, 4.2f * scale,
+                    12.2f * scale, 4.2f * scale,
+                    12.5f * scale, 4.8f * scale
+                )
+                lineTo(13.1f * scale, 13.5f * scale)
+                close()
+            }
+            drawPath(
+                path = needlePath,
+                color = tint,
+            )
+            drawCircle(
+                color = tint,
+                radius = 2.0f * scale,
+                center = Offset(centerX, centerY),
+            )
+        }
+    }
+}
+
+@Composable
 private fun PlayerActionPillButton(
     label: String,
     onClick: () -> Unit,
     icon: ImageVector? = null,
     painter: Painter? = null,
+    customIcon: (@Composable () -> Unit)? = null,
+    labelColor: Color = Color.White,
 ) {
     Row(
         modifier = Modifier
@@ -722,24 +857,26 @@ private fun PlayerActionPillButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
+            customIcon != null -> customIcon()
+
             painter != null -> Icon(
                 painter = painter,
                 contentDescription = label,
-                tint = Color.White,
+                tint = labelColor,
                 modifier = Modifier.size(18.dp),
             )
 
             icon != null -> Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = Color.White,
+                tint = labelColor,
                 modifier = Modifier.size(18.dp),
             )
         }
         Text(
             text = label,
             style = MaterialTheme.nuvioTypeScale.labelSm,
-            color = Color.White,
+            color = labelColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             softWrap = false,
