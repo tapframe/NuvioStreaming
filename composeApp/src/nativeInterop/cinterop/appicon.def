@@ -1,0 +1,2 @@
+headers = AppIconBridge.h
+package = com.nuvio.app.nativebridge

@@ -776,6 +776,13 @@
     <string name="settings_playback_option_device_language">Enhetsspråk</string>
     <string name="settings_playback_option_forced">Tvungen</string>
     <string name="settings_playback_option_none">Ingen</string>
+    <string name="settings_playback_addon_subtitle_startup_all">Alle tilleggsundertekster</string>
+    <string name="settings_playback_addon_subtitle_startup_all_description">Hent og legger ved alle tilleggsundertekster før avspilling. Langsom oppstart.</string>
+    <string name="settings_playback_addon_subtitle_startup_fast">Rask oppstart</string>
+    <string name="settings_playback_addon_subtitle_startup_fast_description">Start avspilling umiddelbart. Valg av undertekst fra tillegg kan laste spilleren på nytt en gang.</string>
+    <string name="settings_playback_addon_subtitle_startup_mode">Last undertekster fra tillegg</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred">Foretrukne språk</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred_description">Hent undertekster fra tillegg før avspilling og legger ved foretrukne/sekundære språkspor.</string>
     <string name="settings_playback_prefer_binge_group">Foretrekk binge-gruppe (neste episode)</string>
     <string name="settings_playback_prefer_binge_group_description">Prøv samme kildeprofil først før vanlige auto-play-regler.</string>
     <string name="settings_playback_preferred_audio_language">Foretrukket lydspråk</string>

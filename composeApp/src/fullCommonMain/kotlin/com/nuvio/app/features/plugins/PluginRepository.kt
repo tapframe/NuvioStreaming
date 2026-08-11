@@ -9,6 +9,9 @@ import com.nuvio.app.features.plugins.runtime.PluginRuntime
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,6 +55,18 @@ private data class PluginPushItem(
     @SerialName("sort_order") val sortOrder: Int = 0,
 )
 
+private data class PluginPersistenceSnapshot(
+    val profileId: Int,
+    val generation: Long,
+    val revision: Long,
+    val state: PluginsUiState,
+)
+
+private data class LoadedPluginState(
+    val state: PluginsUiState,
+    val requiresMigration: Boolean,
+)
+
 actual object PluginRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("PluginRepository")
@@ -64,6 +79,10 @@ actual object PluginRepository {
     private var pulledFromServer = false
     private var currentProfileId = 1
     private val activeRefreshJobs = mutableMapOf<String, Job>()
+    private val persistenceGeneration = atomic(0L)
+    private val persistenceRevision = atomic(0L)
+    private val persistenceLock = SynchronizedObject()
+    private val persistedRevisionByProfile = mutableMapOf<Int, Long>()
 
     actual fun initialize() {
         val effectiveProfileId = resolveEffectiveProfileId(ProfileRepository.activeProfileId)
@@ -89,6 +108,7 @@ actual object PluginRepository {
 
     actual fun clearLocalState() {
         cancelActiveRefreshes()
+        persistenceGeneration.incrementAndGet()
         currentProfileId = 1
         initialized = false
         pulledFromServer = false
@@ -358,59 +378,71 @@ actual object PluginRepository {
     private suspend fun fetchRepositoryData(
         manifestUrl: String,
         previousScrapers: Map<String, PluginScraper>,
-    ): Pair<PluginRepositoryItem, List<PluginScraper>> = withContext(Dispatchers.Default) {
-        val payload = httpGetText(manifestUrl)
-        val manifest = PluginManifestParser.parse(payload)
-        val baseUrl = manifestUrl.substringBefore("?").removeSuffix("/manifest.json")
+    ): Pair<PluginRepositoryItem, List<PluginScraper>> {
+        val storageProfileId = currentProfileId
+        return withContext(Dispatchers.Default) {
+            val payload = httpGetText(manifestUrl)
+            val manifest = PluginManifestParser.parse(payload)
+            val baseUrl = manifestUrl.substringBefore("?").removeSuffix("/manifest.json")
 
-        val scrapers = manifest.scrapers
-            .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
-            .mapNotNull { info ->
-                val codeUrl = if (info.filename.startsWith("http://") || info.filename.startsWith("https://")) {
-                    info.filename
-                } else {
-                    "$baseUrl/${info.filename.trimStart('/')}"
-                }
-                runCatching {
-                    val code = httpGetText(codeUrl)
-                    val scraperId = "${manifestUrl.lowercase()}:${info.id}"
-                    val previous = previousScrapers[scraperId]
-                    val enabled = when {
-                        !info.enabled -> false
-                        previous != null -> previous.enabled
-                        else -> info.enabled
+            val scrapers = manifest.scrapers
+                .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
+                .mapNotNull { info ->
+                    val codeUrl = if (info.filename.startsWith("http://") || info.filename.startsWith("https://")) {
+                        info.filename
+                    } else {
+                        "$baseUrl/${info.filename.trimStart('/')}"
                     }
+                    runCatching {
+                        val code = httpGetText(codeUrl)
+                        val scraperId = "${manifestUrl.lowercase()}:${info.id}"
+                        val cached = PluginStorage.saveScraperCode(
+                            profileId = storageProfileId,
+                            scraperId = scraperId,
+                            code = code,
+                            overwrite = true,
+                        )
+                        if (!cached) {
+                            log.w { "Failed to cache plugin scraper $scraperId" }
+                        }
+                        val previous = previousScrapers[scraperId]
+                        val enabled = when {
+                            !info.enabled -> false
+                            previous != null -> previous.enabled
+                            else -> info.enabled
+                        }
 
-                    PluginScraper(
-                        id = scraperId,
-                        repositoryUrl = manifestUrl,
-                        name = info.name,
-                        description = info.description.orEmpty(),
-                        version = info.version,
-                        filename = info.filename,
-                        supportedTypes = info.supportedTypes,
-                        enabled = enabled,
-                        manifestEnabled = info.enabled,
-                        hasSettings = info.hasSettings,
-                        logo = info.logo,
-                        contentLanguage = info.contentLanguage ?: emptyList(),
-                        formats = info.formats ?: info.supportedFormats,
-                        code = code,
-                    )
-                }.getOrNull()
-            }
+                        PluginScraper(
+                            id = scraperId,
+                            repositoryUrl = manifestUrl,
+                            name = info.name,
+                            description = info.description.orEmpty(),
+                            version = info.version,
+                            filename = info.filename,
+                            supportedTypes = info.supportedTypes,
+                            enabled = enabled,
+                            manifestEnabled = info.enabled,
+                            hasSettings = info.hasSettings,
+                            logo = info.logo,
+                            contentLanguage = info.contentLanguage ?: emptyList(),
+                            formats = info.formats ?: info.supportedFormats,
+                            code = code,
+                        )
+                    }.getOrNull()
+                }
 
-        val repo = PluginRepositoryItem(
-            manifestUrl = manifestUrl,
-            name = manifest.name,
-            description = manifest.description,
-            version = manifest.version,
-            scraperCount = scrapers.size,
-            lastUpdated = currentEpochMillis(),
-            isRefreshing = false,
-            errorMessage = null,
-        )
-        repo to scrapers
+            val repo = PluginRepositoryItem(
+                manifestUrl = manifestUrl,
+                name = manifest.name,
+                description = manifest.description,
+                version = manifest.version,
+                scraperCount = scrapers.size,
+                lastUpdated = currentEpochMillis(),
+                isRefreshing = false,
+                errorMessage = null,
+            )
+            repo to scrapers
+        }
     }
 
     private fun PluginManifestScraper.isSupportedOnCurrentPlatform(): Boolean {
@@ -460,39 +492,49 @@ actual object PluginRepository {
     }
 
     private fun persist() {
-        val state = _uiState.value
-        val payload = StoredPluginsState(
-            pluginsEnabled = state.pluginsEnabled,
-            groupStreamsByRepository = state.groupStreamsByRepository,
-            repositories = state.repositories.map { repo ->
-                StoredPluginRepository(
-                    manifestUrl = repo.manifestUrl,
-                    name = repo.name,
-                    description = repo.description,
-                    version = repo.version,
-                    scraperCount = repo.scraperCount,
-                    lastUpdated = repo.lastUpdated,
-                )
-            },
-            scrapers = state.scrapers.map { scraper ->
-                StoredPluginScraper(
-                    id = scraper.id,
-                    repositoryUrl = scraper.repositoryUrl,
-                    name = scraper.name,
-                    description = scraper.description,
-                    version = scraper.version,
-                    filename = scraper.filename,
-                    supportedTypes = scraper.supportedTypes,
-                    enabled = scraper.enabled,
-                    manifestEnabled = scraper.manifestEnabled,
-                    hasSettings = scraper.hasSettings,
-                    logo = scraper.logo,
-                    contentLanguage = scraper.contentLanguage,
-                    formats = scraper.formats,
-                    code = scraper.code,
-                )            },
+        val snapshot = PluginPersistenceSnapshot(
+            profileId = currentProfileId,
+            generation = persistenceGeneration.value,
+            revision = persistenceRevision.incrementAndGet(),
+            state = _uiState.value,
         )
-        PluginStorage.saveState(currentProfileId, json.encodeToString(payload))
+        val requiresCodeWrite = snapshot.state.scrapers.any { scraper ->
+            !PluginStorage.hasScraperCode(snapshot.profileId, scraper.id)
+        }
+        if (requiresCodeWrite) {
+            scope.launch { persist(snapshot) }
+        } else {
+            persist(snapshot)
+        }
+    }
+
+    private fun persist(snapshot: PluginPersistenceSnapshot) {
+        if (snapshot.generation != persistenceGeneration.value) return
+        var cached = true
+        snapshot.state.scrapers.forEach { scraper ->
+            val scraperCached = PluginStorage.saveScraperCode(
+                profileId = snapshot.profileId,
+                scraperId = scraper.id,
+                code = scraper.code,
+                overwrite = false,
+            )
+            cached = scraperCached && cached
+        }
+        if (!cached || snapshot.generation != persistenceGeneration.value) {
+            if (!cached) {
+                log.w { "Failed to persist plugin scraper cache for profile ${snapshot.profileId}" }
+            }
+            return
+        }
+
+        synchronized(persistenceLock) {
+            if (snapshot.generation != persistenceGeneration.value) return@synchronized
+            val persistedRevision = persistedRevisionByProfile[snapshot.profileId] ?: Long.MIN_VALUE
+            if (snapshot.revision < persistedRevision) return@synchronized
+            val payload = snapshot.state.toStoredPluginsState()
+            PluginStorage.saveState(snapshot.profileId, json.encodeToString(payload))
+            persistedRevisionByProfile[snapshot.profileId] = snapshot.revision
+        }
     }
 
     private fun loadStoredState(profileId: Int): StoredPluginsState? {
@@ -517,49 +559,45 @@ actual object PluginRepository {
         }
 
         currentProfileId = profileId
-        _uiState.value = loadStateAsUiState(profileId)
+        val loadedState = loadStateAsUiState(profileId)
+        _uiState.value = loadedState.state
         initialized = true
+        if (loadedState.requiresMigration) persist()
     }
 
-    private fun loadStateAsUiState(profileId: Int): PluginsUiState {
+    private fun loadStateAsUiState(profileId: Int): LoadedPluginState {
         val stored = loadStoredState(profileId)
-        return PluginsUiState(
-            pluginsEnabled = stored?.pluginsEnabled ?: true,
-            groupStreamsByRepository = stored?.groupStreamsByRepository ?: false,
-            repositories = stored?.repositories
-                ?.map {
-                    PluginRepositoryItem(
-                        manifestUrl = it.manifestUrl,
-                        name = it.name,
-                        description = it.description,
-                        version = it.version,
-                        scraperCount = it.scraperCount,
-                        lastUpdated = it.lastUpdated,
-                        isRefreshing = false,
-                        errorMessage = null,
-                    )
-                }
-                ?: emptyList(),
-            scrapers = stored?.scrapers
-                ?.map {
-                    PluginScraper(
-                        id = it.id,
-                        repositoryUrl = it.repositoryUrl,
-                        name = it.name,
-                        description = it.description,
-                        version = it.version,
-                        filename = it.filename,
-                        supportedTypes = it.supportedTypes,
-                        enabled = it.enabled,
-                        manifestEnabled = it.manifestEnabled,
-                        hasSettings = it.hasSettings,
-                        logo = it.logo,
-                        contentLanguage = it.contentLanguage,
-                        formats = it.formats,
-                        code = it.code,
-                    )
-                }
-                ?: emptyList(),
+        var requiresMigration = false
+        val scrapers = stored?.scrapers
+            ?.mapNotNull { storedScraper ->
+                storedScraper.restorePluginScraper { scraperId ->
+                    PluginStorage.loadScraperCode(profileId, scraperId)
+                }?.also { restored ->
+                    requiresMigration = requiresMigration || restored.requiresMigration
+                }?.scraper
+            }
+            ?: emptyList()
+        return LoadedPluginState(
+            state = PluginsUiState(
+                pluginsEnabled = stored?.pluginsEnabled ?: true,
+                groupStreamsByRepository = stored?.groupStreamsByRepository ?: false,
+                repositories = stored?.repositories
+                    ?.map {
+                        PluginRepositoryItem(
+                            manifestUrl = it.manifestUrl,
+                            name = it.name,
+                            description = it.description,
+                            version = it.version,
+                            scraperCount = it.scraperCount,
+                            lastUpdated = it.lastUpdated,
+                            isRefreshing = false,
+                            errorMessage = null,
+                        )
+                    }
+                    ?: emptyList(),
+                scrapers = scrapers,
+            ),
+            requiresMigration = requiresMigration,
         )
     }
 

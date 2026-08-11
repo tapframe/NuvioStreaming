@@ -709,6 +709,13 @@
     <string name="p2p_consent_enable">P2P הפעל</string>
     <string name="p2p_consent_cancel">ביטול</string>
     <string name="settings_p2p_title">סטרימינג P2P</string>
+    <string name="settings_playback_addon_subtitle_startup_all">כל כתוביות התוסף</string>
+    <string name="settings_playback_addon_subtitle_startup_all_description">משוך את כל כתוביות התוסף לפני ההפעלה. האיטי מבין שלושת המצבים.</string>
+    <string name="settings_playback_addon_subtitle_startup_fast">הפעלה מהירה</string>
+    <string name="settings_playback_addon_subtitle_startup_fast_description">התחל הפעלה מיד. בחירת כתוביות תוסף עלולה לטעון מחדש את הנגן פעם אחת.</string>
+    <string name="settings_playback_addon_subtitle_startup_mode">טעינת כתוביות תוסף</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred">שפות מועדפות</string>
+    <string name="settings_playback_addon_subtitle_startup_preferred_description">משוך כתוביות תוסף מראש, לפני ההפעלה, וצרף רצועות בשפה המועדפת והמשנית שלך.</string>
     <string name="settings_playback_section_p2p">סטרימינג P2P</string>
     <string name="settings_p2p_subtitle">אפשר מקורות Stream עמית-לעמית (חינמי אך טעינה איטית).</string>
     <string name="player_torrent_peer_info">%1$d מקורות · %2$d עמיתים</string>

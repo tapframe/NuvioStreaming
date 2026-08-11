@@ -200,6 +200,7 @@ import com.nuvio.app.features.settings.ContinueWatchingSettingsScreen
 import com.nuvio.app.features.settings.AddonsSettingsScreen
 import com.nuvio.app.features.settings.PluginsSettingsScreen
 import com.nuvio.app.features.settings.AccountSettingsScreen
+import com.nuvio.app.features.settings.AppBrandWordmark
 import com.nuvio.app.features.settings.SupportersContributorsSettingsScreen
 import com.nuvio.app.features.settings.LicensesAttributionsSettingsScreen
 import com.nuvio.app.features.settings.NavBarStyle
@@ -255,7 +256,6 @@ import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import com.nuvio.app.navigation.*
 import nuvio.composeapp.generated.resources.*
-import nuvio.composeapp.generated.resources.app_logo_wordmark
 import nuvio.composeapp.generated.resources.compose_catalog_subtitle_library
 import nuvio.composeapp.generated.resources.compose_catalog_subtitle_trakt_library
 import nuvio.composeapp.generated.resources.compose_nav_home
@@ -446,6 +446,11 @@ fun App(
             .memoryCachePolicy(CachePolicy.ENABLED)
             .components {
                 add(SvgDecoder.Factory())
+                add(
+                    coil3.network.ktor3.KtorNetworkFetcherFactory(
+                        cacheStrategy = { coil3.network.cachecontrol.CacheControlCacheStrategy() },
+                    )
+                )
             }
             .configurePlatformImageLoader()
             .build()
@@ -867,6 +872,7 @@ private fun MainAppContent(
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
+    val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val downloadsUiState by remember {
         DownloadsRepository.ensureLoaded()
         DownloadsRepository.uiState
@@ -3280,6 +3286,7 @@ private fun MainAppContent(
                     val isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = preview,
+                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     )
                     val removesFromLibrary = isSaved &&
                         (posterActionTarget.libraryItem != null || !isRemoteLibrarySource)
@@ -3936,13 +3943,11 @@ private fun AppLaunchOverlay(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(
-                painter = painterResource(Res.drawable.app_logo_wordmark),
+            AppBrandWordmark(
                 contentDescription = stringResource(Res.string.app_brand_name),
                 modifier = Modifier
                     .fillMaxWidth(0.48f)
                     .height(44.dp),
-                contentScale = ContentScale.Fit,
             )
             Spacer(modifier = Modifier.height(tokens.spacing.sectionGap))
             NuvioLoadingIndicator(color = tokens.colors.accent)

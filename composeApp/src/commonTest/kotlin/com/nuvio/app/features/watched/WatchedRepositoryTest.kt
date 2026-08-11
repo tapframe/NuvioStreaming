@@ -4,12 +4,67 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.WatchProgressSource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
+    @Test
+    fun oversizedLegacyPayload_isNotRestored() {
+        assertTrue(shouldRestoreWatchedPayload(4 * 1024 * 1024))
+        assertFalse(shouldRestoreWatchedPayload(4 * 1024 * 1024 + 1))
+    }
+
+    @Test
+    fun emptyProviderExtraKeys_doNotTriggerInitialRefresh() {
+        assertFalse(extraWatchedKeysChanged(previous = null, current = emptySet()))
+    }
+
+    @Test
+    fun populatedProviderExtraKeys_triggerRefreshFromEmptyState() {
+        assertTrue(extraWatchedKeysChanged(previous = null, current = setOf("series:tt1:-1:-1")))
+    }
+
+    @Test
+    fun changedProviderExtraKeys_triggerRefresh() {
+        assertTrue(
+            extraWatchedKeysChanged(
+                previous = setOf("series:tt1:-1:-1"),
+                current = setOf("series:tt2:-1:-1"),
+            ),
+        )
+    }
+
+    @Test
+    fun providerRefreshFailure_isContainedWithoutReplacingState() = runBlocking {
+        val failure = IllegalStateException("rate limited")
+        var observedFailure: Throwable? = null
+
+        val result = watchedProviderRefreshOrNull(
+            refresh = { throw failure },
+            onFailure = { observedFailure = it },
+        )
+
+        assertNull(result)
+        assertEquals(failure, observedFailure)
+    }
+
+    @Test
+    fun providerRefreshCancellation_isNotContained() = runBlocking {
+        assertFailsWith<CancellationException> {
+            watchedProviderRefreshOrNull(
+                refresh = { throw CancellationException("cancelled") },
+                onFailure = {},
+            )
+        }
+        Unit
+    }
+
     @Test
     fun watchedItemKey_isTypeAware() {
         assertEquals("movie:tt1:-1:-1", watchedItemKey(type = "movie", id = "tt1"))
@@ -227,10 +282,29 @@ class WatchedRepositoryTest {
     }
 
     @Test
-    fun onlyNuvioWatchedStateIsPersisted() {
-        assertTrue(shouldPersistWatchedSource(WatchProgressSource.NUVIO_SYNC))
-        assertFalse(shouldPersistWatchedSource(WatchProgressSource.TRAKT))
-        assertFalse(shouldPersistWatchedSource(WatchProgressSource.SIMKL))
+    fun successfulTrackerPush_waitsForRemoteSnapshotAcknowledgement() {
+        val outcome = WatchedPushOutcome(
+            succeededTrackerProviderIds = setOf(TrackingProviderId.TRAKT),
+        )
+
+        assertFalse(shouldAcknowledgeNuvioWatchedPush(WatchProgressSource.TRAKT, outcome))
+    }
+
+    @Test
+    fun providerSnapshot_acknowledgesPendingMarkByPresence() {
+        val localItem = watchedItem(id = "pending", markedAtEpochMs = 1_999L)
+        val remoteItem = localItem.copy(markedAtEpochMs = 1_000L)
+        val key = watchedItemKey(localItem.type, localItem.id)
+
+        val merged = mergeWatchedSnapshot(
+            serverItems = listOf(remoteItem),
+            localItems = listOf(localItem),
+            dirtyKeys = setOf(key),
+            acknowledgeDirtyByPresence = true,
+        )
+
+        assertEquals(mapOf(key to remoteItem), merged.items)
+        assertTrue(merged.dirtyKeys.isEmpty())
     }
 
     @Test

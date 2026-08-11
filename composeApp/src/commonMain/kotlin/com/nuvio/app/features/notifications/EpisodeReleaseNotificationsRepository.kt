@@ -436,6 +436,7 @@ object EpisodeReleaseNotificationsRepository {
             MetaDetailsRepository.fetch(
                 type = trackedShow.contentType,
                 id = trackedShow.contentId,
+                cacheResult = false,
             )
         }.onFailure { error ->
             log.w { "Failed to resolve metadata for ${trackedShow.contentType}:${trackedShow.contentId}: ${error.message}" }

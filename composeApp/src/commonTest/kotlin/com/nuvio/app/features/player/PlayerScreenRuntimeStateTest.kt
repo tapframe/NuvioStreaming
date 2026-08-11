@@ -24,6 +24,18 @@ class PlayerScreenRuntimeStateTest {
     }
 
     @Test
+    fun episodeFilterUpdatesInvalidateUiWithoutPlaybackUpdates() {
+        val runtime = PlayerScreenRuntime(testPlayerScreenArgs())
+        val selectedFilter = derivedStateOf { runtime.episodeStreamsRepoState.selectedFilter }
+
+        assertNull(selectedFilter.value)
+
+        runtime.episodeStreamsRepoState = StreamsUiState(selectedFilter = "addon-id")
+
+        assertEquals("addon-id", selectedFilter.value)
+    }
+
+    @Test
     fun seekScrobbleUpdate_requiresActiveIncompletePlayback() {
         assertTrue(
             shouldUpdateTrackingScrobbleAfterSeek(

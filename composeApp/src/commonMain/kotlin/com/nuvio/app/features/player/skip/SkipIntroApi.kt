@@ -92,8 +92,8 @@ internal object SkipIntroApi {
         malId: String,
         episode: Int,
     ): AniSkipResponse? {
-        val types = "op,ed,recap,mixed-op,mixed-ed"
-        val url = "${ANISKIP_BASE}skip-times/$malId/$episode?types=$types&episodeLength=0"
+        val types = "types=op&types=ed&types=recap&types=mixed-op&types=mixed-ed"
+        val url = "${ANISKIP_BASE}skip-times/$malId/$episode?$types&episodeLength=0"
         return try {
             val text = httpGetText(url)
             json.decodeFromString<AniSkipResponse>(text)

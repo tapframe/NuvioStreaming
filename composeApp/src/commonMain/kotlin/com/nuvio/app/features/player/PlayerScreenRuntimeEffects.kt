@@ -189,11 +189,20 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         controller.updateNowPlayingMetadata(buildNowPlayingInfo())
     }
 
-    LaunchedEffect(activeSourceUrl, addonSubtitleFetchKey, playerSettingsUiState.addonSubtitleStartupMode) {
+    LaunchedEffect(
+        activeSourceUrl,
+        addonSubtitleFetchKey,
+        playerSettingsUiState.addonSubtitleStartupMode,
+        playerController,
+        playerControllerSourceUrl,
+    ) {
         val fetchKey = addonSubtitleFetchKey ?: return@LaunchedEffect
-        if (playerSettingsUiState.addonSubtitleStartupMode == AddonSubtitleStartupMode.FAST_STARTUP) {
-            return@LaunchedEffect
-        }
+        val playerInitialized = playerController != null && playerControllerSourceUrl == activeSourceUrl
+        val canFetch = canAutomaticallyFetchAddonSubtitles(
+            mode = playerSettingsUiState.addonSubtitleStartupMode,
+            playerInitialized = playerInitialized,
+        )
+        if (!canFetch) return@LaunchedEffect
         if (autoFetchedAddonSubtitlesForKey == fetchKey) return@LaunchedEffect
         autoFetchedAddonSubtitlesForKey = fetchKey
         fetchAddonSubtitlesForActiveItem()
@@ -402,12 +411,21 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         if (season == null || episode == null || vid == null) return@LaunchedEffect
 
         launch {
-            val imdbId = vid.split(":").firstOrNull()?.takeIf { it.startsWith("tt") }
-            val intervals = SkipIntroRepository.getSkipIntervals(
-                imdbId = imdbId,
-                season = season,
-                episode = episode,
-            )
+            val intervals = when {
+                vid.startsWith("mal:") -> {
+                    val malId = vid.removePrefix("mal:").substringBefore(':')
+                    SkipIntroRepository.getSkipIntervalsForMal(malId = malId, episode = episode)
+                }
+                vid.startsWith("kitsu:") -> {
+                    val kitsuId = vid.removePrefix("kitsu:").substringBefore(':')
+                    SkipIntroRepository.getSkipIntervalsForKitsu(kitsuId = kitsuId, episode = episode)
+                }
+                else -> SkipIntroRepository.getSkipIntervals(
+                    imdbId = vid.substringBefore(':').takeIf { it.startsWith("tt") },
+                    season = season,
+                    episode = episode,
+                )
+            }
             skipIntervals = intervals
         }
     }

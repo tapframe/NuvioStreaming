@@ -86,6 +86,42 @@ class SubtitleSelectionModelTest {
         assertIs<SubtitleSelectionOption.Addon>(options[1])
     }
 
+    @Test
+    fun emptySubtitleRailShowsFetchActionWhenNoLanguagesAreAvailable() {
+        assertEquals(
+            SubtitleOptionsRailEmptyContent.FETCH,
+            subtitleOptionsRailEmptyContent(
+                selectedLanguageKey = SubtitleOffLanguageKey,
+                hasAvailableLanguages = false,
+                isLoadingAddonSubtitles = false,
+            ),
+        )
+    }
+
+    @Test
+    fun emptySubtitleRailShowsLoadingWhileBackgroundFetchRuns() {
+        assertEquals(
+            SubtitleOptionsRailEmptyContent.LOADING,
+            subtitleOptionsRailEmptyContent(
+                selectedLanguageKey = SubtitleOffLanguageKey,
+                hasAvailableLanguages = false,
+                isLoadingAddonSubtitles = true,
+            ),
+        )
+    }
+
+    @Test
+    fun subtitleRailShowsNoneWhenOffIsSelectedAndLanguagesExist() {
+        assertEquals(
+            SubtitleOptionsRailEmptyContent.NONE,
+            subtitleOptionsRailEmptyContent(
+                selectedLanguageKey = SubtitleOffLanguageKey,
+                hasAvailableLanguages = true,
+                isLoadingAddonSubtitles = false,
+            ),
+        )
+    }
+
     private fun subtitleTrack(
         index: Int,
         language: String,
