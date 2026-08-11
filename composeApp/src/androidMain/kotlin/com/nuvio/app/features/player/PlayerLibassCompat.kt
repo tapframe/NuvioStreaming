@@ -24,6 +24,8 @@ import java.util.Collections
 import java.util.WeakHashMap
 
 private val assHandlersByPlayer = Collections.synchronizedMap(WeakHashMap<ExoPlayer, AssHandler>())
+private val subtitleParserFactoriesByPlayer =
+    Collections.synchronizedMap(WeakHashMap<ExoPlayer, SubtitleParser.Factory>())
 
 @OptIn(UnstableApi::class)
 internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
@@ -31,10 +33,13 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
     renderType: AssRenderType = AssRenderType.CUES,
     dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context),
     extractorsFactory: ExtractorsFactory = DefaultExtractorsFactory(),
-    renderersFactory: RenderersFactory = DefaultRenderersFactory(context)
+    renderersFactory: RenderersFactory = DefaultRenderersFactory(context),
+    subtitleParserFactoryDecorator: (SubtitleParser.Factory) -> SubtitleParser.Factory = { it },
 ): ExoPlayer {
     val assHandler = AssHandler(renderType)
-    val assSubtitleParserFactory = CompatAssSubtitleParserFactory(assHandler)
+    val assSubtitleParserFactory = subtitleParserFactoryDecorator(
+        CompatAssSubtitleParserFactory(assHandler),
+    )
     val assExtractorsFactory = extractorsFactory.withAssMkvSupportCompat(
         subtitleParserFactory = assSubtitleParserFactory,
         assHandler = assHandler
@@ -52,12 +57,16 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
         .build()
 
     assHandlersByPlayer[player] = assHandler
+    subtitleParserFactoriesByPlayer[player] = assSubtitleParserFactory
 
     assHandler.init(player)
     return player
 }
 
 internal fun ExoPlayer.getAssHandlerCompat(): AssHandler? = assHandlersByPlayer[this]
+
+internal fun ExoPlayer.getSubtitleParserFactoryCompat(): SubtitleParser.Factory? =
+    subtitleParserFactoriesByPlayer[this]
 
 @OptIn(UnstableApi::class)
 private class CompatAssSubtitleParserFactory(

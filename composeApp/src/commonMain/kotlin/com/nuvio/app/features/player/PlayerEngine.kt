@@ -16,6 +16,9 @@ interface PlayerEngineController {
     fun selectAudioTrack(index: Int)
     fun selectSubtitleTrack(index: Int)
     fun setSubtitleUri(url: String)
+    fun selectAddonSubtitle(subtitle: AddonSubtitle) {
+        setSubtitleUri(subtitle.url)
+    }
     fun clearExternalSubtitle()
     fun clearExternalSubtitleAndSelect(trackIndex: Int)
     fun applySubtitleStyle(style: SubtitleStyleState) {}
@@ -23,6 +26,34 @@ interface PlayerEngineController {
     fun configureIosVideoOutput(settings: PlayerSettingsUiState) {}
     fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {}
     fun clearNowPlayingInfo() {}
+}
+
+internal const val ADDON_SUBTITLE_TRACK_ID_PREFIX = "nuvio-addon-subtitle:"
+
+internal fun buildAddonSubtitleTrackId(url: String): String =
+    "$ADDON_SUBTITLE_TRACK_ID_PREFIX${url.hashCode().toUInt().toString(16)}"
+
+internal fun buildAddonSubtitleTrackId(subtitle: AddonSubtitle): String =
+    "$ADDON_SUBTITLE_TRACK_ID_PREFIX${subtitle.id}:${subtitle.url.hashCode().toUInt().toString(16)}"
+
+internal fun isAddonSubtitleTrackId(media3TrackId: String?): Boolean =
+    normalizeMedia3MergedTrackId(media3TrackId)?.startsWith(ADDON_SUBTITLE_TRACK_ID_PREFIX) == true
+
+internal fun matchesAddonSubtitleTrackId(media3TrackId: String?, addonTrackId: String): Boolean =
+    normalizeMedia3MergedTrackId(media3TrackId) == addonTrackId
+
+internal fun isLibmpvAddonSubtitleTrack(title: String?, isExternal: Boolean): Boolean =
+    isExternal && title?.startsWith(ADDON_SUBTITLE_TRACK_ID_PREFIX) == true
+
+internal fun normalizeMedia3MergedTrackId(trackId: String?): String? {
+    var normalized = trackId ?: return null
+    while (true) {
+        val separator = normalized.indexOf(':')
+        if (separator <= 0 || normalized.take(separator).any { !it.isDigit() }) {
+            return normalized
+        }
+        normalized = normalized.substring(separator + 1)
+    }
 }
 
 internal fun sanitizePlaybackHeaders(headers: Map<String, String>?): Map<String, String> {

@@ -2,10 +2,60 @@ package com.nuvio.app.features.player
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PlayerTrackSelectionTest {
+
+    @Test
+    fun addonTrackIdentityIsStableWithoutChangingTheSignedUrl() {
+        val subtitle = addonSubtitle(
+            id = "opensubs-42",
+            language = "en",
+        ).copy(url = "https://example.com/sub.srt?token=signed&expires=4102444800")
+
+        val trackId = buildAddonSubtitleTrackId(subtitle)
+
+        assertEquals(trackId, buildAddonSubtitleTrackId(subtitle))
+        assertTrue(trackId.startsWith(ADDON_SUBTITLE_TRACK_ID_PREFIX))
+        assertTrue(trackId.contains("opensubs-42"))
+        assertEquals("https://example.com/sub.srt?token=signed&expires=4102444800", subtitle.url)
+    }
+
+    @Test
+    fun addonTrackIdentityDistinguishesDuplicateAddonIdsWithDifferentUrls() {
+        val first = addonSubtitle(id = "duplicate", language = "en")
+        val second = first.copy(url = "https://example.com/other.srt")
+
+        assertFalse(buildAddonSubtitleTrackId(first) == buildAddonSubtitleTrackId(second))
+    }
+
+    @Test
+    fun media3MergedTrackPrefixesAreNormalizedNarrowly() {
+        val trackId = buildAddonSubtitleTrackId(addonSubtitle(id = "addon", language = "en"))
+
+        assertEquals("audio-track", normalizeMedia3MergedTrackId("0:audio-track"))
+        assertEquals("audio-track", normalizeMedia3MergedTrackId("12:3:audio-track"))
+        assertTrue(isAddonSubtitleTrackId(trackId))
+        assertTrue(isAddonSubtitleTrackId("0:$trackId"))
+        assertTrue(isAddonSubtitleTrackId("12:3:$trackId"))
+        assertTrue(matchesAddonSubtitleTrackId("1:$trackId", trackId))
+        assertFalse(isAddonSubtitleTrackId("embedded:$trackId"))
+        assertFalse(isAddonSubtitleTrackId("x1:$trackId"))
+        assertFalse(matchesAddonSubtitleTrackId("embedded:$trackId", trackId))
+    }
+
+    @Test
+    fun onlyNuvioOwnedExternalTracksAreClassifiedAsAddonSubtitles() {
+        val trackId = buildAddonSubtitleTrackId(addonSubtitle(id = "addon", language = "en"))
+
+        assertTrue(isLibmpvAddonSubtitleTrack(title = trackId, isExternal = true))
+        assertFalse(isLibmpvAddonSubtitleTrack(title = trackId, isExternal = false))
+        assertFalse(isLibmpvAddonSubtitleTrack(title = "English", isExternal = true))
+        assertFalse(isLibmpvAddonSubtitleTrack(title = null, isExternal = true))
+    }
 
     @Test
     fun forcedSelectionUsesPrimaryPreferredLanguageInsteadOfTrackOrder() {
