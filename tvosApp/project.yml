@@ -1,0 +1,75 @@
+name: NuvioTV
+options:
+  deploymentTarget:
+    tvOS: "18.0"
+  xcodeVersion: "27.0"
+  createIntermediateGroups: true
+
+packages:
+  MPVKit:
+    path: ../MPVKit
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TVOS_BUNDLE_IDENTIFIER: com.nuvio.app.tvos.dev
+    TVOS_TEST_BUNDLE_IDENTIFIER: com.nuvio.app.tvos.dev.tests
+
+targets:
+  NuvioTV:
+    type: application
+    platform: tvOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources
+      - path: Resources
+        buildPhase: resources
+    dependencies:
+      - package: MPVKit
+        product: MPVKit-GPL
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(TVOS_BUNDLE_IDENTIFIER)"
+        PRODUCT_NAME: Nuvio
+        PRODUCT_MODULE_NAME: NuvioTV
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+        TARGETED_DEVICE_FAMILY: "3"
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: Nuvio
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSApplicationCategoryType: public.app-category.entertainment
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UIApplicationSupportsIndirectInputEvents: true
+
+  NuvioTVTests:
+    type: bundle.unit-test
+    platform: tvOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: NuvioTV
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(TVOS_TEST_BUNDLE_IDENTIFIER)"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Nuvio.app/Nuvio"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  NuvioTV:
+    build:
+      targets:
+        NuvioTV: all
+        NuvioTVTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - NuvioTVTests

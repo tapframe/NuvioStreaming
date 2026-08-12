@@ -11,7 +11,7 @@
   [![License][license-shield]][license-url]
 
   <p>
-    A modern media hub for Android and iOS built with Kotlin Multiplatform and Compose Multiplatform.
+    A modern media hub for Android, iOS, and Apple TV built with Kotlin Multiplatform, Compose Multiplatform, and native SwiftUI.
     <br />
     Stremio addon ecosystem • Cross-platform
   </p>
@@ -20,9 +20,9 @@
 
 ## About
 
-Nuvio is the current Kotlin Multiplatform rewrite of the original React Native app. It delivers a shared Compose UI for Android and iOS while keeping the playback-focused experience, collection tools, watch progress flows, downloads, and Stremio addon ecosystem integration that shaped the earlier app.
+Nuvio is the current Kotlin Multiplatform rewrite of the original React Native app. It delivers a shared Compose UI for Android and iOS, plus an initial native SwiftUI app for Apple TV. The apps keep the playback-focused experience, collection tools, watch progress flows, downloads, and Stremio addon ecosystem integration that shaped the earlier project.
 
-The mobile app is built from a single shared codebase in [composeApp](./composeApp), with native platform entry points for Android and iOS.
+The mobile app is built from a single shared codebase in [composeApp](./composeApp), with native platform entry points for Android and iOS. The early Apple TV port lives in [tvosApp](./tvosApp) and welcomes focused contributions.
 
 ## Installation
 
@@ -33,6 +33,21 @@ Download the latest Android build from [GitHub Releases](https://github.com/Nuvi
 ### iOS
 
 - [TestFlight](https://testflight.apple.com/join/u4y7MHK9)
+
+### Apple TV
+
+The initial native Apple TV port can be built with Xcode and XcodeGen. The documented physical-device workflow uses a USB-C cable between the Mac and Apple TV.
+
+```bash
+git submodule update --init --recursive
+brew install xcodegen
+export TVOS_DEVICE_ID='YOUR-DEVICE-IDENTIFIER'
+export TVOS_DEVELOPMENT_TEAM='YOURTEAMID'
+export TVOS_BUNDLE_IDENTIFIER='com.example.nuvio.tvos'
+./scripts/run-tvos.sh
+```
+
+See [tvosApp/README.md](./tvosApp/README.md) for unsigned builds, device setup, architecture, and testing. See [tvosApp/CONTRIBUTING.md](./tvosApp/CONTRIBUTING.md) for focused contribution areas.
 
 ## Development
 
@@ -51,6 +66,7 @@ cd NuvioMobile
 - `composeApp/src/androidMain/` contains Android-specific integrations.
 - `composeApp/src/iosMain/` contains iOS-specific integrations.
 - `iosApp/` contains the native Xcode project and iOS entry point.
+- `tvosApp/` contains the initial native SwiftUI Apple TV app and its XcodeGen project specification.
 
 Useful commands:
 
@@ -62,13 +78,13 @@ Useful commands:
 
 Versioning is driven from `iosApp/Configuration/Version.xcconfig`, which is used as the shared source of truth for both iOS and Android builds.
 
-## Legal & DMCA
+## Legal and DMCA
 
 Nuvio functions solely as a client-side interface for browsing metadata and playing media provided by user-installed extensions and/or user-provided sources. It is intended for content the user owns or is otherwise authorized to access.
 
 Nuvio is not affiliated with any third-party extensions, catalogs, sources, or content providers. It does not host, store, or distribute any media content.
 
-For comprehensive legal information, including our full disclaimer, third-party extension policy, and DMCA/Copyright information, please visit our [Legal & Disclaimer Page](https://nuvioapp.space/legal).
+For comprehensive legal information, including our full disclaimer, third-party extension policy, and DMCA/Copyright information, please visit our [Legal and Disclaimer Page](https://nuvioapp.space/legal).
 
 ## Built With
 
