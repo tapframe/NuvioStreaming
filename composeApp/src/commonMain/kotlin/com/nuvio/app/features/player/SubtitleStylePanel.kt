@@ -111,10 +111,10 @@ fun SubtitleStylePanel(
             SubtitleStyleStepper(
                 value = stringResource(Res.string.compose_player_font_size_value, style.fontSizeSp),
                 onDecrease = {
-                    onStyleChanged(style.copy(fontSizeSp = (style.fontSizeSp - 2).coerceAtLeast(12)))
+                    onStyleChanged(style.copy(fontSizeSp = (style.fontSizeSp - 2).coerceAtLeast(subtitleFontSizeRangeSp.first)))
                 },
                 onIncrease = {
-                    onStyleChanged(style.copy(fontSizeSp = (style.fontSizeSp + 2).coerceAtMost(40)))
+                    onStyleChanged(style.copy(fontSizeSp = (style.fontSizeSp + 2).coerceAtMost(subtitleFontSizeRangeSp.last)))
                 },
             )
         }
