@@ -686,6 +686,15 @@ private fun EpisodeHorizontalCard(
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
     val imageUrl = video.thumbnail ?: fallbackImage
+    val visibleProgressEntry = progressEntry?.takeIf { it.durationMs > 0L && !it.isCompleted }
+    val progressBarHeight = 4.dp
+    val progressBarContentSpacing = 6.dp
+    val progressBarBottomSpacing = 8.dp
+    val contentBottomPadding = if (visibleProgressEntry != null) {
+        progressBarContentSpacing + progressBarHeight + progressBarBottomSpacing
+    } else {
+        metrics.contentBottomPadding
+    }
     Box(
         modifier = Modifier
             .width(metrics.cardWidth)
@@ -746,7 +755,7 @@ private fun EpisodeHorizontalCard(
                     start = metrics.contentPadding,
                     end = metrics.contentPadding,
                     top = metrics.contentPadding,
-                    bottom = metrics.contentBottomPadding,
+                    bottom = contentBottomPadding,
                 ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -821,20 +830,22 @@ private fun EpisodeHorizontalCard(
             }
         }
 
-        progressEntry
-            ?.takeIf { it.durationMs > 0L && !it.isCompleted }
-            ?.let { entry ->
-                NuvioProgressBar(
-                    progress = entry.progressFraction,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(horizontal = metrics.contentPadding, vertical = 8.dp),
-                    height = 4.dp,
-                    trackColor = Color.White.copy(alpha = 0.22f),
-                    fillColor = MaterialTheme.colorScheme.primary,
-                )
-            }
+        visibleProgressEntry?.let { entry ->
+            NuvioProgressBar(
+                progress = entry.progressFraction,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(
+                        start = metrics.contentPadding,
+                        end = metrics.contentPadding,
+                        bottom = progressBarBottomSpacing,
+                    ),
+                height = progressBarHeight,
+                trackColor = Color.White.copy(alpha = 0.22f),
+                fillColor = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 
