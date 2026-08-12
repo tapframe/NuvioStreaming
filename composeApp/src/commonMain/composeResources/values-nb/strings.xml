@@ -300,13 +300,11 @@
     <string name="compose_auth_create_account">Opprett konto</string>
     <string name="compose_auth_dont_have_account">Har du ikke konto? </string>
     <string name="compose_auth_email">E-post</string>
-    <string name="compose_auth_or_separator">  eller  </string>
     <string name="compose_auth_password">Passord</string>
     <string name="compose_auth_sign_in_subtitle">Logg inn for å få tilgang til biblioteket og fremdriften din</string>
     <string name="compose_auth_sign_in">Logg inn</string>
     <string name="compose_auth_sign_up_subtitle">Registrer deg for å synkronisere data på tvers av enheter</string>
     <string name="compose_auth_sign_up">Registrer deg</string>
-    <string name="compose_auth_store_locally">Dataene dine vil kun lagres lokalt</string>
     <string name="compose_auth_tagline">Strøm alt, overalt</string>
     <string name="compose_auth_welcome_back">Velkommen tilbake</string>
     <string name="compose_catalog_subtitle_library">Bibliotek</string>

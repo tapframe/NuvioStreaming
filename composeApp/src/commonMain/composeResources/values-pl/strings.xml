@@ -302,13 +302,11 @@
     <string name="compose_auth_create_account">Utwórz konto</string>
     <string name="compose_auth_dont_have_account">Nie masz konta? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  lub  </string>
     <string name="compose_auth_password">Hasło</string>
     <string name="compose_auth_sign_in_subtitle">Zaloguj się, aby uzyskać dostęp do biblioteki i postępu</string>
     <string name="compose_auth_sign_in">Zaloguj się</string>
     <string name="compose_auth_sign_up_subtitle">Zarejestruj się, aby synchronizować dane między urządzeniami</string>
     <string name="compose_auth_sign_up">Zarejestruj się</string>
-    <string name="compose_auth_store_locally">Twoje dane będą przechowywane tylko lokalnie</string>
     <string name="compose_auth_tagline">Streamuj wszystko, wszędzie</string>
     <string name="compose_auth_welcome_back">Witaj ponownie</string>
     <string name="compose_catalog_subtitle_library">Biblioteka</string>

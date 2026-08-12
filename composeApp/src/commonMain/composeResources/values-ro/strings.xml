@@ -319,13 +319,11 @@
     <string name="compose_auth_create_account">Creează cont</string>
     <string name="compose_auth_dont_have_account">Nu ai un cont? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  sau  </string>
     <string name="compose_auth_password">Parolă</string>
     <string name="compose_auth_sign_in_subtitle">Autentifică-te pentru a-ți accesa biblioteca și progresul</string>
     <string name="compose_auth_sign_in">Autentificare</string>
     <string name="compose_auth_sign_up_subtitle">Înregistrează-te pentru a-ți sincroniza datele pe toate dispozitivele</string>
     <string name="compose_auth_sign_up">Înregistrare</string>
-    <string name="compose_auth_store_locally">Datele tale vor fi stocate doar local</string>
     <string name="compose_auth_tagline">Urmărește-ți biblioteca, oriunde</string>
     <string name="compose_auth_terms_prefix">Prin înregistrare, sunt de acord cu</string>
     <string name="compose_auth_terms_link">Termenii</string>

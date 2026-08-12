@@ -319,13 +319,11 @@
     <string name="compose_auth_create_account">Vytvořit účet</string>
     <string name="compose_auth_dont_have_account">Nemáte účet? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  nebo  </string>
     <string name="compose_auth_password">Heslo</string>
     <string name="compose_auth_sign_in_subtitle">Přihlaste se pro přístup ke své knihovně a postupu</string>
     <string name="compose_auth_sign_in">Přihlásit se</string>
     <string name="compose_auth_sign_up_subtitle">Zaregistrujte se pro synchronizaci dat napříč zařízeními</string>
     <string name="compose_auth_sign_up">Zaregistrovat se</string>
-    <string name="compose_auth_store_locally">Vaše data budou uložena pouze lokálně</string>
     <string name="compose_auth_tagline">Sledujte svou knihovnu kdekoliv</string>
     <string name="compose_auth_terms_prefix">Registrací souhlasím s</string>
     <string name="compose_auth_terms_link">Podmínkami</string>

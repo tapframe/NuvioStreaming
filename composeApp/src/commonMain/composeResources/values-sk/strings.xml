@@ -311,13 +311,11 @@
     <string name="compose_auth_create_account">Vytvoriť účet</string>
     <string name="compose_auth_dont_have_account">Nemáte účet?</string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">alebo</string>
     <string name="compose_auth_password">Heslo</string>
     <string name="compose_auth_sign_in_subtitle">Prihláste sa pre prístup k vašej knižnici a postupu</string>
     <string name="compose_auth_sign_in">Prihlásiť sa</string>
     <string name="compose_auth_sign_up_subtitle">Zaregistrujte sa a synchronizujte dáta naprieč zariadeniami</string>
     <string name="compose_auth_sign_up">Zaregistrovať sa</string>
-    <string name="compose_auth_store_locally">Vaše dáta budú uložené iba lokálne</string>
     <string name="compose_auth_tagline">Streamujte všetko, všade</string>
     <string name="compose_auth_welcome_back">Vitajte späť</string>
     <string name="compose_catalog_subtitle_library">Knižnica</string>

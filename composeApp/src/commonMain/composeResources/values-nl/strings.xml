@@ -320,13 +320,11 @@
     <string name="compose_auth_create_account">Account aanmaken</string>
     <string name="compose_auth_dont_have_account">Heb je nog geen account? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  of  </string>
     <string name="compose_auth_password">Wachtwoord</string>
     <string name="compose_auth_sign_in_subtitle">Log in om toegang te krijgen tot je bibliotheek en voortgang</string>
     <string name="compose_auth_sign_in">Inloggen</string>
     <string name="compose_auth_sign_up_subtitle">Registreer om je gegevens te synchroniseren tussen apparaten</string>
     <string name="compose_auth_sign_up">Registreren</string>
-    <string name="compose_auth_store_locally">Je gegevens worden alleen lokaal opgeslagen</string>
     <string name="compose_auth_tagline">Bekijk je bibliotheek, overal</string>
     <string name="compose_auth_terms_prefix">Door je te registreren ga je akkoord met de</string>
     <string name="compose_auth_terms_link">Voorwaarden</string>

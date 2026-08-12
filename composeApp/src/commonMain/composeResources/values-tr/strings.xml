@@ -320,13 +320,11 @@
     <string name="compose_auth_create_account">Hesap oluştur</string>
     <string name="compose_auth_dont_have_account">Hesabın yok mu? </string>
     <string name="compose_auth_email">E-posta</string>
-    <string name="compose_auth_or_separator">  veya  </string>
     <string name="compose_auth_password">Şifre</string>
     <string name="compose_auth_sign_in_subtitle">Kitaplığına ve izleme ilerlemene ulaşmak için giriş yap</string>
     <string name="compose_auth_sign_in">Giriş yap</string>
     <string name="compose_auth_sign_up_subtitle">Verilerini cihazlar arasında eşitlemek için kayıt ol</string>
     <string name="compose_auth_sign_up">Kayıt ol</string>
-    <string name="compose_auth_store_locally">Verilerin sadece bu cihazda saklanacak</string>
     <string name="compose_auth_tagline">Her şeyi, her yerde izle</string>
     <string name="compose_auth_terms_prefix">Kayıt olarak şunları kabul ediyorum:</string>
     <string name="compose_auth_terms_link">Kullanım Koşulları</string>

@@ -311,13 +311,11 @@
     <string name="compose_auth_create_account">Créer un compte</string>
     <string name="compose_auth_dont_have_account">Pas encore de compte ? </string>
     <string name="compose_auth_email">Adresse e-mail</string>
-    <string name="compose_auth_or_separator">  ou  </string>
     <string name="compose_auth_password">Mot de passe</string>
     <string name="compose_auth_sign_in_subtitle">Connectez-vous pour accéder à votre bibliothèque et votre progression</string>
     <string name="compose_auth_sign_in">Se connecter</string>
     <string name="compose_auth_sign_up_subtitle">Inscrivez-vous pour synchroniser vos données entre appareils</string>
     <string name="compose_auth_sign_up">S’inscrire</string>
-    <string name="compose_auth_store_locally">Vos données seront uniquement stockées localement</string>
     <string name="compose_auth_tagline">Regardez tout, partout</string>
     <string name="compose_auth_terms_prefix">En m’inscrivant, j’accepte les</string>
     <string name="compose_auth_terms_link">Conditions d’utilisation</string>
