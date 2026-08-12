@@ -368,6 +368,17 @@ final class StremioServiceTests: XCTestCase {
         XCTAssertNil(store.resumablePosition(videoID: "tt-series:1:1", contentID: "other-series"))
     }
 
+    func testTokenEndpointURLCarriesGrantTypeAsQuery() throws {
+        let url = NuvioAccountService.tokenURL(grantType: "password")
+        XCTAssertEqual(url.path, "/auth/v1/token")
+        XCTAssertEqual(url.query, "grant_type=password")
+        XCTAssertEqual(NuvioAccountService.tokenURL(grantType: "refresh_token").query, "grant_type=refresh_token")
+        // Regression guard: appending(path:) folds the query into the path and breaks token auth.
+        let broken = URL(string: "https://api.nuvio.tv")!.appending(path: "/auth/v1/token?grant_type=password")
+        XCTAssertNil(broken.query)
+        XCTAssertNotEqual(broken.path, "/auth/v1/token")
+    }
+
     private func isolatedDefaults() -> UserDefaults {
         let suite = "NuvioTVTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

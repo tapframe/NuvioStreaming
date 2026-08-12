@@ -93,6 +93,8 @@ struct SettingsView: View {
     }
 
     private func signOut() async {
+        URLCache.shared.removeAllCachedResponses()
+        TVSyncClientIdentity.clear()
         addons.clearForLogout()
         library.clearForLogout()
         watchProgress.clearForLogout()

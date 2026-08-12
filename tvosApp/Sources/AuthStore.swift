@@ -15,6 +15,7 @@ final class AuthStore: ObservableObject {
     private let guestKey = "nuvio.tv.continueAsGuest.v1"
     private var nonce: String?
     private var pollingTask: Task<Void, Never>?
+    private var refreshTask: Task<AuthSession, Error>?
 
     init(
         defaults: UserDefaults = .standard,
@@ -70,6 +71,8 @@ final class AuthStore: ObservableObject {
 
     func logout() async {
         pollingTask?.cancel()
+        refreshTask?.cancel()
+        refreshTask = nil
         let current = session
         clearLocalSession()
         status = .signedOut
@@ -80,15 +83,33 @@ final class AuthStore: ObservableObject {
     }
 
     func validAccessToken() async throws -> String {
-        guard var current = session else { throw AuthError.missingUser }
-        if current.needsRefresh {
-            let response = try await service.refresh(token: current.refreshToken)
-            let user = response.user ?? current.user
-            current = response.session(user: user)
-            save(current)
-            status = .authenticated(current)
+        guard let current = session else { throw AuthError.missingUser }
+        guard current.needsRefresh else { return current.accessToken }
+        let refreshed = try await refreshedSession(from: current)
+        return refreshed.accessToken
+    }
+
+    private func refreshedSession(from current: AuthSession) async throws -> AuthSession {
+        if let refreshTask { return try await refreshTask.value }
+        let token = current.refreshToken
+        let user = current.user
+        let task = Task<AuthSession, Error> { [weak self] in
+            guard let self else { throw AuthError.missingUser }
+            let response = try await self.service.refresh(token: token)
+            let active = response.session(user: response.user ?? user)
+            self.save(active)
+            self.status = .authenticated(active)
+            return active
         }
-        return current.accessToken
+        refreshTask = task
+        do {
+            let result = try await task.value
+            refreshTask = nil
+            return result
+        } catch {
+            refreshTask = nil
+            throw error
+        }
     }
 
     private func restore() async {

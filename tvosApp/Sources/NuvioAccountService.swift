@@ -14,16 +14,27 @@ struct NuvioAccountService {
 
     func signIn(email: String, password: String) async throws -> TokenResponse {
         try await request(
-            path: "/auth/v1/token?grant_type=password",
+            url: Self.tokenURL(grantType: "password"),
             body: ["email": email, "password": password]
         )
     }
 
     func refresh(token: String) async throws -> TokenResponse {
         try await request(
-            path: "/auth/v1/token?grant_type=refresh_token",
+            url: Self.tokenURL(grantType: "refresh_token"),
             body: ["refresh_token": token]
         )
+    }
+
+    static func tokenURL(grantType: String) -> URL {
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        components.path = "/auth/v1/token"
+        components.queryItems = [URLQueryItem(name: "grant_type", value: grantType)]
+        return components.url!
+    }
+
+    private func endpointURL(path: String) -> URL {
+        Self.baseURL.appending(path: path)
     }
 
     func user(accessToken: String) async throws -> AuthUser {
@@ -45,7 +56,7 @@ struct NuvioAccountService {
 
     func startTVLogin(nonce: String, deviceName: String) async throws -> TVLoginStart {
         let rows: [TVLoginStart] = try await request(
-            path: "/rest/v1/rpc/start_tv_login_session",
+            url: endpointURL(path: "/rest/v1/rpc/start_tv_login_session"),
             body: [
                 "p_device_nonce": nonce,
                 "p_redirect_base_url": Self.webLoginURL,
@@ -58,7 +69,7 @@ struct NuvioAccountService {
 
     func pollTVLogin(code: String, nonce: String) async throws -> TVLoginPoll {
         let rows: [TVLoginPoll] = try await request(
-            path: "/rest/v1/rpc/poll_tv_login_session",
+            url: endpointURL(path: "/rest/v1/rpc/poll_tv_login_session"),
             body: ["p_code": code, "p_device_nonce": nonce]
         )
         guard let first = rows.first else { throw AuthError.invalidResponse }
@@ -67,14 +78,14 @@ struct NuvioAccountService {
 
     func exchangeTVLogin(code: String, nonce: String) async throws -> TokenResponse {
         try await request(
-            path: "/functions/v1/tv-logins-exchange",
+            url: endpointURL(path: "/functions/v1/tv-logins-exchange"),
             body: ["code": code, "device_nonce": nonce]
         )
     }
 
     func effectiveOwner(accessToken: String) async throws -> String {
         try await request(
-            path: "/rest/v1/rpc/get_sync_owner",
+            url: endpointURL(path: "/rest/v1/rpc/get_sync_owner"),
             body: [String: String](),
             accessToken: accessToken
         )
@@ -99,7 +110,7 @@ struct NuvioAccountService {
 
     func profiles(accessToken: String) async throws -> [TVProfile] {
         try await request(
-            path: "/rest/v1/rpc/sync_pull_profiles",
+            url: endpointURL(path: "/rest/v1/rpc/sync_pull_profiles"),
             body: EmptyAccountPayload(),
             accessToken: accessToken
         )
@@ -107,7 +118,7 @@ struct NuvioAccountService {
 
     func watchProgress(accessToken: String, profileID: Int) async throws -> [SyncWatchProgressRecord] {
         try await request(
-            path: "/rest/v1/rpc/sync_pull_watch_progress",
+            url: endpointURL(path: "/rest/v1/rpc/sync_pull_watch_progress"),
             body: ProfilePayload(pProfileID: profileID),
             accessToken: accessToken
         )
@@ -165,7 +176,7 @@ struct NuvioAccountService {
 
     func collections(accessToken: String, profileID: Int) async throws -> [TVCollection] {
         let rows: [CollectionSyncBlob] = try await request(
-            path: "/rest/v1/rpc/sync_pull_collections",
+            url: endpointURL(path: "/rest/v1/rpc/sync_pull_collections"),
             body: ProfilePayload(pProfileID: profileID),
             accessToken: accessToken
         )
@@ -174,7 +185,7 @@ struct NuvioAccountService {
 
     func homePreferences(accessToken: String, profileID: Int) async throws -> HomePreferences? {
         let rows: [HomeCatalogSyncBlob] = try await request(
-            path: "/rest/v1/rpc/sync_pull_home_catalog_settings",
+            url: endpointURL(path: "/rest/v1/rpc/sync_pull_home_catalog_settings"),
             body: HomeSettingsPayload(pProfileID: profileID, pPlatform: "home_catalog_shared"),
             accessToken: accessToken
         )
@@ -200,7 +211,7 @@ struct NuvioAccountService {
 
     func library(accessToken: String, profileID: Int) async throws -> [LibrarySyncRecord] {
         try await request(
-            path: "/rest/v1/rpc/sync_pull_library",
+            url: endpointURL(path: "/rest/v1/rpc/sync_pull_library"),
             body: LibraryPullPayload(pProfileID: profileID, pLimit: 500, pOffset: 0),
             accessToken: accessToken
         )
@@ -251,11 +262,11 @@ struct NuvioAccountService {
     }
 
     private func request<T: Decodable, B: Encodable>(
-        path: String,
+        url: URL,
         body: B,
         accessToken: String? = nil
     ) async throws -> T {
-        var request = URLRequest(url: Self.baseURL.appending(path: path))
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         addHeaders(to: &request, accessToken: accessToken)
         request.httpBody = try JSONEncoder().encode(body)

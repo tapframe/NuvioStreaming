@@ -10,6 +10,10 @@ enum TVSyncClientIdentity {
         return generated
     }
 
+    static func clear(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key)
+    }
+
     private static func isValid(_ value: String) -> Bool {
         guard (16...96).contains(value.count) else { return false }
         return value.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
