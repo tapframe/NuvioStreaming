@@ -113,6 +113,12 @@ Use concise, literal interface text.
 
 The initial port intentionally leaves these areas for follow-up:
 
+- profile PIN enforcement on PIN-protected profiles
+- Keychain-backed storage for credential-bearing addon URLs
+- a narrower App Transport Security exception policy
+- watch progress deletion reconciliation with the shared sync contract
+- TMDB and Trakt collection source resolution
+- provider credential flow for the Anime Skip client identifier
 - addon subtitle resource discovery
 - next-episode autoplay
 - tracking-provider scrobble synchronization

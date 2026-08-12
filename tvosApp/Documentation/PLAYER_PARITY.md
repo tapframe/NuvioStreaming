@@ -19,10 +19,12 @@ The reference is the established Compose player under `composeApp/src/commonMain
 | Resume and progress persistence | `PlayerScreenRuntimePlaybackActions.kt` | Implemented locally, resumes from 15 seconds through 92 percent, keeps the newest 250 items |
 | Source and episode metadata | `PlayerScreenArgs.kt` | Implemented in the player header and option panels |
 | Network request headers | stream `behaviorHints.proxyHeaders.request` | Implemented with validation and MPV `http-header-fields` |
-| Skip intro, recap, and ending | `SkipIntroRepository.kt`, Anime Skip, AniSkip | Implemented with synchronized mobile integration settings and focused in-player skip actions |
+| Skip intro, recap, and ending | `SkipIntroRepository.kt`, Anime Skip, AniSkip | Implemented with synchronized mobile integration settings and focused in-player skip actions. Anime Skip reads its client identifier from the profile settings blob; the current mobile contract separates that credential into a provider credential flow, so Anime Skip may be enabled without a usable credential until that flow is ported. |
 | Addon subtitle discovery | `SubtitleRepository.kt` | Deferred until the tvOS service implements the subtitle resource endpoint |
 | Subtitle size and delay | `SubtitleStylePanel.kt` | Implemented with native MPV font-size controls and 100 ms delay adjustment |
 | Next-episode autoplay | `PlayerNextEpisodeAutoPlay.kt` | Deferred, manual episode selection is available |
+| Profile PIN protection | `ProfileRepository.kt`, `verify_profile_pin` | Deferred. PIN-protected profiles open without a challenge until the PIN entry flow is implemented. |
+| TMDB and Trakt collection sources | `TVCollectionSource` | Deferred. Sources decode but are not resolved; provider-backed folders render empty. |
 | Tracking scrobble sync | `PlayerScreenRuntimePlaybackActions.kt` | Deferred because native tvOS currently has no tracking provider repository |
 | Picture in Picture | Android platform manager | Outside tvOS fullscreen television scope |
 | Mobile gestures and control lock | `PlayerSurfaceGestures.kt` | Outside remote-first tvOS scope |
