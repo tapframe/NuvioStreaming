@@ -1445,7 +1445,10 @@ internal fun buildHomeContinueWatchingItems(
                 HomeContinueWatchingCandidate(
                     lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
                     item = liveItem
-                        .withFallbackMetadata(cachedInProgressByProgressKey[entry.resolvedProgressKey()])
+                        .withFallbackMetadata(
+                            fallback = cachedInProgressByProgressKey[entry.resolvedProgressKey()],
+                            preserveFallbackPlaybackIdentity = true,
+                        )
                         .withCloudLibraryMetadata(cloudLibraryUiState),
                     isProgressEntry = true,
                 )
@@ -1659,7 +1662,8 @@ internal fun buildHomeInProgressCacheSnapshot(
         val item = entry
             .toContinueWatchingItem()
             .withFallbackMetadata(
-                cachedByProgressKey[entry.resolvedProgressKey()]?.toContinueWatchingItem(),
+                fallback = cachedByProgressKey[entry.resolvedProgressKey()]?.toContinueWatchingItem(),
+                preserveFallbackPlaybackIdentity = true,
             )
         CachedInProgressItem(
             contentId = entry.parentMetaId,
@@ -1792,6 +1796,7 @@ private fun CachedInProgressItem.toContinueWatchingItem(): ContinueWatchingItem 
 
 private fun ContinueWatchingItem.withFallbackMetadata(
     fallback: ContinueWatchingItem?,
+    preserveFallbackPlaybackIdentity: Boolean = false,
 ): ContinueWatchingItem {
     val nonBlankFallbackTitle = fallback?.title?.takeIf { it.isNotBlank() }
     val fallbackHasPlaceholderTitle = fallback?.hasPlaceholderHomeTitle() == true
@@ -1806,14 +1811,18 @@ private fun ContinueWatchingItem.withFallbackMetadata(
         },
         subtitle = when {
             subtitle.isBlank() -> fallback?.subtitle?.takeIf { it.isNotBlank() }.orEmpty()
-            fallback?.subtitle.isNullOrBlank() -> subtitle
-            else -> fallback.subtitle
+            preserveFallbackPlaybackIdentity && !fallback?.subtitle.isNullOrBlank() -> fallback.subtitle
+            else -> subtitle
         },
         imageUrl = imageUrl.orNonBlank(fallback?.imageUrl),
         logo = logo.orNonBlank(fallback?.logo),
         poster = poster.orNonBlank(fallback?.poster),
         background = background.orNonBlank(fallback?.background),
-        videoId = fallback?.videoId?.takeIf { it.isNotBlank() } ?: videoId,
+        videoId = if (preserveFallbackPlaybackIdentity) {
+            fallback?.videoId?.takeIf { it.isNotBlank() } ?: videoId
+        } else {
+            videoId
+        },
         episodeTitle = episodeTitle.orNonBlank(fallback?.episodeTitle),
         episodeThumbnail = episodeThumbnail.orNonBlank(fallback?.episodeThumbnail),
         pauseDescription = pauseDescription.orNonBlank(fallback?.pauseDescription),

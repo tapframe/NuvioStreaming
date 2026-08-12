@@ -255,7 +255,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun `build home continue watching items preserves cached in progress artwork fallback`() {
+    fun `build home continue watching items preserves cached in progress identity and metadata`() {
         val progress = progressEntry(
             videoId = "show:1:4",
             title = "Show",
@@ -271,9 +271,9 @@ class HomeScreenTest {
         val cached = ContinueWatchingItem(
             parentMetaId = "show",
             parentMetaType = "series",
-            videoId = "show:1:4",
+            videoId = "stable-show:1:4",
             title = "Cached Show",
-            subtitle = "S1E4",
+            subtitle = "Cached S1E4",
             imageUrl = "https://example.test/cached.jpg",
             logo = "https://example.test/logo.png",
             poster = "https://example.test/poster.jpg",
@@ -295,6 +295,8 @@ class HomeScreenTest {
             nextUpItemsBySeries = emptyMap(),
         )
 
+        assertEquals("stable-show:1:4", result.single().videoId)
+        assertEquals("Cached S1E4", result.single().subtitle)
         assertEquals("https://example.test/cached.jpg", result.single().imageUrl)
         assertEquals("https://example.test/logo.png", result.single().logo)
         assertEquals("https://example.test/poster.jpg", result.single().poster)

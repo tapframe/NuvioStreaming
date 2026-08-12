@@ -427,6 +427,11 @@ kotlin {
                 }
             }
         }
+        val androidHostTest by getting {
+            if (androidDistribution == "full") {
+                kotlin.srcDir(project.file("src/androidFullHostTest/kotlin"))
+            }
+        }
         commonMain.dependencies {
             implementation("io.coil-kt.coil3:coil-compose:${libs.versions.coil.get()}") {
                 exclude(group = "org.jetbrains.skiko", module = "skiko")
