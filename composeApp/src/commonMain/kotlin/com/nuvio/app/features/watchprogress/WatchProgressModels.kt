@@ -220,6 +220,12 @@ data class ContinueWatchingItem(
     val isNewSeasonRelease: Boolean = false,
 )
 
+internal fun continueWatchingItemKey(item: ContinueWatchingItem): String {
+    val season = item.seasonNumber ?: -1
+    val episode = item.episodeNumber ?: -1
+    return "${item.parentMetaId}:$season:$episode"
+}
+
 data class ContinueWatchingPreferencesUiState(
     val isVisible: Boolean = true,
     val style: ContinueWatchingSectionStyle = ContinueWatchingSectionStyle.Card,

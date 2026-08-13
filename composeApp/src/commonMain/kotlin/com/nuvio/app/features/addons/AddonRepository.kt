@@ -262,7 +262,7 @@ object AddonRepository {
         val manifest = try {
             withContext(Dispatchers.Default) {
                 InAppLogger.info("Addons/Manifest", "GET ${InAppLogger.redactUrl(manifestUrl)} reason=add")
-                val payload = httpGetText(manifestUrl)
+                val payload = fetchAddonResponseText(manifestUrl)
                 InAppLogger.info("Addons/Manifest", "GET ${InAppLogger.redactUrl(manifestUrl)} ok chars=${payload.length} reason=add")
                 AddonManifestParser.parse(
                     manifestUrl = manifestUrl,
@@ -376,11 +376,17 @@ object AddonRepository {
         val enabledAddons = _uiState.value.addons.filter { it.enabled }.distinctBy { it.manifestUrl }
         InAppLogger.info("Addons/Repository", "refreshAll enabledCount=${enabledAddons.size}")
         enabledAddons.forEach { addon ->
-            refreshAddon(addon.manifestUrl)
+            refreshAddon(
+                manifestUrl = addon.manifestUrl,
+                forceRefresh = true,
+            )
         }
     }
 
-    fun refreshAddon(manifestUrl: String) {
+    fun refreshAddon(
+        manifestUrl: String,
+        forceRefresh: Boolean = false,
+    ) {
         val existingJob = activeRefreshJobs[manifestUrl]
         if (existingJob?.isActive == true) {
             InAppLogger.debug("Addons/Manifest", "refresh skipped active url=${InAppLogger.redactUrl(manifestUrl)}")
@@ -393,7 +399,10 @@ object AddonRepository {
             try {
                 val result = runCatching {
                     InAppLogger.info("Addons/Manifest", "GET ${InAppLogger.redactUrl(manifestUrl)} reason=refresh")
-                    val payload = httpGetText(manifestUrl)
+                    val payload = fetchAddonResponseText(
+                        url = manifestUrl,
+                        forceRefresh = forceRefresh,
+                    )
                     InAppLogger.info("Addons/Manifest", "GET ${InAppLogger.redactUrl(manifestUrl)} ok chars=${payload.length} reason=refresh")
                     AddonManifestParser.parse(
                         manifestUrl = manifestUrl,

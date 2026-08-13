@@ -60,7 +60,7 @@ suspend fun resolveWatchedBadgesBulk(
         for (contentId in touchedSeriesIds) {
             semaphore.withPermit {
                 val meta = try {
-                    MetaDetailsRepository.fetch(type = "series", id = contentId)
+                    MetaDetailsRepository.fetch(type = "series", id = contentId, cacheResult = false)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Throwable) {

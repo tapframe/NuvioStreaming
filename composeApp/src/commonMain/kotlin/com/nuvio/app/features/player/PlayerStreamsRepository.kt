@@ -6,7 +6,7 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
-import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridStreamPresentation
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
@@ -356,7 +356,10 @@ object PlayerStreamsRepository {
                         "Fetching streams addon=$displayName addonId=${addon.addonId} url=${InAppLogger.redactUrl(url)}",
                     )
                     val group = runCatchingUnlessCancelled {
-                        val payload = httpGetText(url)
+                        val payload = fetchAddonResponseText(
+                            url = url,
+                            forceRefresh = forceRefresh,
+                        )
                         StreamParser.parse(
                             payload = payload,
                             addonName = displayName,
@@ -538,5 +541,4 @@ private fun StreamsUiState.streamDiagnostics(): String {
 
 private fun com.nuvio.app.features.addons.ManagedAddon.streamAddonInstanceId(manifestId: String): String =
     "addon:$manifestId:$manifestUrl"
-
 

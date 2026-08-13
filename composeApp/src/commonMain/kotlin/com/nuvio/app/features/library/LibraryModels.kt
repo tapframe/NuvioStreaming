@@ -40,6 +40,9 @@ data class LibrarySection(
     val items: List<LibraryItem>,
 )
 
+internal fun librarySectionItemKey(sectionType: String, item: LibraryItem): String =
+    "$sectionType|${item.type}|${item.id}"
+
 enum class LibrarySourceMode {
     LOCAL,
     TRAKT,
