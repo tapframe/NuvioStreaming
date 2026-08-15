@@ -12,7 +12,6 @@ final class MPVPictureInPictureFrameCapture {
     private let playbackPositionProvider: () -> Double
     private let videoFrameRateProvider: () -> Double
     private let playbackRateProvider: () -> Double
-    private let isPausedProvider: () -> Bool
 
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
@@ -33,7 +32,6 @@ final class MPVPictureInPictureFrameCapture {
     private var lastCaptureTime: CFTimeInterval = 0
     private var enqueuedFrameCount: UInt64 = 0
     private var loggedUnsupportedFormat = false
-    private var extendedDynamicRangePreferred = true
 
     init?(
         displayLayer: AVSampleBufferDisplayLayer,
@@ -41,8 +39,7 @@ final class MPVPictureInPictureFrameCapture {
         videoSizeProvider: @escaping () -> CGSize,
         playbackPositionProvider: @escaping () -> Double,
         videoFrameRateProvider: @escaping () -> Double,
-        playbackRateProvider: @escaping () -> Double,
-        isPausedProvider: @escaping () -> Bool
+        playbackRateProvider: @escaping () -> Double
     ) {
         guard
             let device = metalLayer.device ?? MTLCreateSystemDefaultDevice(),
@@ -58,7 +55,6 @@ final class MPVPictureInPictureFrameCapture {
         self.playbackPositionProvider = playbackPositionProvider
         self.videoFrameRateProvider = videoFrameRateProvider
         self.playbackRateProvider = playbackRateProvider
-        self.isPausedProvider = isPausedProvider
         self.device = device
         self.commandQueue = queue
 
@@ -82,9 +78,6 @@ final class MPVPictureInPictureFrameCapture {
     }
 
     func setExtendedDynamicRangePreferred(_ enabled: Bool) {
-        stateLock.lock()
-        extendedDynamicRangePreferred = enabled
-        stateLock.unlock()
         if #available(iOS 17.0, *) {
             DispatchQueue.main.async { [weak self] in
                 self?.displayLayer.wantsExtendedDynamicRangeContent = enabled
@@ -102,6 +95,7 @@ final class MPVPictureInPictureFrameCapture {
 
     func setBackgrounded(_ backgrounded: Bool) {
         metalLayer.capturesWithoutPresentation = backgrounded
+        metalLayer.releasePendingDrawable()
         InAppLogBridge.shared.info(
             tag: "PiP/iOS",
             message: "PiP capture mode=\(backgrounded ? "deferred" : "presented") " +
@@ -156,8 +150,6 @@ final class MPVPictureInPictureFrameCapture {
         }
     }
 
-    var capturedDrawableCount: UInt64 { metalLayer.capturedDrawableCount }
-
     var enqueuedFrames: UInt64 {
         stateLock.lock()
         defer { stateLock.unlock() }
@@ -185,6 +177,8 @@ final class MPVPictureInPictureFrameCapture {
     }
 
     private func handlePresentedDrawable(_ drawable: CAMetalDrawable) {
+        guard !metalLayer.isSuspended else { return }
+
         stateLock.lock()
         let priming = isPriming
         let active = isActive
@@ -197,7 +191,7 @@ final class MPVPictureInPictureFrameCapture {
         }
         let now = CACurrentMediaTime()
         let minimumInterval = 1.0 / (frameRate * max(0.5, playbackRateProvider()))
-        if active && !priming && burst == 0 && (now - lastCaptureTime) < minimumInterval * 0.5 {
+        if burst == 0 && (now - lastCaptureTime) < minimumInterval * 0.5 {
             stateLock.unlock()
             return
         }

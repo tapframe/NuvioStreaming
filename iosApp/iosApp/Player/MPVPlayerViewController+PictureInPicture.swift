@@ -16,20 +16,9 @@ extension MPVPlayerViewController {
             displayLayer: sampleBufferDisplayView.displayLayer,
             metalLayer: metalLayer,
             videoSizeProvider: { [weak self] in self?.currentRenderVideoSize() ?? .zero },
-            playbackPositionProvider: { [weak self] in
-                guard let self else { return 0 }
-                let precisePosition = self.getDouble("time-pos")
-                return precisePosition.isFinite ? precisePosition : Double(self.positionMs) / 1000.0
-            },
-            videoFrameRateProvider: { [weak self] in
-                guard let self else { return 30.0 }
-                let container = self.getDouble("container-fps")
-                if container.isFinite, container >= 12 { return container }
-                let estimated = self.getDouble("estimated-vf-fps")
-                return estimated.isFinite && estimated >= 12 ? estimated : 30.0
-            },
-            playbackRateProvider: { [weak self] in Double(self?.currentSpeed ?? 1.0) },
-            isPausedProvider: { [weak self] in !(self?.isPlayerPlaying ?? false) }
+            playbackPositionProvider: { [weak self] in self?.interpolatedPositionSeconds ?? 0 },
+            videoFrameRateProvider: { [weak self] in self?.currentRenderFrameRate ?? 30.0 },
+            playbackRateProvider: { [weak self] in Double(self?.currentSpeed ?? 1.0) }
         )
         primaryRenderSurface = renderSurface
         sampleBufferDisplayView.alpha = 1.0
@@ -37,15 +26,10 @@ extension MPVPlayerViewController {
         sampleBufferDisplayView.pictureInPictureController?.setAutomaticStartEnabled(false)
     }
 
-    func layoutExperimentalPictureInPictureSurfacesIfNeeded(in bounds: CGRect) -> Bool {
-        guard experimentalSinglePrimaryPictureInPictureEnabled else { return false }
+    func layoutExperimentalPictureInPictureSurfaces(in bounds: CGRect) {
+        guard experimentalSinglePrimaryPictureInPictureEnabled else { return }
         sampleBufferDisplayView.frame = CGRect(origin: .zero, size: bounds.size)
         primaryRenderSurface?.requestRenderBurst(reason: "layout", count: 2)
-        return false
-    }
-
-    func initializeExperimentalPictureInPictureMpvIfNeeded() -> Bool {
-        return false
     }
 
     func setupNotifications() {
@@ -169,6 +153,10 @@ extension MPVPlayerViewController {
     }
 
     @objc func cancelAutomaticPictureInPictureIfForegrounded() {
+        retryDeviceLossRecoveryNow()
+        if !isAwaitingDeviceLossRecovery {
+            metalLayer.setRenderingSuspended(false, reason: "did-become-active")
+        }
         defer {
             if !isPictureInPictureActive(), !isPictureInPictureStarting {
                 clearPictureInPictureStartPlaybackPreservation()
@@ -193,6 +181,7 @@ extension MPVPlayerViewController {
     }
 
     @objc func enterBackground() {
+        metalLayer.releasePendingDrawable()
         primaryRenderSurface?.setBackgrounded(true)
         guard mpv != nil else { return }
         if experimentalSinglePrimaryPictureInPictureEnabled {
@@ -236,6 +225,10 @@ extension MPVPlayerViewController {
     }
 
     @objc func enterForeground() {
+        retryDeviceLossRecoveryNow()
+        if !isAwaitingDeviceLossRecovery {
+            metalLayer.setRenderingSuspended(false, reason: "enter-foreground")
+        }
         primaryRenderSurface?.setBackgrounded(false)
         guard mpv != nil else { return }
         if experimentalSinglePrimaryPictureInPictureEnabled {
@@ -469,8 +462,6 @@ extension MPVPlayerViewController {
         endAutomaticPictureInPictureBackgroundTask()
         if !isPictureInPictureActive() {
             isPictureInPictureStarting = false
-        }
-        if !isPictureInPictureActive() {
             clearPictureInPictureStartPlaybackPreservation()
         }
         if stopPriming {
