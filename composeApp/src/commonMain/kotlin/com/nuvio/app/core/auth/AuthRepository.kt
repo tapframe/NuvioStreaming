@@ -14,6 +14,7 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,7 @@ object AuthRepository {
     val error: StateFlow<String?> = _error.asStateFlow()
 
     private var initialized = false
+    private var sessionStatusJob: Job? = null
     private var validatedRemoteUserId: String? = null
 
     fun initialize() {
@@ -48,7 +50,7 @@ object AuthRepository {
             )
         }
 
-        scope.launch {
+        sessionStatusJob = scope.launch {
             SupabaseProvider.client.auth.sessionStatus.collect { status ->
                 if (AuthStorage.loadAnonymousUserId() != null) return@collect
                 when (status) {
@@ -172,6 +174,27 @@ object AuthRepository {
             }.getOrDefault("Sign out failed")
             Result.failure(failure)
         }
+    }
+
+    suspend fun prepareForServerSwitch(): Result<Unit> {
+        _error.value = null
+        val anonymousClear = runCatching { AuthStorage.clearAnonymousUserId() }
+        validatedRemoteUserId = null
+        val sessionClear = runCatching { SupabaseProvider.client.auth.clearSession() }
+        _state.value = AuthState.Unauthenticated
+        val failure = anonymousClear.exceptionOrNull() ?: sessionClear.exceptionOrNull()
+        val cancellation = sessionClear.exceptionOrNull() as? CancellationException
+        if (cancellation != null) throw cancellation
+        return if (failure == null) Result.success(Unit) else Result.failure(failure)
+    }
+
+    fun reinitialize() {
+        sessionStatusJob?.cancel()
+        sessionStatusJob = null
+        initialized = false
+        validatedRemoteUserId = null
+        _state.value = AuthState.Loading
+        initialize()
     }
 
     suspend fun signOutIfSessionInvalid(error: Throwable, source: String): Boolean {
