@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="episodes_sort_descending_action">ترتيب الحلقات تنازليًا</string>
+    <string name="episodes_sort_ascending_action">ترتيب الحلقات تصاعديًا</string>
+</resources>

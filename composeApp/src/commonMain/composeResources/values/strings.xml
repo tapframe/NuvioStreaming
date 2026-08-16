@@ -2196,6 +2196,8 @@
     <string name="entity_browse_about">About</string>
     <string name="player_external_loading_subtitles">Loading subtitles from addons...</string>
     <string name="player_external_downloading_subtitles">Downloading subtitles...</string>
+    <string name="episodes_sort_descending_action">Sort episodes descending</string>
+    <string name="episodes_sort_ascending_action">Sort episodes ascending</string>
     <plurals name="entity_browse_title_count">
         <item quantity="one">%d title</item>
         <item quantity="other">%d titles</item>
