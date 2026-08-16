@@ -78,7 +78,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 
 private const val TAG = "NuvioPlayer"
@@ -911,6 +913,7 @@ private fun LibmpvPlayerSurface(
     onError: (String?) -> Unit,
 ) {
     val context = LocalContext.current
+    val isLocalFileSource = sourceUrl.startsWith("file:", ignoreCase = true)
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
@@ -1149,8 +1152,8 @@ private fun LibmpvPlayerSurface(
         factory = { viewContext ->
             NuvioLibmpvView(
                 context = viewContext,
-                videoOutput = videoOutput,
-                hardwareDecodingEnabled = hardwareDecodingEnabled,
+                videoOutput = if (isLocalFileSource) AndroidLibmpvVideoOutput.Gpu else videoOutput,
+                hardwareDecodingEnabled = if (isLocalFileSource) false else hardwareDecodingEnabled,
                 yuv420pEnabled = yuv420pEnabled,
             ).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
@@ -1260,9 +1263,9 @@ private class NuvioLibmpvView(
         val sourceUrl = currentSourceUrl ?: return
         applyRequestHeaders(currentRequestHeaders)
         setPaused(!playWhenReady)
-        mpv.command("loadfile", sourceUrl, "replace")
+        mpv.command("loadfile", sourceUrl.toMpvSource(), "replace")
         currentSourceAudioUrl?.takeIf { it.isNotBlank() }?.let { sourceAudioUrl ->
-            mpv.command("audio-add", sourceAudioUrl, "auto")
+            mpv.command("audio-add", sourceAudioUrl.toMpvSource(), "auto")
         }
         currentExternalSubtitles.forEachIndexed { index, subtitle ->
             val flag = if (index == 0) "auto" else "cached"
@@ -1270,6 +1273,13 @@ private class NuvioLibmpvView(
         }
         setPaused(!playWhenReady)
     }
+
+    private fun String.toMpvSource(): String =
+        if (!startsWith("file:", ignoreCase = true)) {
+            this
+        } else {
+            runCatching { File(URI(this)).absolutePath }.getOrDefault(this)
+        }
 
     fun setPaused(paused: Boolean) {
         runCatching { mpv.setPropertyBoolean("pause", paused) }
