@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
@@ -2010,9 +2012,9 @@ private fun ConfiguredMetaSections(
                                 stringResource(Res.string.hero_mark_watched)
                             },
                             icon = if (isWatched) {
-                                Icons.Default.CheckCircle
+                                Icons.Default.Visibility
                             } else {
-                                Icons.Default.CheckCircleOutline
+                                Icons.Default.VisibilityOff
                             },
                             isActive = isWatched,
                             onClick = onWatchedClick,
