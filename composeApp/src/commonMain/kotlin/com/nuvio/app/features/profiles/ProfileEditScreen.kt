@@ -53,7 +53,7 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
-import com.nuvio.app.features.home.components.CollectionCardRemoteImage
+import com.nuvio.app.core.ui.NuvioAsyncImage
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -408,7 +408,7 @@ private fun ProfileIdentityCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (customAvatarUrl != null) {
-                        CollectionCardRemoteImage(
+                        NuvioAsyncImage(
                             imageUrl = customAvatarUrl,
                             contentDescription = name,
                             modifier = Modifier.fillMaxSize(),
@@ -416,7 +416,7 @@ private fun ProfileIdentityCard(
                             animateIfPossible = true,
                         )
                     } else if (selectedAvatar != null) {
-                        CollectionCardRemoteImage(
+                        NuvioAsyncImage(
                             imageUrl = avatarStorageUrl(selectedAvatar.storagePath),
                             contentDescription = selectedAvatar.displayName,
                             modifier = Modifier.fillMaxSize(),
@@ -525,7 +525,7 @@ private fun AvatarChoiceItem(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        CollectionCardRemoteImage(
+        NuvioAsyncImage(
             imageUrl = avatarStorageUrl(avatar.storagePath),
             contentDescription = avatar.displayName,
             modifier = Modifier.fillMaxSize().clip(CircleShape),

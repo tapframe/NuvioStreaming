@@ -1,4 +1,4 @@
-package com.nuvio.app.features.home.components
+package com.nuvio.app.core.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -9,7 +9,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 
 @Composable
-internal actual fun CollectionCardRemoteImage(
+internal actual fun NuvioAsyncImage(
     imageUrl: String,
     contentDescription: String,
     modifier: Modifier,

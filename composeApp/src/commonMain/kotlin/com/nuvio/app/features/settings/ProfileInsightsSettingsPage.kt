@@ -62,7 +62,7 @@ import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.nuvio
-import com.nuvio.app.features.home.components.CollectionCardRemoteImage
+import com.nuvio.app.core.ui.NuvioAsyncImage
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.library.LibraryItem
@@ -453,7 +453,7 @@ private fun ProfileHeroAvatar(
         contentAlignment = Alignment.Center,
     ) {
         if (!avatarImageUrl.isNullOrBlank()) {
-            CollectionCardRemoteImage(
+            NuvioAsyncImage(
                 imageUrl = avatarImageUrl,
                 contentDescription = profileName,
                 modifier = Modifier
@@ -740,7 +740,7 @@ private fun ProfileInsightPosterTile(
             contentAlignment = Alignment.Center,
         ) {
             if (resolvedImageUrl != null) {
-                CollectionCardRemoteImage(
+                NuvioAsyncImage(
                     imageUrl = resolvedImageUrl.orEmpty(),
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
