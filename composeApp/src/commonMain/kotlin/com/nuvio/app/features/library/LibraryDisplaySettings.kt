@@ -170,7 +170,7 @@ internal fun buildLibraryVerticalProjection(
         }
     }
     val availableTypes = deduplicatedEntries.values
-        .map { entry -> entry.item.type.normalizedLibraryType() }
+        .map { entry -> (entry.item.mediaCategory ?: entry.item.type).normalizedLibraryType() }
         .filter { it.isNotBlank() }
         .distinct()
         .sorted()
@@ -178,7 +178,7 @@ internal fun buildLibraryVerticalProjection(
         ?.normalizedLibraryType()
         ?.takeIf { it in availableTypes }
     val filteredEntries = deduplicatedEntries.values.filter { entry ->
-        effectiveType == null || entry.item.type.normalizedLibraryType() == effectiveType
+        effectiveType == null || (entry.item.mediaCategory ?: entry.item.type).normalizedLibraryType() == effectiveType
     }
     val entryByKey = filteredEntries.associateBy { entry -> libraryDisplayItemKey(entry.item) }
     val sortedEntries = sortLibraryItems(

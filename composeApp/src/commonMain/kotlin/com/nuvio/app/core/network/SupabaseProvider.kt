@@ -1,7 +1,7 @@
 package com.nuvio.app.core.network
 
 import com.nuvio.app.core.build.AppVersionConfig
-import com.nuvio.app.core.logging.InAppLogger
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
@@ -13,16 +13,19 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.takeFrom
 
 object SupabaseProvider {
+    private var cachedClient: SupabaseClient? = null
+
     @OptIn(SupabaseInternal::class)
-    val client by lazy {
+    val client: SupabaseClient
+        get() = cachedClient ?: createClient().also { cachedClient = it }
+
+    @OptIn(SupabaseInternal::class)
+    private fun createClient(): SupabaseClient {
+        val configuration = ServerConfigurationRepository.active.value
         val userAgent = "NuvioMobile/${AppVersionConfig.VERSION_NAME.ifBlank { "dev" }}"
-        InAppLogger.info(
-            "Network/Supabase",
-            "Creating Supabase client url=${InAppLogger.redactUrl(SupabaseConfig.URL)} userAgent=$userAgent",
-        )
-        val nextClient = createSupabaseClient(
-            supabaseUrl = SupabaseConfig.URL,
-            supabaseKey = SupabaseConfig.ANON_KEY,
+        return createSupabaseClient(
+            supabaseUrl = configuration.backendUrl,
+            supabaseKey = configuration.publishableKey,
         ) {
             httpConfig {
                 if (SupabaseEndpointConfig.hasFallback) {
@@ -55,7 +58,11 @@ object SupabaseProvider {
             install(Postgrest)
             install(Functions)
         }
-        InAppLogger.info("Network/Supabase", "Supabase client created")
-        nextClient
+    }
+
+    suspend fun reset() {
+        val previous = cachedClient
+        cachedClient = null
+        previous?.close()
     }
 }

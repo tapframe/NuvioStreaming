@@ -1,6 +1,7 @@
 package com.nuvio.app.features.settings
 
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.lang_arabic
 import nuvio.composeapp.generated.resources.lang_bulgarian
 import nuvio.composeapp.generated.resources.lang_czech
 import nuvio.composeapp.generated.resources.lang_english
@@ -30,6 +31,7 @@ enum class AppLanguage(
     val labelRes: StringResource,
 ) {
     DEVICE("device", Res.string.settings_appearance_app_language_device),
+    ARABIC("ar", Res.string.lang_arabic),
     BULGARIAN("bg", Res.string.lang_bulgarian),
     CZECH("cs", Res.string.lang_czech),
     ENGLISH("en", Res.string.lang_english),
