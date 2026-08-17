@@ -8,11 +8,15 @@ import kotlin.test.assertTrue
 class ScopedDisintegrationTrackerTest {
 
     @Test
-    fun `same source retains removed items for disintegration`() {
+    fun `armed removal retains item for disintegration`() {
         val tracker = ScopedDisintegrationTracker<String, String, String>(itemKey = { it })
         tracker.sync(scope = "trakt", items = listOf("first", "second"))
 
-        val entries = tracker.sync(scope = "trakt", items = listOf("second"))
+        val entries = tracker.sync(
+            scope = "trakt",
+            items = listOf("second"),
+            request = DisintegrationRequest(id = 1L, key = "first"),
+        )
 
         assertEquals(listOf("first", "second"), entries.map { it.item })
         assertTrue(entries.first { it.item == "first" }.exiting)
@@ -20,10 +24,65 @@ class ScopedDisintegrationTrackerTest {
     }
 
     @Test
-    fun `source replacement drops old items without disintegration`() {
+    fun `unarmed removal drops item without disintegration`() {
+        val tracker = ScopedDisintegrationTracker<String, String, String>(itemKey = { it })
+        tracker.sync(scope = "trakt", items = listOf("first", "second"))
+
+        val entries = tracker.sync(scope = "trakt", items = listOf("second"))
+
+        assertEquals(listOf("second"), entries.map { it.item })
+        assertTrue(entries.none { it.exiting })
+    }
+
+    @Test
+    fun `request first seen with initial snapshot does not arm future removal`() {
+        val tracker = ScopedDisintegrationTracker<String, String, String>(itemKey = { it })
+        val request = DisintegrationRequest(id = 1L, key = "first")
+        tracker.sync(scope = "trakt", items = listOf("first"), request = request)
+
+        val entries = tracker.sync(scope = "trakt", items = emptyList(), request = request)
+
+        assertTrue(entries.isEmpty())
+    }
+
+    @Test
+    fun `armed request survives unchanged snapshots until removal`() {
+        val tracker = ScopedDisintegrationTracker<String, String, String>(itemKey = { it })
+        tracker.sync(scope = "trakt", items = listOf("first", "second"))
+        val request = DisintegrationRequest(id = 1L, key = "first")
+
+        tracker.sync(scope = "trakt", items = listOf("first", "second"), request = request)
+        val entries = tracker.sync(scope = "trakt", items = listOf("second"), request = request)
+
+        assertTrue(entries.first { it.item == "first" }.exiting)
+    }
+
+    @Test
+    fun `cancelled request drops removed item without disintegration`() {
+        val tracker = ScopedDisintegrationTracker<String, String, String>(itemKey = { it })
+        tracker.sync(scope = "trakt", items = listOf("first", "second"))
+        val request = DisintegrationRequest(id = 1L, key = "first")
+        tracker.sync(scope = "trakt", items = listOf("first", "second"), request = request)
+
+        val entries = tracker.sync(
+            scope = "trakt",
+            items = listOf("second"),
+            request = request.copy(isActive = false),
+        )
+
+        assertEquals(listOf("second"), entries.map { it.item })
+        assertTrue(entries.none { it.exiting })
+    }
+
+    @Test
+    fun `source replacement drops armed items without disintegration`() {
         val tracker = ScopedDisintegrationTracker<String, String, String>(itemKey = { it })
         tracker.sync(scope = "trakt", items = listOf("trakt-one", "trakt-two"))
-        tracker.sync(scope = "trakt", items = listOf("trakt-two"))
+        tracker.sync(
+            scope = "trakt",
+            items = listOf("trakt-one", "trakt-two"),
+            request = DisintegrationRequest(id = 1L, key = "trakt-one"),
+        )
 
         val entries = tracker.sync(scope = "simkl", items = listOf("simkl-one"))
 

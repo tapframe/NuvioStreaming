@@ -161,7 +161,12 @@ internal fun AddonsSettingsPageContent(
                     } else {
                         null
                     },
-                    onRefreshClick = { AddonRepository.refreshAddon(addon.manifestUrl) },
+                    onRefreshClick = {
+                        AddonRepository.refreshAddon(
+                            manifestUrl = addon.manifestUrl,
+                            forceRefresh = true,
+                        )
+                    },
                     onEnabledChange = { enabled ->
                         AddonRepository.setAddonEnabled(addon.manifestUrl, enabled)
                     },

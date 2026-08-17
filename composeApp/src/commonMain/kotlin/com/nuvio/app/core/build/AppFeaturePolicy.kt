@@ -16,4 +16,5 @@ expect object AppFeaturePolicy {
     val inAppUpdaterEnabled: Boolean
     val imdbRatingLogoEnabled: Boolean
     val mediaPlaybackForegroundServiceEnabled: Boolean
+    val customServerConnectionsEnabled: Boolean
 }
