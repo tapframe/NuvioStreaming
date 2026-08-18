@@ -5,7 +5,7 @@ import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
-import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.mdblist.MdbListMetadataService
@@ -193,7 +193,7 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState()
     }
 
-    suspend fun fetch(type: String, id: String): MetaDetails? {
+    suspend fun fetch(type: String, id: String, cacheResult: Boolean = true): MetaDetails? {
         val requestKey = "$type:$id"
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
@@ -205,13 +205,17 @@ object MetaDetailsRepository {
                 tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
             }
             if (result != null) {
-                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+                if (cacheResult) {
+                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+                }
                 return result
             }
         }
 
         return tryFetchTmdbFallbackMeta(type = type, id = id)?.also { result ->
-            cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+            if (cacheResult) {
+                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+            }
         }
     }
 
@@ -236,7 +240,7 @@ object MetaDetailsRepository {
         return try {
             TmdbSettingsRepository.ensureLoaded()
             log.d { "Fetching meta from: $url" }
-            val payload = httpGetText(url)
+            val payload = fetchAddonResponseText(url)
             log.d { "Raw payload length=${payload.length}, first 500 chars: ${payload.take(500)}" }
             val result = MetaDetailsParser.parse(payload)
             val tmdbEnriched = withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {

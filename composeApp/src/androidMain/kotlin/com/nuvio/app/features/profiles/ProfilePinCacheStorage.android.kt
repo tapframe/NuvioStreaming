@@ -19,14 +19,14 @@ actual object ProfilePinCacheStorage {
         preferences
             ?.edit()
             ?.putString(payloadKey(profileIndex), payload)
-            ?.apply()
+            ?.commit()
     }
 
     actual fun removePayload(profileIndex: Int) {
         preferences
             ?.edit()
             ?.remove(payloadKey(profileIndex))
-            ?.apply()
+            ?.commit()
     }
 
     private fun payloadKey(profileIndex: Int): String = "profile_pin_cache_$profileIndex"

@@ -67,6 +67,7 @@ import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.DisintegratingContainer
+import com.nuvio.app.core.ui.DisintegrationRequest
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.core.ui.NuvioScreen
@@ -105,6 +106,7 @@ fun LibraryScreen(
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
+    disintegrationRequest: DisintegrationRequest<String>? = null,
 ) {
     val uiState by remember {
         LibraryRepository.ensureLoaded()
@@ -226,6 +228,7 @@ fun LibraryScreen(
             sourceMode = uiState.sourceMode,
             sections = sortedSections,
             previewLimit = LIBRARY_SECTION_PREVIEW_LIMIT,
+            request = disintegrationRequest,
         )
     } else {
         disintegration.reset()
@@ -1253,12 +1256,9 @@ private class LibraryExitingEntry(
     val index: Int,
 )
 
-private fun libraryGlobalKey(sectionType: String, item: LibraryItem): String =
-    "$sectionType|${item.type}|${item.id}"
-
 private class LibraryDisintegrationHolder {
     private val tracker = ScopedDisintegrationTracker<LibrarySourceMode, String, LibraryExitingEntry> { entry ->
-        libraryGlobalKey(entry.sectionType, entry.item)
+        librarySectionItemKey(entry.sectionType, entry.item)
     }
 
     fun onExited(globalKey: String) {
@@ -1273,6 +1273,7 @@ private class LibraryDisintegrationHolder {
         sourceMode: LibrarySourceMode,
         sections: List<LibrarySection>,
         previewLimit: Int,
+        request: DisintegrationRequest<String>?,
     ): List<LibraryDisplaySection> {
         val current = ArrayList<LibraryExitingEntry>()
         sections.forEach { section ->
@@ -1280,7 +1281,7 @@ private class LibraryDisintegrationHolder {
                 current += LibraryExitingEntry(item, section.type, section.displayTitle, index)
             }
         }
-        val exitingBySection = tracker.sync(sourceMode, current)
+        val exitingBySection = tracker.sync(sourceMode, current, request)
             .asSequence()
             .filter { entry -> entry.exiting }
             .map { entry -> entry.item }
@@ -1293,14 +1294,14 @@ private class LibraryDisintegrationHolder {
             val entries = ArrayList<LibraryDisplayEntry>(previewLimit + 1)
             section.items.take(previewLimit).forEach { item ->
                 entries += LibraryDisplayEntry(
-                    globalKey = libraryGlobalKey(section.type, item),
+                    globalKey = librarySectionItemKey(section.type, item),
                     item = item,
                     section = section,
                     exiting = false,
                 )
             }
             exitingBySection[section.type]?.sortedBy { it.index }?.forEach { ex ->
-                val key = libraryGlobalKey(section.type, ex.item)
+                val key = librarySectionItemKey(section.type, ex.item)
                 if (entries.none { it.globalKey == key }) {
                     entries.add(
                         ex.index.coerceIn(0, entries.size),
@@ -1315,7 +1316,7 @@ private class LibraryDisintegrationHolder {
             if (type in seenTypes) continue
             val sorted = list.sortedBy { it.index }
             val entries = sorted.map { ex ->
-                LibraryDisplayEntry(libraryGlobalKey(type, ex.item), ex.item, section = null, exiting = true)
+                LibraryDisplayEntry(librarySectionItemKey(type, ex.item), ex.item, section = null, exiting = true)
             }
             result += LibraryDisplaySection(null, type, sorted.first().sectionTitle, entries)
         }

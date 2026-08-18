@@ -94,6 +94,8 @@ internal expect object PlayerSettingsStorage {
     fun saveIntroSubmitEnabled(enabled: Boolean)
     fun loadStreamAutoPlayNextEpisodeEnabled(): Boolean?
     fun saveStreamAutoPlayNextEpisodeEnabled(enabled: Boolean)
+    fun loadStreamAutoPlayNextEpisodeFallbackEnabled(): Boolean?
+    fun saveStreamAutoPlayNextEpisodeFallbackEnabled(enabled: Boolean)
     fun loadStreamAutoPlayPreferBingeGroup(): Boolean?
     fun saveStreamAutoPlayPreferBingeGroup(enabled: Boolean)
     fun loadStreamAutoPlayReuseBingeGroup(): Boolean?

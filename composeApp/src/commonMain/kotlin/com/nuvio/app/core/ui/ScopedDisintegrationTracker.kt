@@ -14,9 +14,11 @@ internal class ScopedDisintegrationTracker<S, K, T>(
     private val itemKey: (T) -> K,
 ) {
     private val exiting = LinkedHashMap<K, Pair<T, Int>>()
+    private val armedRequests = LinkedHashMap<K, Long>()
     private var previous = LinkedHashMap<K, Pair<T, Int>>()
     private var activeScope: S? = null
     private var hasActiveScope = false
+    private var lastRequest: DisintegrationRequest<K>? = null
     private var invalidations by mutableStateOf(0)
 
     fun onDisintegrated(key: K) {
@@ -25,27 +27,44 @@ internal class ScopedDisintegrationTracker<S, K, T>(
 
     fun reset() {
         exiting.clear()
+        armedRequests.clear()
         previous = LinkedHashMap()
         activeScope = null
         hasActiveScope = false
     }
 
-    fun sync(scope: S, items: List<T>): List<DisintegrationTrackedItem<K, T>> {
+    fun sync(
+        scope: S,
+        items: List<T>,
+        request: DisintegrationRequest<K>? = null,
+    ): List<DisintegrationTrackedItem<K, T>> {
         @Suppress("UNUSED_EXPRESSION")
         invalidations
 
         if (!hasActiveScope || activeScope != scope) {
             exiting.clear()
+            armedRequests.clear()
             previous = LinkedHashMap()
             activeScope = scope
             hasActiveScope = true
+        }
+
+        if (request != null && request != lastRequest) {
+            if (request.isActive) {
+                if (request.key in previous) {
+                    armedRequests[request.key] = request.id
+                }
+            } else if (armedRequests[request.key] == request.id) {
+                armedRequests.remove(request.key)
+            }
+            lastRequest = request
         }
 
         val current = LinkedHashMap<K, Pair<T, Int>>()
         items.forEachIndexed { index, item -> current[itemKey(item)] = item to index }
 
         for ((key, info) in previous) {
-            if (key !in current && key !in exiting) {
+            if (key !in current && key !in exiting && armedRequests.remove(key) != null) {
                 exiting[key] = info
             }
         }

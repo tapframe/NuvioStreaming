@@ -4,7 +4,7 @@ import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
-import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.fetchAddonResponseText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +83,7 @@ object SubtitleRepository {
                         try {
                             val response = withTimeoutOrNull(10_000L) {
                                 withContext(Dispatchers.Default) {
-                                    httpGetText(subtitleUrl)
+                                    fetchAddonResponseText(subtitleUrl)
                                 }
                             } ?: return@async
 

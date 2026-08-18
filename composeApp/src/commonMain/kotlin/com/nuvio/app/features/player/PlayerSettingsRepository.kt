@@ -68,6 +68,7 @@ data class PlayerSettingsUiState(
     val introDbApiKey: String = "",
     val introSubmitEnabled: Boolean = false,
     val streamAutoPlayNextEpisodeEnabled: Boolean = false,
+    val streamAutoPlayNextEpisodeFallbackEnabled: Boolean = true,
     val streamAutoPlayPreferBingeGroup: Boolean = true,
     val streamAutoPlayReuseBingeGroup: Boolean = true,
     val nextEpisodeThresholdMode: NextEpisodeThresholdMode = NextEpisodeThresholdMode.PERCENTAGE,
@@ -133,6 +134,7 @@ object PlayerSettingsRepository {
     private var introDbApiKey = ""
     private var introSubmitEnabled = false
     private var streamAutoPlayNextEpisodeEnabled = false
+    private var streamAutoPlayNextEpisodeFallbackEnabled = true
     private var streamAutoPlayPreferBingeGroup = true
     private var streamAutoPlayReuseBingeGroup = true
     private var nextEpisodeThresholdMode = NextEpisodeThresholdMode.PERCENTAGE
@@ -203,6 +205,7 @@ object PlayerSettingsRepository {
         introDbApiKey = ""
         introSubmitEnabled = false
         streamAutoPlayNextEpisodeEnabled = false
+        streamAutoPlayNextEpisodeFallbackEnabled = true
         streamAutoPlayPreferBingeGroup = true
         streamAutoPlayReuseBingeGroup = true
         nextEpisodeThresholdMode = NextEpisodeThresholdMode.PERCENTAGE
@@ -266,8 +269,8 @@ object PlayerSettingsRepository {
                 ?: SubtitleStyleState.DEFAULT.outlineWidth,
             bold = PlayerSettingsStorage.loadSubtitleBold()
                 ?: SubtitleStyleState.DEFAULT.bold,
-            fontSizeSp = PlayerSettingsStorage.loadSubtitleFontSizeSp()
-                ?: SubtitleStyleState.DEFAULT.fontSizeSp,
+            fontSizeSp = (PlayerSettingsStorage.loadSubtitleFontSizeSp()
+                ?: SubtitleStyleState.DEFAULT.fontSizeSp).coerceIn(subtitleFontSizeRangeSp),
             bottomOffset = PlayerSettingsStorage.loadSubtitleBottomOffset()
                 ?: SubtitleStyleState.DEFAULT.bottomOffset,
             useForcedSubtitles = PlayerSettingsStorage.loadSubtitleUseForcedSubtitles()
@@ -323,6 +326,7 @@ object PlayerSettingsRepository {
         introDbApiKey = PlayerSettingsStorage.loadIntroDbApiKey() ?: ""
         introSubmitEnabled = PlayerSettingsStorage.loadIntroSubmitEnabled() ?: false
         streamAutoPlayNextEpisodeEnabled = PlayerSettingsStorage.loadStreamAutoPlayNextEpisodeEnabled() ?: false
+        streamAutoPlayNextEpisodeFallbackEnabled = PlayerSettingsStorage.loadStreamAutoPlayNextEpisodeFallbackEnabled() ?: true
         streamAutoPlayPreferBingeGroup = PlayerSettingsStorage.loadStreamAutoPlayPreferBingeGroup() ?: true
         streamAutoPlayReuseBingeGroup = PlayerSettingsStorage.loadStreamAutoPlayReuseBingeGroup() ?: true
         nextEpisodeThresholdMode = PlayerSettingsStorage.loadNextEpisodeThresholdMode()
@@ -488,19 +492,20 @@ object PlayerSettingsRepository {
 
     fun setSubtitleStyle(style: SubtitleStyleState) {
         ensureLoaded()
-        if (subtitleStyle == style) return
-        subtitleStyle = style
+        val normalized = style.copy(fontSizeSp = style.fontSizeSp.coerceIn(subtitleFontSizeRangeSp))
+        if (subtitleStyle == normalized) return
+        subtitleStyle = normalized
         publish()
-        PlayerSettingsStorage.saveSubtitleTextColor(style.textColor.toStorageHexString())
-        PlayerSettingsStorage.saveSubtitleBackgroundColor(style.backgroundColor.toStorageHexString())
-        PlayerSettingsStorage.saveSubtitleOutlineColor(style.outlineColor.toStorageHexString())
-        PlayerSettingsStorage.saveSubtitleOutlineEnabled(style.outlineEnabled)
-        PlayerSettingsStorage.saveSubtitleOutlineWidth(style.outlineWidth)
-        PlayerSettingsStorage.saveSubtitleBold(style.bold)
-        PlayerSettingsStorage.saveSubtitleFontSizeSp(style.fontSizeSp)
-        PlayerSettingsStorage.saveSubtitleBottomOffset(style.bottomOffset)
-        PlayerSettingsStorage.saveSubtitleUseForcedSubtitles(style.useForcedSubtitles)
-        PlayerSettingsStorage.saveSubtitleShowOnlyPreferredLanguages(style.showOnlyPreferredLanguages)
+        PlayerSettingsStorage.saveSubtitleTextColor(normalized.textColor.toStorageHexString())
+        PlayerSettingsStorage.saveSubtitleBackgroundColor(normalized.backgroundColor.toStorageHexString())
+        PlayerSettingsStorage.saveSubtitleOutlineColor(normalized.outlineColor.toStorageHexString())
+        PlayerSettingsStorage.saveSubtitleOutlineEnabled(normalized.outlineEnabled)
+        PlayerSettingsStorage.saveSubtitleOutlineWidth(normalized.outlineWidth)
+        PlayerSettingsStorage.saveSubtitleBold(normalized.bold)
+        PlayerSettingsStorage.saveSubtitleFontSizeSp(normalized.fontSizeSp)
+        PlayerSettingsStorage.saveSubtitleBottomOffset(normalized.bottomOffset)
+        PlayerSettingsStorage.saveSubtitleUseForcedSubtitles(normalized.useForcedSubtitles)
+        PlayerSettingsStorage.saveSubtitleShowOnlyPreferredLanguages(normalized.showOnlyPreferredLanguages)
     }
 
     fun setStreamReuseLastLinkEnabled(enabled: Boolean) {
@@ -671,6 +676,14 @@ object PlayerSettingsRepository {
         streamAutoPlayNextEpisodeEnabled = enabled
         publish()
         PlayerSettingsStorage.saveStreamAutoPlayNextEpisodeEnabled(enabled)
+    }
+
+    fun setStreamAutoPlayNextEpisodeFallbackEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (streamAutoPlayNextEpisodeFallbackEnabled == enabled) return
+        streamAutoPlayNextEpisodeFallbackEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayNextEpisodeFallbackEnabled(enabled)
     }
 
     fun setStreamAutoPlayPreferBingeGroup(enabled: Boolean) {
@@ -932,6 +945,7 @@ object PlayerSettingsRepository {
             introDbApiKey = introDbApiKey,
             introSubmitEnabled = introSubmitEnabled,
             streamAutoPlayNextEpisodeEnabled = streamAutoPlayNextEpisodeEnabled,
+            streamAutoPlayNextEpisodeFallbackEnabled = streamAutoPlayNextEpisodeFallbackEnabled,
             streamAutoPlayPreferBingeGroup = streamAutoPlayPreferBingeGroup,
             streamAutoPlayReuseBingeGroup = streamAutoPlayReuseBingeGroup,
             nextEpisodeThresholdMode = nextEpisodeThresholdMode,
