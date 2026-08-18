@@ -356,13 +356,31 @@ private fun ExoPlayerSurface(
             .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
 
         val trackSelector = DefaultTrackSelector(context).apply {
-            setParameters(
-                buildUponParameters()
-                    .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
-            )
+            var parameters = buildUponParameters()
+                .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
             if (playerSettings.tunnelingEnabled) {
-                setParameters(buildUponParameters().setTunnelingEnabled(true))
+                parameters = parameters.setTunnelingEnabled(true)
             }
+            val captioningManager = context.getSystemService(Context.CAPTIONING_SERVICE)
+                as? android.view.accessibility.CaptioningManager
+            if (captioningManager != null) {
+                if (!captioningManager.isEnabled) {
+                    parameters = parameters.setIgnoredTextSelectionFlags(
+                        parameters.build().ignoredTextSelectionFlags or C.SELECTION_FLAG_DEFAULT
+                    )
+                }
+                captioningManager.locale?.let { locale ->
+                    parameters = parameters.setPreferredTextLanguage(locale.isO3Language)
+                }
+            }
+            if (playerSettings.subtitleStyle.useForcedSubtitles) {
+                parameters = parameters.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            } else {
+                parameters = parameters.setIgnoredTextSelectionFlags(
+                    parameters.build().ignoredTextSelectionFlags or C.SELECTION_FLAG_FORCED
+                )
+            }
+            setParameters(parameters)
         }
 
         val loadControl = DefaultLoadControl.Builder()
@@ -400,6 +418,13 @@ private fun ExoPlayerSurface(
                 .build()
         }
 
+        player.applySubtitleTrackPreferences(
+            preferredLanguage = playerSettings.preferredSubtitleLanguage,
+            useForcedSubtitles = playerSettings.subtitleStyle.useForcedSubtitles,
+            autoSelectionApplied = false,
+            hasActiveSubtitle = false,
+            useCustomSubtitles = false,
+        )
         player
     }
 
@@ -875,6 +900,23 @@ private fun ExoPlayerSurface(
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
                     currentSubtitleStyle = style
                     playerViewRef?.applySubtitleStyle(style, pipSubtitleScale)
+                }
+
+                override fun applySubtitlePreferences(
+                    preferredLanguage: String,
+                    secondaryPreferredLanguage: String?,
+                    useForcedSubtitles: Boolean,
+                    autoSelectionApplied: Boolean,
+                    hasActiveSubtitle: Boolean,
+                    useCustomSubtitles: Boolean,
+                ) {
+                    exoPlayer.applySubtitleTrackPreferences(
+                        preferredLanguage = preferredLanguage,
+                        useForcedSubtitles = useForcedSubtitles,
+                        autoSelectionApplied = autoSelectionApplied,
+                        hasActiveSubtitle = hasActiveSubtitle,
+                        useCustomSubtitles = useCustomSubtitles,
+                    )
                 }
 
                 override fun setSubtitleDelayMs(delayMs: Int) {
@@ -1461,6 +1503,35 @@ private class NuvioLibmpvView(
                 selectSubtitleTrack(trackIndex)
             }
 
+            override fun applySubtitlePreferences(
+                preferredLanguage: String,
+                secondaryPreferredLanguage: String?,
+                useForcedSubtitles: Boolean,
+                autoSelectionApplied: Boolean,
+                hasActiveSubtitle: Boolean,
+                useCustomSubtitles: Boolean,
+            ) {
+                val languages = listOfNotNull(
+                    preferredLanguage.takeIf { language ->
+                        language.isNotBlank() &&
+                            !language.equals(SubtitleLanguageOption.NONE, ignoreCase = true) &&
+                            !language.equals(SubtitleLanguageOption.FORCED, ignoreCase = true)
+                    },
+                    secondaryPreferredLanguage?.takeIf { language ->
+                        language.isNotBlank() &&
+                            !language.equals(SubtitleLanguageOption.NONE, ignoreCase = true) &&
+                            !language.equals(SubtitleLanguageOption.FORCED, ignoreCase = true)
+                    },
+                )
+                if (languages.isEmpty()) {
+                    mpv.setPropertyString("sid", "no")
+                    return
+                }
+                runCatching {
+                    mpv.setPropertyString("slang", languages.joinToString(","))
+                }
+            }
+
             override fun applySubtitleStyle(style: SubtitleStyleState) {
                 mpv.setPropertyString("sub-ass-override", "no")
                 mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
@@ -1816,6 +1887,52 @@ private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
         idx++
     }
     return tracks
+}
+
+private fun ExoPlayer.applySubtitleTrackPreferences(
+    preferredLanguage: String,
+    useForcedSubtitles: Boolean,
+    autoSelectionApplied: Boolean,
+    hasActiveSubtitle: Boolean,
+    useCustomSubtitles: Boolean,
+) {
+    val builder = trackSelectionParameters.buildUpon()
+    val resolvedPreferred = exoPreferredTextLanguage(preferredLanguage)
+
+    if (resolvedPreferred == null) {
+        builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        builder.setPreferredTextLanguage(null)
+    } else if (!useCustomSubtitles) {
+        val userDisabledSubtitles = autoSelectionApplied && !hasActiveSubtitle
+        val shouldSuppressExoAutoSelect = useForcedSubtitles && !autoSelectionApplied
+        if (!userDisabledSubtitles && !shouldSuppressExoAutoSelect) {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        }
+        if (!shouldSuppressExoAutoSelect) {
+            builder.setPreferredTextLanguage(resolvedPreferred)
+        }
+    }
+
+    val currentFlags = trackSelectionParameters.ignoredTextSelectionFlags
+    val newFlags = if (!useForcedSubtitles) {
+        currentFlags or C.SELECTION_FLAG_FORCED
+    } else {
+        currentFlags and C.SELECTION_FLAG_FORCED.inv()
+    }
+    builder.setIgnoredTextSelectionFlags(newFlags)
+    trackSelectionParameters = builder.build()
+}
+
+private fun exoPreferredTextLanguage(preferredLanguage: String): String? {
+    val normalized = normalizeLanguageCode(preferredLanguage) ?: return null
+    return when (normalized) {
+        SubtitleLanguageOption.NONE,
+        SubtitleLanguageOption.FORCED,
+        -> null
+        SubtitleLanguageOption.DEVICE ->
+            DeviceLanguagePreferences.preferredLanguageCodes().firstOrNull()
+        else -> normalized
+    }
 }
 
 private fun ExoPlayer.extractSubtitleTracks(context: Context): List<SubtitleTrack> {
