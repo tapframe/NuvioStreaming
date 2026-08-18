@@ -82,6 +82,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         speedBoostRestoreSpeed = null
         preferredAudioSelectionApplied = false
         preferredSubtitleSelectionApplied = false
+        isUserExplicitSubtitleSelection = false
         hasScannedTextTracksOnce = false
         showSourcesPanel = false
         showEpisodesPanel = false

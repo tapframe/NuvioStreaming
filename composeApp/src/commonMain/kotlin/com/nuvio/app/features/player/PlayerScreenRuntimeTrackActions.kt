@@ -195,6 +195,8 @@ internal fun PlayerScreenRuntime.refreshTracks() {
 private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTracks(
     preferredAudioTargets: List<String>,
 ) {
+    if (isUserExplicitSubtitleSelection) return
+
     val preferredSubtitleLanguage = normalizeLanguageCode(
         playerSettingsUiState.preferredSubtitleLanguage,
     )
