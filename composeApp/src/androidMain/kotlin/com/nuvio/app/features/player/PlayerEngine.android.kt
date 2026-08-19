@@ -261,6 +261,7 @@ private fun ExoPlayerSurface(
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     var videoAspectRatio by remember(playerSourceKey) { mutableStateOf(0f) }
     val latestVideoAspectRatio = rememberUpdatedState(videoAspectRatio)
+    var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
@@ -349,6 +350,7 @@ private fun ExoPlayerSurface(
             shouldNormalizeCuePositionProvider = {
                 latestExternalSubtitleMimeType.value == MimeTypes.TEXT_VTT
             },
+            shouldStripSdhProvider = { currentSubtitleStyle.stripSdh },
             videoBoundsFractionProvider = {
                 playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
             },
@@ -459,7 +461,6 @@ private fun ExoPlayerSurface(
 
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
     val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
-    var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
     val isInPip = rememberIsInPictureInPicture()
     val pipSubtitleScale by rememberUpdatedState(if (isInPip) 0.4f else 1.0f)
@@ -1449,6 +1450,8 @@ private class NuvioLibmpvView(
                 mpv.setPropertyInt("sub-outline-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
+                mpv.setPropertyBoolean("sub-filter-sdh", style.stripSdh)
+                mpv.setPropertyBoolean("sub-filter-sdh-harder", style.stripSdh)
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
@@ -1917,6 +1920,7 @@ private class SubtitleOffsetRenderersFactory(
     context: Context,
     private val subtitleDelayUsProvider: () -> Long,
     private val shouldNormalizeCuePositionProvider: () -> Boolean,
+    private val shouldStripSdhProvider: () -> Boolean,
     private val videoBoundsFractionProvider: () -> RectF?,
 ) : DefaultRenderersFactory(context) {
     override fun buildTextRenderers(
@@ -1929,6 +1933,7 @@ private class SubtitleOffsetRenderersFactory(
         val normalizingOutput = CueNormalizingTextOutput(
             delegate = output,
             shouldNormalizeCuePositionProvider = shouldNormalizeCuePositionProvider,
+            shouldStripSdhProvider = shouldStripSdhProvider,
             videoBoundsFractionProvider = videoBoundsFractionProvider,
         )
         val startIndex = out.size
@@ -1945,20 +1950,28 @@ private class SubtitleOffsetRenderersFactory(
 private class CueNormalizingTextOutput(
     private val delegate: TextOutput,
     private val shouldNormalizeCuePositionProvider: () -> Boolean,
+    private val shouldStripSdhProvider: () -> Boolean,
     private val videoBoundsFractionProvider: () -> RectF?,
 ) : TextOutput {
     override fun onCues(cueGroup: CueGroup) {
-        val processed = cueGroup.cues.map(::processCue)
+        val processed = cueGroup.cues.mapNotNull(::processCue)
         delegate.onCues(CueGroup(processed, cueGroup.presentationTimeUs))
     }
 
     @Deprecated("Uses the deprecated Media3 callback for text outputs.")
     override fun onCues(cues: List<Cue>) {
-        delegate.onCues(cues.map(::processCue))
+        delegate.onCues(cues.mapNotNull(::processCue))
     }
 
-    private fun processCue(cue: Cue): Cue {
+    private fun processCue(cue: Cue): Cue? {
         var processed = fixRtlCueText(cue)
+        if (shouldStripSdhProvider()) {
+            val text = processed.text?.toString() ?: return processed
+            val filtered = SubtitleSdhFilter.filter(text) ?: return null
+            if (filtered != text) {
+                processed = processed.buildUpon().setText(filtered).build()
+            }
+        }
         if (shouldNormalizeCuePositionProvider()) {
             processed = normalizeCuePosition(processed)
         }

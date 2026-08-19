@@ -1100,6 +1100,8 @@
     <string name="settings_playback_subtitle_show_preferred_only">Show Only Preferred Languages</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Only show subtitles matching your preferred subtitle languages.</string>
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
+    <string name="settings_playback_subtitle_strip_sdh">Strip SDH Subtitles</string>
+    <string name="settings_playback_subtitle_strip_sdh_description">Hide sound descriptions and speaker labels from text subtitles.</string>
     <string name="settings_playback_subtitle_text_color">Text Color</string>
     <string name="settings_playback_subtitle_use_forced">Use Forced Subtitles</string>
     <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when audio matches the subtitle language; if unavailable, select nothing.</string>
