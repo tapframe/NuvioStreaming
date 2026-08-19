@@ -1,9 +1,8 @@
 package com.nuvio.app.core.ui
 
-import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -14,8 +13,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.request.get
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -30,10 +35,13 @@ private const val MinFrameDurationMillis = 20
 private const val MaxCachedSourceBytes = 24L * 1024 * 1024
 private const val MaxConcurrentLoads = 6
 
+private const val IdleRetentionMillis = 2_000L
+
 internal const val AnimatedImageProbeLogging = true
 
 private val animatedSourceHttpClient by lazy { HttpClient(Darwin) }
 private val loadSemaphore = Semaphore(MaxConcurrentLoads)
+
 private val sourceCacheLock = Mutex()
 private val sourceCache = LinkedHashMap<String, ByteArray>()
 private var sourceCacheBytes = 0L
@@ -100,7 +108,7 @@ internal class SkiaAnimatedImage private constructor(
     }
 }
 
-internal suspend fun loadSkiaAnimatedImage(url: String): SkiaAnimatedImage? =
+private suspend fun loadSkiaAnimatedImage(url: String): SkiaAnimatedImage? =
     loadSemaphore.withPermit {
         val bytes = cachedSourceBytes(url) ?: withContext(Dispatchers.Default) {
             runCatching {
@@ -111,83 +119,117 @@ internal suspend fun loadSkiaAnimatedImage(url: String): SkiaAnimatedImage? =
         withContext(Dispatchers.Default) { SkiaAnimatedImage.fromBytes(bytes) }
     }
 
-@Composable
-internal fun rememberAnimatedFrame(image: SkiaAnimatedImage?): ImageBitmap? {
-    if (image == null) return null
-
-    var frame by remember(image) { mutableStateOf<ImageBitmap?>(null) }
-
-    LaunchedEffect(image) {
-        image.decodeFrame(0)?.let { frame = it }
-        if (image.frameCount <= 1) return@LaunchedEffect
-
-        var frameIndex = 0
-        var accumulatedMillis = 0L
-        var previousNanos = 0L
-
-        while (true) {
-            withInfiniteAnimationFrameNanos { nanos ->
-                if (previousNanos != 0L) {
-                    accumulatedMillis += (nanos - previousNanos) / 1_000_000
-                }
-                previousNanos = nanos
-            }
-
-            var advanced = false
-            var guard = 0
-            while (accumulatedMillis >= image.frameDurationMillis(frameIndex) && guard < image.frameCount) {
-                accumulatedMillis -= image.frameDurationMillis(frameIndex)
-                frameIndex = (frameIndex + 1) % image.frameCount
-                advanced = true
-                guard++
-            }
-
-            if (advanced) {
-                image.decodeFrame(frameIndex)?.let { frame = it }
-            }
-        }
-    }
-
-    return frame
+private class SharedAnimation(
+    val url: String,
+    val image: SkiaAnimatedImage,
+) {
+    var refCount: Int = 0
+    var job: Job? = null
+    var idleEviction: Job? = null
+    val frame: MutableState<ImageBitmap?> = mutableStateOf(null)
 }
 
-internal sealed interface SkiaAnimatedImageState {
-    data object Loading : SkiaAnimatedImageState
-    data class Ready(val image: SkiaAnimatedImage) : SkiaAnimatedImageState
-    data object Failed : SkiaAnimatedImageState
-}
+private val registryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+private val registry = mutableMapOf<String, SharedAnimation>()
+private val pending = mutableMapOf<String, Deferred<SharedAnimation?>>()
 
-@Composable
-internal fun rememberSkiaAnimatedImage(url: String): SkiaAnimatedImageState {
-    var state by remember(url) {
-        mutableStateOf<SkiaAnimatedImageState>(SkiaAnimatedImageState.Loading)
+private suspend fun acquireShared(url: String): SharedAnimation? {
+    registry[url]?.let { existing ->
+        existing.refCount++
+        existing.idleEviction?.cancel()
+        existing.idleEviction = null
+        startIfNeeded(existing)
+        return existing
     }
 
-    LaunchedEffect(url) {
-        val loaded = loadSkiaAnimatedImage(url)
-        if (loaded == null) {
-            state = SkiaAnimatedImageState.Failed
-            return@LaunchedEffect
-        }
-        if (!isActive) {
-            loaded.close()
-            return@LaunchedEffect
-        }
+    val inFlight = pending[url] ?: registryScope.async {
+        val image = loadSkiaAnimatedImage(url) ?: return@async null
         if (AnimatedImageProbeLogging) {
-            println("[SkiaAnimatedImage] $url -> frameCount=${loaded.frameCount}")
+            println("[SkiaAnimatedImage] $url -> frameCount=${image.frameCount}")
         }
-        state = if (loaded.frameCount > 1) {
-            SkiaAnimatedImageState.Ready(loaded)
-        } else {
-            loaded.close()
-            SkiaAnimatedImageState.Failed
+        if (image.frameCount <= 1) {
+            // Nothing to animate; let Coil render it statically.
+            image.close()
+            return@async null
+        }
+        SharedAnimation(url, image).also { registry[url] = it }
+    }.also { pending[url] = it }
+
+    val shared = try {
+        inFlight.await()
+    } finally {
+        if (pending[url] === inFlight) pending.remove(url)
+    } ?: return null
+
+    shared.refCount++
+    shared.idleEviction?.cancel()
+    shared.idleEviction = null
+    startIfNeeded(shared)
+    return shared
+}
+
+private fun startIfNeeded(shared: SharedAnimation) {
+    if (shared.job != null) return
+    shared.job = registryScope.launch {
+        val image = shared.image
+        var index = 0
+        withContext(Dispatchers.Default) { image.decodeFrame(0) }?.let { shared.frame.value = it }
+
+        while (image.frameCount > 1) {
+            delay(image.frameDurationMillis(index).toLong())
+            index = (index + 1) % image.frameCount
+            withContext(Dispatchers.Default) { image.decodeFrame(index) }
+                ?.let { shared.frame.value = it }
+        }
+    }
+}
+
+private fun releaseShared(shared: SharedAnimation) {
+    shared.refCount--
+    if (shared.refCount > 0) return
+
+    shared.idleEviction?.cancel()
+    shared.idleEviction = registryScope.launch {
+        delay(IdleRetentionMillis)
+        evictIfIdle(shared.url)
+    }
+}
+
+private fun evictIfIdle(url: String) {
+    val shared = registry[url] ?: return
+    if (shared.refCount > 0) return
+    shared.job?.cancel()
+    shared.job = null
+    shared.idleEviction = null
+    registry.remove(url)
+    shared.frame.value = null
+    shared.image.close()
+}
+
+@Composable
+internal fun rememberAnimatedFrame(url: String): ImageBitmap? {
+    var shared by remember(url) { mutableStateOf<SharedAnimation?>(null) }
+
+    DisposableEffect(url) {
+        var released = false
+        var acquired: SharedAnimation? = null
+
+        val subscription = registryScope.launch {
+            val result = acquireShared(url) ?: return@launch
+            if (released) {
+                releaseShared(result)
+                return@launch
+            }
+            acquired = result
+            shared = result
+        }
+
+        onDispose {
+            released = true
+            subscription.cancel()
+            acquired?.let { releaseShared(it) }
         }
     }
 
-    val current = state
-    DisposableEffect(current) {
-        onDispose { (current as? SkiaAnimatedImageState.Ready)?.image?.close() }
-    }
-
-    return state
+    return shared?.frame?.value
 }

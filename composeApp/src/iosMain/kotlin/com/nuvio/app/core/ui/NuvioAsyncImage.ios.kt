@@ -25,9 +25,7 @@ internal actual fun NuvioAsyncImage(
         return
     }
 
-    val state = rememberSkiaAnimatedImage(imageUrl)
-    val animatedImage = (state as? SkiaAnimatedImageState.Ready)?.image
-    val frame = rememberAnimatedFrame(animatedImage)
+    val frame = rememberAnimatedFrame(imageUrl)
 
     Box(modifier = modifier) {
         if (frame == null) {
