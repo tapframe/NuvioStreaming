@@ -1451,7 +1451,7 @@ private class NuvioLibmpvView(
                 mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
                 mpv.setPropertyBoolean("sub-filter-sdh", style.stripSdh)
-                mpv.setPropertyBoolean("sub-filter-sdh-harder", false)
+                mpv.setPropertyBoolean("sub-filter-sdh-harder", style.stripSdh)
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {

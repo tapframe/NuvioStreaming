@@ -826,7 +826,7 @@ final class MPVPlayerViewController: UIViewController {
         var position = Int64(subPos)
         checkError(mpv_set_property(mpv, "sub-pos", MPV_FORMAT_INT64, &position))
         setStringProperty("sub-filter-sdh", stripSdh ? "yes" : "no")
-        setStringProperty("sub-filter-sdh-harder", "no")
+        setStringProperty("sub-filter-sdh-harder", stripSdh ? "yes" : "no")
     }
 
     func destroyPlayer() {
