@@ -1,7 +1,10 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.app_logo_wordmark_gold
 
 class AppIconOptionTest {
     @Test
@@ -25,5 +28,13 @@ class AppIconOptionTest {
     @Test
     fun unknownIconFallsBackToOriginal() {
         assertEquals(AppIconOption.ORIGINAL, AppIconOption.fromPlatformName("UnknownIcon"))
+    }
+
+    @Test
+    fun goldThemeUsesGoldWordmark() {
+        assertEquals(
+            Res.drawable.app_logo_wordmark_gold,
+            AppTheme.GOLD.wordmarkResource(AppIconOption.COPPER),
+        )
     }
 }

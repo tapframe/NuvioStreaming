@@ -26,17 +26,18 @@ fun NuvioWatchedBadge(
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
+    val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
     Box(
         modifier = modifier
             .size(NuvioTokens.Icon.md)
             .clip(tokens.shapes.avatar)
-            .background(tokens.colors.accent),
+            .background(palette.accentBrush()),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.Default.Check,
             contentDescription = stringResource(Res.string.episodes_cd_watched),
-            tint = tokens.colors.onAccent,
+            tint = palette.onSecondary,
             modifier = Modifier.size(NuvioTokens.Icon.xs),
         )
     }
