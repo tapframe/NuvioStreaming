@@ -1,7 +1,7 @@
 package com.nuvio.app.core.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -25,9 +25,16 @@ internal actual fun NuvioAsyncImage(
         return
     }
 
-    val frame = rememberAnimatedFrame(imageUrl)
+    BoxWithConstraints(modifier = modifier) {
+        val targetWidth = constraints.maxWidth
+            .takeIf { it in 1..MaxAnimationTargetEdgePx }
+            ?: DefaultAnimationTargetEdgePx
+        val targetHeight = constraints.maxHeight
+            .takeIf { it in 1..MaxAnimationTargetEdgePx }
+            ?: DefaultAnimationTargetEdgePx
 
-    Box(modifier = modifier) {
+        val frame = rememberAnimatedFrame(imageUrl, targetWidth, targetHeight)
+
         if (frame == null) {
             AsyncImage(
                 model = imageUrl,
