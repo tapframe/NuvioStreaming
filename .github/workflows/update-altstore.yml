@@ -14,7 +14,6 @@ concurrency:
 
 env:
   SOURCE_REPO: ${{ github.repository }}
-  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   EXPECTED_BUNDLE_ID: com.nuvio.media
 
 jobs:
@@ -22,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out default branch
+      - name: Check main branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: main
           fetch-depth: 0
 
       - name: Set up Python
@@ -401,5 +400,5 @@ jobs:
           git commit -m \
             "chore: update AltStore sources $(date -u +%Y-%m-%dT%H:%MZ)"
 
-          git pull --rebase origin "$DEFAULT_BRANCH"
-          git push origin "HEAD:$DEFAULT_BRANCH"
+          git pull --rebase origin main
+          git push origin "HEAD:main"

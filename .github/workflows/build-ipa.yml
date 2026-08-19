@@ -52,28 +52,28 @@ jobs:
                   "65713615f53352b37baffb38c5b88d88bab647d050d999bcc4684344ab636bdf"
               ),
               "Libavformat": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavformat.xcframework.zip",
-                  "962c010aa2c4b369cf8f6efa2b0bd26e0a2392d58a1487e6a2be8c3d73044d45"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavformat.xcframework.zip",
+                  "2afb601375929640e743e7bdaa6c4a88e2b582a07e1c5f2dc95cc7f5b26a0810"
               ),
               "Libavfilter": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavfilter.xcframework.zip",
-                  "1ea0aebfc460f347d631fad982dd1db3a929896d02722cd18903faeb4c5f4103"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavfilter.xcframework.zip",
+                  "3e71af8633d99d365f14b88064bceafd57acb23fc64db90e55b715a9c0dca328"
               ),
               "Libavutil": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libavutil.xcframework.zip",
-                  "62d7d932c0a9d2bd45a23d7845db12a293b4f810e5cfae2b5e4ad05e8b737a1b"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libavutil.xcframework.zip",
+                  "5dc251c8807c501982edfb0bc9bddfee4148733142d6ebb947738c60fb3bf8d8"
               ),
               "Libswresample": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libswresample.xcframework.zip",
-                  "80fbd7a266d0633a916d21a01fcfab347b4ffb8d16c7a02e43671ef71e6999f0"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libswresample.xcframework.zip",
+                  "d5c36acf2ff944e15706f4b7bfbf18bb1993ffc5b446c9f67f1aa79de5441f15"
               ),
               "Libswscale": (
-                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1.2/Libswscale.xcframework.zip",
-                  "fd968cad30f5295082b86a8ab7ada5dd9ea18e9049ec194a748e91bd0027afb5"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libswscale.xcframework.zip",
+                  "4fc00de6a7a8cddcdfe0eeb73b4f919cfaf9a0fd5a442f42a43e0f56e157d7c5"
               ),
               "Libmpv": (
-                  "https://github.com/NuvioMedia/MPVKit/releases/download/0.41.0-n8.1.2-nuvio.2/Libmpv.xcframework.zip",
-                  "d2abcf546c715fc9dd740ac0a5ddfa88b002a3a41c91f2f9df1938924895a3ad"
+                  "https://github.com/mpvkit/MPVKit/releases/download/1.0.0/Libmpv.xcframework.zip",
+                  "c381ceb4c1504efac12da95293e56585bbeb691634aa64e3a729f517169933ba"
               ),
           }
 
