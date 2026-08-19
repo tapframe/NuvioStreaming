@@ -3,8 +3,8 @@ package com.nuvio.app.features.player
 internal object SubtitleSdhFilter {
     private val squareBrackets = Regex("\\[[^]]*][ \\t]*")
     private val parentheses = Regex(
-        "(?:\\((?=[A-Za-z0-9 '#.,\\\"\\\\\\-\\r\\n]*\\))(?=[^)]*[A-Za-z])[^)]*\\)|" +
-            "（(?=[A-Za-z0-9 '#.,\\\"\\\\\\-\\r\\n]*）)(?=[^）]*[A-Za-z])[^）]*）)[ \\t]*",
+        "(?:\\((?=[A-Za-z0-9 '#.,\\\"\\\\\\-\\r\\n]*\\))(?![0-9]*\\))[^)]*\\)|" +
+            "（(?=[A-Za-z0-9 '#.,\\\"\\\\\\-\\r\\n]*）)(?![0-9]*）)[^）]*）)[ \\t]*",
     )
     private val speakerLabel = Regex(
         "(?m)^([ \\t]*-[ \\t]*)?(?:[A-Za-z0-9 ()'#.,]+|\\[[^]\\r\\n]*]):(?=\\s|$)[ \\t]*",
