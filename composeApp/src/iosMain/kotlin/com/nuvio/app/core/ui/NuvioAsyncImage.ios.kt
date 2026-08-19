@@ -33,18 +33,18 @@ internal actual fun NuvioAsyncImage(
             .takeIf { it in 1..MaxAnimationTargetEdgePx }
             ?: DefaultAnimationTargetEdgePx
 
-        val frame = rememberAnimatedFrame(imageUrl, targetWidth, targetHeight)
+        val state = rememberAnimatedFrame(imageUrl, targetWidth, targetHeight)
 
-        if (frame == null) {
-            AsyncImage(
+        when {
+            state.unavailable -> AsyncImage(
                 model = imageUrl,
                 contentDescription = contentDescription,
                 modifier = Modifier.matchParentSize(),
                 contentScale = contentScale,
             )
-        } else {
-            Image(
-                bitmap = frame,
+
+            state.bitmap != null -> Image(
+                bitmap = state.bitmap,
                 contentDescription = contentDescription,
                 modifier = Modifier.matchParentSize(),
                 contentScale = contentScale,
