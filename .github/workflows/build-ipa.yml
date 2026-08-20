@@ -193,8 +193,9 @@ jobs:
           NUVIO_IOS_DISTRIBUTION=full
           EOF
 
-      - name: Cache iOS build dependencies
-        uses: actions/cache@v5
+      - name: Restore iOS build caches
+        id: ios-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.gradle/caches
@@ -220,6 +221,18 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             build
+
+      - name: Save iOS build caches
+        if: always() && steps.ios-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+            ~/Library/Caches/org.swift.swiftpm
+            iosApp/build/SourcePackages
+          key: ${{ steps.ios-cache.outputs.cache-primary-key }}
 
       - name: Set artifact suffix
         run: |
