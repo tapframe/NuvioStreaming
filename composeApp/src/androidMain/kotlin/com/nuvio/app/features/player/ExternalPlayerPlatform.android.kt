@@ -109,6 +109,7 @@ internal actual object ExternalPlayerPlatform {
         val subtitles = request.subtitles
         if (!subtitles.isNullOrEmpty()) {
             val subtitleUris = subtitles.map { Uri.parse(it.url) }.toTypedArray()
+            val subtitleCurrentOrFirstUri = request.currentSubtitle?.url ?: subtitles.first().url
             val subtitleNames = subtitles.map { it.name }.toTypedArray()
             val subtitleFilenames = subtitles.map { "${it.lang}_${it.name}.srt" }.toTypedArray()
 
@@ -120,7 +121,7 @@ internal actual object ExternalPlayerPlatform {
             val clipData = android.content.ClipData(
                 "subtitles",
                 arrayOf("application/x-subrip", "text/vtt"),
-                android.content.ClipData.Item(subtitleUris.first())
+                android.content.ClipData.Item(subtitleCurrentOrFirstUri)
             )
             subtitleUris.drop(1).forEach { subtitleUri ->
                 clipData.addItem(android.content.ClipData.Item(subtitleUri))
@@ -131,17 +132,17 @@ internal actual object ExternalPlayerPlatform {
             putExtra("subs", subtitleUris)
             putExtra("subs.name", subtitleNames)
             putExtra("subs.filename", subtitleFilenames)
-            putExtra("subs.enable", arrayOf(subtitleUris.first()))
+            putExtra("subs.enable", arrayOf(subtitleCurrentOrFirstUri))
 
             // Just Player
             putExtra("subtitle_uri", subtitleUris)
             putExtra("subtitle_name", subtitleNames)
 
-            // VLC (single subtitle — use first one)
-            putExtra("subtitles_location", subtitleUris.first())
+            // VLC (single subtitle — use selected one)
+            putExtra("subtitles_location", subtitleCurrentOrFirstUri)
 
             // Vimu Player
-            putExtra("forcedsrt", subtitles.first().url)
+            putExtra("forcedsrt", subtitleCurrentOrFirstUri)
         }
     }
 

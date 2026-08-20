@@ -33,6 +33,7 @@ suspend fun prepareExternalPlayerLaunch(
     request: ExternalPlayerPlaybackRequest,
     type: String,
     videoId: String,
+    parentMetaId: String,
     forwardSubtitles: Boolean,
     sendSkipSegments: Boolean,
     preferredLanguage: String,
@@ -48,6 +49,7 @@ suspend fun prepareExternalPlayerLaunch(
             val subtitles = SubtitleForwarder.fetchForExternalPlayer(
                 type = type,
                 videoId = videoId,
+                parentMetaId = parentMetaId,
                 preferredLanguage = preferredLanguage,
                 secondaryLanguage = secondaryLanguage,
             )
@@ -76,6 +78,17 @@ suspend fun prepareExternalPlayerLaunch(
     }
     skipSegmentsDeferred?.await()?.let { skipSegmentsJson ->
         result = result.copy(skipSegmentsJson = skipSegmentsJson)
+    }
+
+    val preference = PlayerTrackPreferenceStorage.load(parentMetaId)
+    if (result.currentSubtitle == null && preference != null) {
+        val match = result.subtitles?.find {
+            it.url == preference.addonSubtitleUrl ||
+                    (it.name == preference.subtitleName && it.lang == preference.subtitleLanguage)
+        }
+        if (match != null) {
+            result = result.copy(currentSubtitle = match)
+        }
     }
 
     return@coroutineScope result

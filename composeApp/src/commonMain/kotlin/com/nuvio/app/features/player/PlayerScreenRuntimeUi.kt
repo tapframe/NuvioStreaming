@@ -308,6 +308,13 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
                             sourceHeaders = activeSourceHeaders,
                             resumePositionMs = playbackSnapshot.positionMs,
                             subtitles = loadedSubtitles,
+                            currentSubtitle = selectedAddonSubtitle?.let {
+                                SubtitleInput(
+                                    it.url,
+                                    it.display,
+                                    it.language
+                                )
+                            },
                             season = activeSeasonNumber,
                             episode = activeEpisodeNumber,
                             episodeTitle = activeEpisodeTitle,

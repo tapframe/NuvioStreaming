@@ -13,6 +13,7 @@ object SubtitleForwarder {
     suspend fun fetchForExternalPlayer(
         type: String,
         videoId: String,
+        parentMetaId: String,
         preferredLanguage: String,
         secondaryLanguage: String?,
         timeoutMs: Long = 10_000L,
@@ -31,11 +32,18 @@ object SubtitleForwarder {
                 }
 
                 val allSubtitles = SubtitleRepository.addonSubtitles.value
+                val preference = PlayerTrackPreferenceStorage.load(parentMetaId)
 
                 val filtered = allSubtitles.filter { subtitle ->
-                    languageMatchesPreference(subtitle.language, preferredLanguage) ||
-                        (secondaryLanguage != null &&
-                            languageMatchesPreference(subtitle.language, secondaryLanguage))
+                    val isLastSelected = preference != null && (
+                            subtitle.url == preference.addonSubtitleUrl ||
+                                    (subtitle.display == preference.subtitleName && subtitle.language == preference.subtitleLanguage)
+                            )
+
+                    isLastSelected ||
+                            languageMatchesPreference(subtitle.language, preferredLanguage) ||
+                            (secondaryLanguage != null &&
+                                    languageMatchesPreference(subtitle.language, secondaryLanguage))
                 }
 
                 filtered.map { subtitle ->
