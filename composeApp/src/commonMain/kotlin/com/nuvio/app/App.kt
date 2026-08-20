@@ -94,6 +94,7 @@ import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.sync.AppForegroundMonitor
 import com.nuvio.app.core.sync.ProfileSettingsSync
 import com.nuvio.app.core.sync.SyncManager
+import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNavigationBar
@@ -1142,6 +1143,7 @@ private fun MainAppContent(
             InAppLogger.debug("App/Foreground", "foreground event: refreshing network status")
             NetworkStatusRepository.requestForegroundRefresh()
             DeviceSessionRegistration.registerIfAuthenticated()
+            MemberAccessRepository.refreshIfStale()
         }
     }
 
@@ -1172,6 +1174,7 @@ private fun MainAppContent(
                     previousConditionName == NetworkCondition.NoInternet.name ||
                     previousConditionName == NetworkCondition.ServersUnreachable.name
                 ) {
+                    MemberAccessRepository.refresh()
                     NuvioToastController.show(getString(Res.string.network_back_online))
                 }
             }
