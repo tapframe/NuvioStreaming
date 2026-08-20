@@ -319,13 +319,11 @@
     <string name="compose_auth_create_account">アカウントを作成</string>
     <string name="compose_auth_dont_have_account">アカウントをお持ちでないですか？ </string>
     <string name="compose_auth_email">メールアドレス</string>
-    <string name="compose_auth_or_separator">  または  </string>
     <string name="compose_auth_password">パスワード</string>
     <string name="compose_auth_sign_in_subtitle">サインインしてライブラリと視聴進捗にアクセス</string>
     <string name="compose_auth_sign_in">サインイン</string>
     <string name="compose_auth_sign_up_subtitle">サインアップしてデバイス間でデータを同期</string>
     <string name="compose_auth_sign_up">サインアップ</string>
-    <string name="compose_auth_store_locally">データはこのデバイスにのみ保存されます</string>
     <string name="compose_auth_tagline">いつでも、どこでも、すべてをストリーム</string>
     <string name="compose_auth_terms_prefix">サインアップにより、</string>
     <string name="compose_auth_terms_link">利用規約</string>

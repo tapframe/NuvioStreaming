@@ -312,13 +312,11 @@
     <string name="compose_auth_create_account">Създай акаунт</string>
     <string name="compose_auth_dont_have_account">Нямате акаунт? </string>
     <string name="compose_auth_email">Имейл</string>
-    <string name="compose_auth_or_separator">  или  </string>
     <string name="compose_auth_password">Парола</string>
     <string name="compose_auth_sign_in_subtitle">Влезте, за да получите достъп до библиотеката и напредъка си</string>
     <string name="compose_auth_sign_in">Влез</string>
     <string name="compose_auth_sign_up_subtitle">Регистрирайте се, за да синхронизирате данните си между устройствата</string>
     <string name="compose_auth_sign_up">Регистрирай се</string>
-    <string name="compose_auth_store_locally">Данните ви ще се съхраняват само локално</string>
     <string name="compose_auth_tagline"> потоквай всичко, навсякъде</string>
     <string name="compose_auth_welcome_back">Добре дошли отново</string>
     <string name="compose_catalog_subtitle_library">Библиотека</string>

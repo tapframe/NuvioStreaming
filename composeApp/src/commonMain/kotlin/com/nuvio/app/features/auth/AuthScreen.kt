@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -96,13 +95,11 @@ import nuvio.composeapp.generated.resources.compose_auth_continue_without_accoun
 import nuvio.composeapp.generated.resources.compose_auth_create_account
 import nuvio.composeapp.generated.resources.compose_auth_dont_have_account
 import nuvio.composeapp.generated.resources.compose_auth_email
-import nuvio.composeapp.generated.resources.compose_auth_or_separator
 import nuvio.composeapp.generated.resources.compose_auth_password
 import nuvio.composeapp.generated.resources.compose_auth_sign_in
 import nuvio.composeapp.generated.resources.compose_auth_sign_in_subtitle
 import nuvio.composeapp.generated.resources.compose_auth_sign_up
 import nuvio.composeapp.generated.resources.compose_auth_sign_up_subtitle
-import nuvio.composeapp.generated.resources.compose_auth_store_locally
 import nuvio.composeapp.generated.resources.compose_auth_tagline
 import nuvio.composeapp.generated.resources.compose_auth_terms_link
 import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
@@ -119,9 +116,6 @@ private val AuthFieldBackgroundMobile = Color.White.copy(alpha = 0.035f)
 private val AuthFieldBorder = Color.White.copy(alpha = 0.08f)
 private val AuthPaneBackground = Color.White.copy(alpha = 0.022f)
 private val AuthPaneBorder = Color.White.copy(alpha = 0.07f)
-private val AuthDividerColor = Color.White.copy(alpha = 0.10f)
-private val AuthSecondaryButtonBackground = Color.White.copy(alpha = 0.05f)
-private val AuthSecondaryButtonBorder = Color.White.copy(alpha = 0.09f)
 
 private data class AuthFormMetrics(
     val fieldHeight: Dp,
@@ -131,9 +125,6 @@ private data class AuthFormMetrics(
     val primaryTop: Dp,
     val primaryHeight: Dp,
     val toggleTop: Dp,
-    val dividerTop: Dp,
-    val secondaryTop: Dp,
-    val secondaryHeight: Dp,
     val fieldBackground: Color,
 )
 
@@ -145,9 +136,6 @@ private val MobileAuthFormMetrics = AuthFormMetrics(
     primaryTop = 22.dp,
     primaryHeight = 54.dp,
     toggleTop = 18.dp,
-    dividerTop = 28.dp,
-    secondaryTop = 24.dp,
-    secondaryHeight = 54.dp,
     fieldBackground = AuthFieldBackgroundMobile,
 )
 
@@ -159,9 +147,6 @@ private val LargeAuthFormMetrics = AuthFormMetrics(
     primaryTop = 24.dp,
     primaryHeight = 56.dp,
     toggleTop = 18.dp,
-    dividerTop = 30.dp,
-    secondaryTop = 26.dp,
-    secondaryHeight = 56.dp,
     fieldBackground = AuthFieldBackground,
 )
 
@@ -176,9 +161,6 @@ private fun largeAuthFormMetrics(scale: Float): AuthFormMetrics = LargeAuthFormM
     primaryTop = 24.dp * scale,
     primaryHeight = 56.dp * scale,
     toggleTop = 18.dp * scale,
-    dividerTop = 30.dp * scale,
-    secondaryTop = 26.dp * scale,
-    secondaryHeight = 56.dp * scale,
 )
 
 @Composable
@@ -419,7 +401,7 @@ private fun AuthMobileLayout(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            AuthBrandLockup(logoHeight = 38.dp)
+            AuthBrandLockup(logoHeight = 38.dp, showTagline = false)
 
             Spacer(modifier = Modifier.height(64.dp))
 
@@ -588,6 +570,7 @@ private fun AuthLargeLayout(
 @Composable
 private fun AuthBrandLockup(
     logoHeight: Dp,
+    showTagline: Boolean = true,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -596,16 +579,18 @@ private fun AuthBrandLockup(
             contentDescription = null,
             modifier = Modifier.height(logoHeight),
         )
-        Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = stringResource(Res.string.compose_auth_tagline),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Normal,
-            ),
-        )
+        if (showTagline) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = stringResource(Res.string.compose_auth_tagline),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = AuthTextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Normal,
+                ),
+            )
+        }
     }
 }
 
@@ -749,32 +734,12 @@ private fun AuthForm(
             onToggleAuthMode = onToggleAuthMode,
         )
 
-        Spacer(modifier = Modifier.height(metrics.dividerTop))
+        Spacer(modifier = Modifier.height(24.dp * scale))
 
-        AuthDivider(scale = scale)
-
-        Spacer(modifier = Modifier.height(metrics.secondaryTop))
-
-        AuthSecondaryButton(
+        AuthTextAction(
             text = stringResource(Res.string.compose_auth_continue_without_account),
             enabled = !isLoading,
-            height = metrics.secondaryHeight,
-            scale = scale,
             onClick = onContinueWithoutAccount,
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Text(
-            text = stringResource(Res.string.compose_auth_store_locally),
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextMuted,
-                fontSize = (13f * scale).sp,
-                lineHeight = (18f * scale).sp,
-                fontWeight = FontWeight.Normal,
-            ),
-            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1004,65 +969,27 @@ private fun AuthModeToggle(
 }
 
 @Composable
-private fun AuthDivider(scale: Float) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(AuthDividerColor),
-        )
-        Text(
-            text = stringResource(Res.string.compose_auth_or_separator).trim(),
-            modifier = Modifier.padding(horizontal = 16.dp),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = AuthTextMuted,
-                fontSize = (13f * scale).sp,
-                lineHeight = (18f * scale).sp,
-                fontWeight = FontWeight.Normal,
-            ),
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(1.dp)
-                .background(AuthDividerColor),
-        )
-    }
-}
-
-@Composable
-private fun AuthSecondaryButton(
+private fun AuthTextAction(
     text: String,
     enabled: Boolean,
-    height: Dp,
-    scale: Float,
     onClick: () -> Unit,
 ) {
-    Button(
-        onClick = onClick,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(height),
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, AuthSecondaryButtonBorder),
-        contentPadding = PaddingValues(0.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = AuthSecondaryButtonBackground,
-            contentColor = AuthTextPrimary,
-            disabledContainerColor = AuthSecondaryButtonBackground.copy(alpha = 0.45f),
-            disabledContentColor = AuthTextPrimary.copy(alpha = 0.55f),
-        ),
+            .height(48.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = (15f * scale).sp,
-                lineHeight = (21f * scale).sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = if (enabled) AuthTextPrimary else AuthTextPrimary.copy(alpha = 0.55f),
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
             ),
             textAlign = TextAlign.Center,

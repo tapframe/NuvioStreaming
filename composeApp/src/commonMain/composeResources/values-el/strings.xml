@@ -129,13 +129,11 @@
     <string name="compose_auth_create_account">Δημιουργία λογαριασμού</string>
     <string name="compose_auth_dont_have_account">Δεν έχετε λογαριασμό; </string>
     <string name="compose_auth_email">Ηλεκτρονικό ταχυδρομείο</string>
-    <string name="compose_auth_or_separator">  ή  </string>
     <string name="compose_auth_password">Κωδικός</string>
     <string name="compose_auth_sign_in_subtitle">Συνδεθείτε για να αποκτήσετε πρόσβαση στη βιβλιοθήκη και την πρόοδό σας</string>
     <string name="compose_auth_sign_in">Σύνδεση</string>
     <string name="compose_auth_sign_up_subtitle">Εγγραφείτε για να συγχρονίσετε τα δεδομένα σας σε όλες τις συσκευές</string>
     <string name="compose_auth_sign_up">Εγγραφή</string>
-    <string name="compose_auth_store_locally">Τα δεδομένα σας θα αποθηκευτούν μόνο τοπικά</string>
     <string name="compose_auth_tagline">Ροή παντού, πάντα</string>
     <string name="compose_auth_welcome_back">Καλώς ορίσατε ξανά</string>
     <string name="compose_catalog_subtitle_library">Βιβλιοθήκη</string>

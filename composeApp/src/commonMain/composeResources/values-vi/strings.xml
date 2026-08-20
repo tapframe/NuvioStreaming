@@ -318,13 +318,11 @@
     <string name="compose_auth_create_account">Tạo tài khoản</string>
     <string name="compose_auth_dont_have_account">Chưa có tài khoản? </string>
     <string name="compose_auth_email">Email</string>
-    <string name="compose_auth_or_separator"> hoặc </string>
     <string name="compose_auth_password">Mật khẩu</string>
     <string name="compose_auth_sign_in_subtitle">Đăng nhập để đồng bộ thư viện và tiến trình xem</string>
     <string name="compose_auth_sign_in">Đăng nhập</string>
     <string name="compose_auth_sign_up_subtitle">Tạo tài khoản để đồng bộ trên mọi thiết bị</string>
     <string name="compose_auth_sign_up">Đăng ký</string>
-    <string name="compose_auth_store_locally">Dữ liệu chỉ được lưu trên thiết bị này</string>
     <string name="compose_auth_tagline">Mang thư viện phim theo bạn mọi nơi</string>
     <string name="compose_auth_terms_prefix">Khi đăng ký, tôi đồng ý với</string>
     <string name="compose_auth_terms_link">Điều khoản sử dụng</string>

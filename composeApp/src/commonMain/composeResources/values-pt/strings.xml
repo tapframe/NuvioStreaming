@@ -318,13 +318,11 @@
     <string name="compose_auth_create_account">Criar conta</string>
     <string name="compose_auth_dont_have_account">Não tens uma conta? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  ou  </string>
     <string name="compose_auth_password">Palavra-passe</string>
     <string name="compose_auth_sign_in_subtitle">Inicia sessão para acederes à tua biblioteca e progresso</string>
     <string name="compose_auth_sign_in">Iniciar sessão</string>
     <string name="compose_auth_sign_up_subtitle">Regista-te para sincronizares os teus dados entre dispositivos</string>
     <string name="compose_auth_sign_up">Registar</string>
-    <string name="compose_auth_store_locally">Os teus dados serão guardados apenas localmente</string>
     <string name="compose_auth_tagline">Tudo em streaming, em qualquer lugar</string>
     <string name="compose_auth_welcome_back">Olá novamente</string>
     <string name="compose_catalog_subtitle_library">Biblioteca</string>

@@ -301,13 +301,11 @@
     <string name="compose_auth_create_account">Criar Conta</string>
     <string name="compose_auth_dont_have_account">Não tem uma conta? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  ou  </string>
     <string name="compose_auth_password">Senha</string>
     <string name="compose_auth_sign_in_subtitle">Faça login para acessar sua biblioteca e progresso</string>
     <string name="compose_auth_sign_in">Entrar</string>
     <string name="compose_auth_sign_up_subtitle">Cadastre-se para sincronizar seus dados entre dispositivos</string>
     <string name="compose_auth_sign_up">Cadastrar</string>
-    <string name="compose_auth_store_locally">Seus dados serão armazenados apenas localmente</string>
     <string name="compose_auth_tagline">Assista tudo, em qualquer lugar</string>
     <string name="compose_auth_welcome_back">Bem-vindo de Volta</string>
     <string name="compose_catalog_subtitle_library">Biblioteca</string>

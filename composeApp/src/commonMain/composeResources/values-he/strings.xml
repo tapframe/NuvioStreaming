@@ -166,13 +166,11 @@
     <string name="compose_auth_create_account">צור חשבון</string>
     <string name="compose_auth_dont_have_account">אין לך חשבון? </string>
     <string name="compose_auth_email">אימייל</string>
-    <string name="compose_auth_or_separator">  או  </string>
     <string name="compose_auth_password">סיסמה</string>
     <string name="compose_auth_sign_in_subtitle">התחבר כדי לגשת לספרייה ולהתקדמות שלך</string>
     <string name="compose_auth_sign_in">התחברות</string>
     <string name="compose_auth_sign_up_subtitle">הירשם כדי לסנכרן את הנתונים שלך בין מכשירים</string>
     <string name="compose_auth_sign_up">הרשמה</string>
-    <string name="compose_auth_store_locally">הנתונים שלך יישמרו מקומית בלבד</string>
     <string name="compose_auth_tagline">צפה בספרייה שלך, בכל מקום</string>
     <string name="compose_auth_terms_prefix">בהרשמה, אני מסכים ל</string>
     <string name="compose_auth_terms_link">תנאי השימוש</string>

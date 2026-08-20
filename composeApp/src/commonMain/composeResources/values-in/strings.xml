@@ -302,13 +302,11 @@
     <string name="compose_auth_create_account">Buat Akun</string>
     <string name="compose_auth_dont_have_account">Belum punya akun? </string>
     <string name="compose_auth_email">Email</string>
-    <string name="compose_auth_or_separator">  atau  </string>
     <string name="compose_auth_password">Kata Sandi</string>
     <string name="compose_auth_sign_in_subtitle">Masuk untuk mengakses pustaka dan progres Anda</string>
     <string name="compose_auth_sign_in">Masuk</string>
     <string name="compose_auth_sign_up_subtitle">Daftar untuk menyinkronkan data Anda di semua perangkat</string>
     <string name="compose_auth_sign_up">Daftar</string>
-    <string name="compose_auth_store_locally">Data Anda hanya akan disimpan secara lokal</string>
     <string name="compose_auth_tagline">Streaming semua, di mana saja</string>
     <string name="compose_auth_welcome_back">Selamat Datang Kembali</string>
     <string name="compose_catalog_subtitle_library">Pustaka</string>

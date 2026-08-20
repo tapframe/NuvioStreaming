@@ -294,13 +294,11 @@
     <string name="compose_auth_create_account">Fiók létrehozása</string>
     <string name="compose_auth_dont_have_account">Nincs még fiókod? </string>
     <string name="compose_auth_email">E-mail</string>
-    <string name="compose_auth_or_separator">  vagy  </string>
     <string name="compose_auth_password">Jelszó</string>
     <string name="compose_auth_sign_in_subtitle">Jelentkezz be a könyvtárad és a megtekintési előzményeid eléréséhez</string>
     <string name="compose_auth_sign_in">Bejelentkezés</string>
     <string name="compose_auth_sign_up_subtitle">Regisztrálj az adataid eszközök közötti szinkronizálásához</string>
     <string name="compose_auth_sign_up">Regisztráció</string>
-    <string name="compose_auth_store_locally">Az adataid csak helyileg lesznek tárolva</string>
     <string name="compose_auth_tagline">Streamelj mindent, bárhol</string>
     <string name="compose_auth_welcome_back">Üdvözlünk újra!</string>
     <string name="compose_catalog_subtitle_library">Könyvtár</string>

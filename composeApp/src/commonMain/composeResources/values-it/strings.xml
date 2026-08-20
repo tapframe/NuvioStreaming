@@ -134,13 +134,11 @@
   <string name="compose_auth_create_account">Crea account</string>
   <string name="compose_auth_dont_have_account">Non hai un account? </string>
   <string name="compose_auth_email">Email</string>
-  <string name="compose_auth_or_separator">  o  </string>
   <string name="compose_auth_password">Password</string>
   <string name="compose_auth_sign_in_subtitle">Accedi per accedere alla tua libreria e ai tuoi progressi</string>
   <string name="compose_auth_sign_in">Accedi</string>
   <string name="compose_auth_sign_up_subtitle">Registrati per sincronizzare i tuoi dati su più dispositivi</string>
   <string name="compose_auth_sign_up">Registrati</string>
-  <string name="compose_auth_store_locally">I tuoi dati verranno salvati solo localmente</string>
   <string name="compose_auth_tagline">Tutto in streaming, ovunque</string>
   <string name="compose_auth_welcome_back">Bentornato</string>
   <string name="compose_catalog_subtitle_library">Libreria</string>

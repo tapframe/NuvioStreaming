@@ -285,13 +285,11 @@
     <string name="compose_auth_create_account">Konto erstellen</string>
     <string name="compose_auth_dont_have_account">Du hast kein Konto? </string>
     <string name="compose_auth_email">E-Mail</string>
-    <string name="compose_auth_or_separator">  oder  </string>
     <string name="compose_auth_password">Passwort</string>
     <string name="compose_auth_sign_in_subtitle">Melde dich an, um auf deine Bibliothek und Fortschritt zuzugreifen</string>
     <string name="compose_auth_sign_in">Anmelden</string>
     <string name="compose_auth_sign_up_subtitle">Registriere dich, um deine Daten geräteübergreifend zu synchronisieren</string>
     <string name="compose_auth_sign_up">Registrieren</string>
-    <string name="compose_auth_store_locally">Deine Daten werden nur lokal gespeichert</string>
     <string name="compose_auth_tagline">Streame alles, überall</string>
     <string name="compose_auth_welcome_back">Willkommen zurück</string>
     <string name="compose_catalog_subtitle_library">Bibliothek</string>
