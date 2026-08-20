@@ -366,6 +366,7 @@ final class MPVPlayerViewController: UIViewController {
         let bold: Bool
         let fontSize: Float
         let subPos: Int
+        let stripSdh: Bool
     }
 
     private var lastLoadRequest: PendingLoadRequest?
@@ -1194,7 +1195,8 @@ final class MPVPlayerViewController: UIViewController {
                 outlineSize: style.outlineSize,
                 bold: style.bold,
                 fontSize: style.fontSize,
-                subPos: style.subPos
+                subPos: style.subPos,
+                stripSdh: style.stripSdh
             )
         }
         setSpeed(currentSpeed)
@@ -1454,7 +1456,8 @@ final class MPVPlayerViewController: UIViewController {
             outlineSize: outlineSize,
             bold: bold,
             fontSize: fontSize,
-            subPos: subPos
+            subPos: subPos,
+            stripSdh: stripSdh
         )
         guard mpv != nil else { return }
 
