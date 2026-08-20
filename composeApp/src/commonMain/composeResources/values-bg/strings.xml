@@ -1,4 +1,13 @@
 <resources>
+    <string name="theme_gold">Злато</string>
+    <string name="theme_jade">Нефрит</string>
+    <string name="theme_rose_gold">Розово злато</string>
+    <string name="theme_arctic_blue">Арктическо синьо</string>
+    <string name="theme_graphite">Графит</string>
+    <string name="profile_choose_background">Избери фон на профила</string>
+    <string name="profile_background_member_note">URL адресите за персонализиран фон могат да се конфигурират от уеб панела на Nuvio.</string>
+    <string name="profile_background_normal">Нормално</string>
+    <string name="profile_background_custom">Персонализира л</string>
     <string name="about_licenses_attributions_subtitle">Източници на данни, благодарности и лицензи на платформата</string>
     <string name="about_supporters_contributors_subtitle">Открито признание и кредити на проекта</string>
     <string name="action_back">Назад</string>
@@ -575,6 +584,7 @@
     <string name="compose_tracking_list_picker_loading">Зареждане на списъци…</string>
     <string name="compose_tracking_list_picker_subtitle">Изберете къде да се запази това заглавие</string>
     <string name="action_donate">Дарете</string>
+    <string name="action_support_nuvio">Подкрепете Nuvio</string>
     <string name="cw_action_go_to_details">Отиди към детайлите</string>
     <string name="cw_action_remove">Премахни</string>
     <string name="cw_action_start_from_beginning">Започни от началото</string>
