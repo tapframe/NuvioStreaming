@@ -151,7 +151,7 @@ object SkipIntroRepository {
         return chosen.values.toList()
     }
 
-    private fun segmentCategory(type: String): String? = when (type.lowercase()) {
+    internal fun segmentCategory(type: String): String? = when (type.lowercase()) {
         "intro", "op", "mixed-op" -> "opening"
         "outro", "ed", "mixed-ed", "credits", "ending" -> "ending"
         "recap" -> "recap"

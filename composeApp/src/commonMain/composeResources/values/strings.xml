@@ -1121,6 +1121,12 @@
     <string name="settings_playback_subtitle_vertical_offset">Vertical Offset</string>
     <string name="settings_playback_skip_intro_outro_recap">Skip Intro</string>
     <string name="settings_playback_skip_intro_outro_recap_description">Use introdb.app to detect intros and recaps.</string>
+    <string name="settings_playback_auto_skip_intro">Auto-skip Intro / Opening</string>
+    <string name="settings_playback_auto_skip_intro_description">Skip intros and anime openings automatically.</string>
+    <string name="settings_playback_auto_skip_recap">Auto-skip Recap</string>
+    <string name="settings_playback_auto_skip_recap_description">Skip recap segments automatically.</string>
+    <string name="settings_playback_auto_skip_outro">Auto-skip Outro / Ending</string>
+    <string name="settings_playback_auto_skip_outro_description">Skip outros and anime endings automatically.</string>
     <string name="settings_playback_source_scope">Auto-play Source Scope</string>
     <string name="settings_playback_source_scope_all_addons">All installed addons</string>
     <string name="settings_playback_source_scope_all_addons_description">Auto-play only considers streams coming from your installed addons.</string>

@@ -1043,6 +1043,33 @@ private fun PlaybackSettingsSection(
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_auto_skip_intro),
+                    description = stringResource(Res.string.settings_playback_auto_skip_intro_description),
+                    checked = autoPlayPlayerSettings.autoSkipIntroEnabled,
+                    enabled = autoPlayPlayerSettings.skipIntroEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setAutoSkipIntroEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_auto_skip_recap),
+                    description = stringResource(Res.string.settings_playback_auto_skip_recap_description),
+                    checked = autoPlayPlayerSettings.autoSkipRecapEnabled,
+                    enabled = autoPlayPlayerSettings.skipIntroEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setAutoSkipRecapEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_auto_skip_outro),
+                    description = stringResource(Res.string.settings_playback_auto_skip_outro_description),
+                    checked = autoPlayPlayerSettings.autoSkipOutroEnabled,
+                    enabled = autoPlayPlayerSettings.skipIntroEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setAutoSkipOutroEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_anime_skip),
                     description = stringResource(Res.string.settings_playback_anime_skip_description),
                     checked = autoPlayPlayerSettings.animeSkipEnabled,

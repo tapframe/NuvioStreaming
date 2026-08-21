@@ -639,6 +639,9 @@ internal fun settingsSearchEntries(
         icon = Icons.Rounded.PlayArrow,
         rows = listOf(
             PlaybackSearchRow("skip-intro", stringResource(Res.string.settings_playback_skip_intro_outro_recap), stringResource(Res.string.settings_playback_skip_intro_outro_recap_description)),
+            PlaybackSearchRow("auto-skip-intro", stringResource(Res.string.settings_playback_auto_skip_intro), stringResource(Res.string.settings_playback_auto_skip_intro_description)),
+            PlaybackSearchRow("auto-skip-recap", stringResource(Res.string.settings_playback_auto_skip_recap), stringResource(Res.string.settings_playback_auto_skip_recap_description)),
+            PlaybackSearchRow("auto-skip-outro", stringResource(Res.string.settings_playback_auto_skip_outro), stringResource(Res.string.settings_playback_auto_skip_outro_description)),
             PlaybackSearchRow("anime-skip", stringResource(Res.string.settings_playback_anime_skip), stringResource(Res.string.settings_playback_anime_skip_description)),
             PlaybackSearchRow("anime-skip-client", stringResource(Res.string.settings_playback_anime_skip_client_id), stringResource(Res.string.settings_playback_anime_skip_client_id_description)),
             PlaybackSearchRow("intro-submit", stringResource(Res.string.settings_playback_intro_submit_enabled), stringResource(Res.string.settings_playback_intro_submit_enabled_description)),

@@ -10,6 +10,7 @@ import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
+import com.nuvio.app.features.player.skip.SkipInterval
 import com.nuvio.app.features.player.skip.SkipIntroRepository
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
@@ -22,6 +23,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
+
+/** Whether auto-skip is enabled for this segment's type (categorized by SkipIntroRepository). */
+internal fun PlayerSettingsUiState.autoSkips(interval: SkipInterval): Boolean =
+    when (SkipIntroRepository.segmentCategory(interval.type)) {
+        "opening" -> autoSkipIntroEnabled
+        "recap" -> autoSkipRecapEnabled
+        "ending" -> autoSkipOutroEnabled
+        else -> false
+    }
 
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
@@ -401,6 +411,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         skipIntervals = emptyList()
         activeSkipInterval = null
         skipIntervalDismissed = false
+        autoSkippedIntervals = emptySet()
         showNextEpisodeCard = false
         nextEpisodeAutoPlayJob?.cancel()
         nextEpisodeAutoPlaySearching = false
@@ -443,6 +454,21 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             activeSkipInterval = current
             if (current != null) skipIntervalDismissed = false
         }
+    }
+
+    // Automatically skip the segment currently playing, once per segment.
+    LaunchedEffect(playbackSnapshot.positionMs, skipIntervals) {
+        if (!initialLoadCompleted || !initialSeekApplied || pausedOverlayVisible) return@LaunchedEffect
+        val positionSec = playbackSnapshot.positionMs / 1000.0
+        val current = skipIntervals.firstOrNull { interval ->
+            positionSec >= interval.startTime && positionSec < interval.endTime - 0.5
+        } ?: return@LaunchedEffect
+        if (current in autoSkippedIntervals) return@LaunchedEffect
+        if (!playerSettingsUiState.autoSkips(current)) return@LaunchedEffect
+        autoSkippedIntervals = autoSkippedIntervals + current
+        playerController?.seekTo((current.endTime * 1000).toLong())
+        scheduleProgressSyncAfterSeek()
+        skipIntervalDismissed = true
     }
 
     LaunchedEffect(playerMetaVideos, activeSeasonNumber, activeEpisodeNumber) {

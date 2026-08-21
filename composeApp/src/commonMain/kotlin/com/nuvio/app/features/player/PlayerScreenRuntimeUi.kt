@@ -380,7 +380,9 @@ private fun BoxScope.RenderPlaybackOverlays(
         renderedGestureFeedback = renderedGestureFeedback,
         initialLoadCompleted = initialLoadCompleted,
         pausedOverlayVisible = pausedOverlayVisible,
-        activeSkipInterval = activeSkipInterval,
+        activeSkipInterval = activeSkipInterval?.takeUnless {
+            playerSettingsUiState.autoSkips(it) && (it !in autoSkippedIntervals || skipIntervalDismissed)
+        },
         skipIntervalDismissed = skipIntervalDismissed,
         controlsVisible = controlsVisible,
         onSkipInterval = { interval ->
