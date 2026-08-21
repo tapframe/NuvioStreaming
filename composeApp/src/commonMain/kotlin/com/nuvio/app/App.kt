@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1855,7 +1856,11 @@ private fun MainAppContent(
                     )
 
                     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        val isTabletLayout = useTabletFloatingTabBar || maxWidth >= 768.dp
+                        val isTabletLayout = isTabletAppLayout(
+                            width = maxWidth,
+                            height = maxHeight,
+                            forceTabletLayout = useTabletFloatingTabBar,
+                        )
                         val useNativeBottomTabs = if (useNativeNavigation) {
                             useNativeTabBar
                         } else {
@@ -3680,6 +3685,12 @@ private fun MainAppContent(
             }
         }
 }
+
+internal fun isTabletAppLayout(
+    width: Dp,
+    height: Dp,
+    forceTabletLayout: Boolean = false,
+): Boolean = forceTabletLayout || minOf(width, height) >= 768.dp
 
 @Composable
 private fun rememberGuardedPopBackStack(
