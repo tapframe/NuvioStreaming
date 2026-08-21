@@ -22,6 +22,8 @@ node_modules/
 logs/
 analysis/
 Docs
+SUPPORTER_COSMETICS.md
+supabase/migrations/
 keystore/
 scripts/build-distribution.sh
 asset

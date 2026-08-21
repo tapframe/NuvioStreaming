@@ -55,6 +55,10 @@ SHORTLIST_KEYS = {
 
 VARIANTS = [variant for variant in ALL_VARIANTS if variant[0] in SHORTLIST_KEYS]
 
+THEME_WORDMARK_VARIANTS = [
+    ("gold", "theme-gold.png"),
+]
+
 DENSITIES = {
     "mdpi": 1.0,
     "hdpi": 1.5,
@@ -348,6 +352,14 @@ def generate() -> None:
                     resized(monochrome_icon(adaptive), foreground_size),
                     directory / "ic_launcher_monochrome.webp",
                 )
+
+    for key, filename in THEME_WORDMARK_VARIANTS:
+        transparent = Image.open(COLORWAYS / "transparent" / filename).convert("RGBA")
+        wordmark_for(transparent).save(
+            COMPOSE_DRAWABLE / f"app_logo_wordmark_{key}.png",
+            "PNG",
+            optimize=True,
+        )
 
     generate_preview_board(previews)
     ANDROID_THEMES.write_text(base_theme_contents(), encoding="utf-8")

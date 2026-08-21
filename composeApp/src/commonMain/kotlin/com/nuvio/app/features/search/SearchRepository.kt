@@ -47,7 +47,11 @@ object SearchRepository {
     private var discoverSources: List<DiscoverCatalogOption> = emptyList()
     private var lastDiscoverHideUnreleasedContent: Boolean? = null
 
-    fun search(query: String, addons: List<ManagedAddon>) {
+    fun search(
+        query: String,
+        addons: List<ManagedAddon>,
+        forceRefresh: Boolean = false,
+    ) {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
             clear()
@@ -88,7 +92,7 @@ object SearchRepository {
                 },
             )
         }
-        if (requestKey == lastRequestKey) return
+        if (!forceRefresh && requestKey == lastRequestKey && activeJob?.isActive == true) return
         lastRequestKey = requestKey
 
         activeJob?.cancel()
@@ -98,7 +102,7 @@ object SearchRepository {
             val resultChannel = Channel<IndexedSearchResult>(Channel.UNLIMITED)
             val jobs = requests.mapIndexed { index, request ->
                 launch {
-                    runCatching { request.toSection() }
+                    runCatching { request.toSection(forceRefresh = forceRefresh) }
                         .fold(
                             onSuccess = { section ->
                                 resultChannel.send(
@@ -176,7 +180,10 @@ object SearchRepository {
         _discoverUiState.value = DiscoverUiState()
     }
 
-    fun refreshDiscover(addons: List<ManagedAddon>) {
+    fun refreshDiscover(
+        addons: List<ManagedAddon>,
+        forceRefresh: Boolean = false,
+    ) {
         val activeAddons = addons.enabledAddons().filter { it.manifest != null }
         if (activeAddons.isEmpty()) {
             activeDiscoverJob?.cancel()
@@ -193,9 +200,10 @@ object SearchRepository {
         val current = _discoverUiState.value
         val hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent
         if (
+            !forceRefresh &&
             sources == discoverSources &&
             lastDiscoverHideUnreleasedContent == hideUnreleasedContent &&
-            current.canReuseDiscoverState(sources)
+            activeDiscoverJob?.isActive == true
         ) {
             log.d {
                 "Reusing discover state type=${current.selectedType} catalog=${current.selectedCatalogKey} " +
@@ -241,7 +249,10 @@ object SearchRepository {
                 "genre=${selectedGenre ?: "<all>"} sources=${sources.size}"
         }
 
-        loadDiscoverFeed(reset = true)
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = forceRefresh,
+        )
     }
 
     fun selectDiscoverType(type: String) {
@@ -275,7 +286,10 @@ object SearchRepository {
             emptyStateReason = null,
             errorMessage = null,
         )
-        loadDiscoverFeed(reset = true)
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = false,
+        )
     }
 
     fun selectDiscoverCatalog(catalogKey: String) {
@@ -292,7 +306,10 @@ object SearchRepository {
             emptyStateReason = null,
             errorMessage = null,
         )
-        loadDiscoverFeed(reset = true)
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = false,
+        )
     }
 
     fun selectDiscoverGenre(genre: String?) {
@@ -309,13 +326,19 @@ object SearchRepository {
             emptyStateReason = null,
             errorMessage = null,
         )
-        loadDiscoverFeed(reset = true)
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = false,
+        )
     }
 
     fun loadMoreDiscover() {
         val current = _discoverUiState.value
         if (current.isLoading || current.nextSkip == null) return
-        loadDiscoverFeed(reset = false)
+        loadDiscoverFeed(
+            reset = false,
+            forceRefresh = false,
+        )
     }
 
     private fun buildSearchRequests(
@@ -363,13 +386,14 @@ object SearchRepository {
                 }
         }
 
-    private suspend fun SearchCatalogRequest.toSection(): HomeCatalogSection {
+    private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
         val manifest = requireNotNull(addon.manifest)
         val page = fetchCatalogPage(
             manifestUrl = manifest.transportUrl,
             type = type,
             catalogId = catalogId,
             search = query,
+            forceRefresh = forceRefresh,
         ).withUnreleasedFilter()
         val items = page.items
         require(items.isNotEmpty()) {
@@ -393,7 +417,10 @@ object SearchRepository {
         )
     }
 
-    private fun loadDiscoverFeed(reset: Boolean) {
+    private fun loadDiscoverFeed(
+        reset: Boolean,
+        forceRefresh: Boolean,
+    ) {
         activeDiscoverJob?.cancel()
         val current = _discoverUiState.value
         val selectedCatalog = current.selectedCatalog ?: return
@@ -430,6 +457,7 @@ object SearchRepository {
                     catalogId = selectedCatalog.catalogId,
                     genre = current.selectedGenre,
                     skip = requestedSkip.takeIf { it > 0 },
+                    forceRefresh = forceRefresh,
                 ).withUnreleasedFilter()
             }.fold(
                 onSuccess = { page ->
@@ -550,27 +578,6 @@ private fun DiscoverCatalogOption.resolveGenreSelection(requestedGenre: String?)
         genreRequired -> genreOptions.firstOrNull()
         else -> null
     }
-
-private fun DiscoverUiState.canReuseDiscoverState(
-    sources: List<DiscoverCatalogOption>,
-): Boolean {
-    val currentType = selectedType ?: return false
-    if (!typeOptions.contains(currentType) || !sources.any { it.type == currentType }) {
-        return false
-    }
-
-    val currentCatalog = sources.firstOrNull { it.key == selectedCatalogKey } ?: return false
-    if (currentCatalog.type != currentType) {
-        return false
-    }
-
-    val resolvedGenre = currentCatalog.resolveGenreSelection(selectedGenre)
-    if (selectedGenre != resolvedGenre) {
-        return false
-    }
-
-    return isLoading || items.isNotEmpty() || emptyStateReason != null || errorMessage != null || nextSkip != null
-}
 
 private fun List<MetaPreview>.previewNames(limit: Int = 5): String {
     if (isEmpty()) return "[]"

@@ -34,7 +34,7 @@ object HomeRepository {
 
     private var activeJob: Job? = null
     private var activeRequestKey: String? = null
-    private var completedRequestKey: String? = null
+    private var currentRequestKey: String? = null
     private var currentDefinitions: List<HomeCatalogDefinition> = emptyList()
     private var cachedSections: Map<String, HomeCatalogSection> = emptyMap()
     private var cachedCollectionHeroItems: List<MetaPreview> = emptyList()
@@ -50,27 +50,15 @@ object HomeRepository {
         val requestCacheKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
         cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
         val requestKey = requests.joinToString(separator = "|", transform = HomeCatalogDefinition::cacheKey)
+        currentRequestKey = requestKey
 
         if (!force && activeRequestKey == requestKey && _uiState.value.isLoading) return
-
-        if (
-            !force &&
-            requestKey == completedRequestKey &&
-            requestCacheKeys.all(cachedSections::containsKey) &&
-            requestCacheKeys.any(::hasRenderableCachedSection)
-        ) {
-            if (_uiState.value.sections.isEmpty() || _uiState.value.heroItems.isEmpty()) {
-                applyCurrentSettings()
-            }
-            return
-        }
         activeRequestKey = requestKey
 
         if (requests.isEmpty()) {
             activeJob?.cancel()
             activeJob = null
             activeRequestKey = null
-            completedRequestKey = requestKey
             cachedSections = emptyMap()
             lastErrorMessage = null
             publishCurrentState(
@@ -79,7 +67,8 @@ object HomeRepository {
             )
             ensureCollectionHeroFallback(
                 addons = activeAddons,
-                force = force,
+                forceRefresh = force,
+                refreshSources = true,
                 requestKey = requestKey,
             )
             return
@@ -92,26 +81,20 @@ object HomeRepository {
                 definitions = requests,
                 snapshot = HomeCatalogSettingsRepository.snapshot(),
             )
-            val pendingRequests = prioritizedRequests.filter { definition ->
-                force || cachedSections[definition.cacheKey] == null
-            }
-            if (pendingRequests.isEmpty()) {
-                publishCurrentState(
-                    isLoading = false,
-                    requestKey = requestKey,
-                )
-                return@launch
-            }
             val loadedSections = linkedMapOf<String, HomeCatalogSection>().apply {
                 putAll(cachedSections)
             }
             var firstErrorMessage: String? = null
             var batchIndex = 0
 
-            pendingRequests.chunked(HOME_CATALOG_FETCH_BATCH_SIZE).forEach { batch ->
+            prioritizedRequests.chunked(HOME_CATALOG_FETCH_BATCH_SIZE).forEach { batch ->
                 if (activeRequestKey != requestKey) return@launch
                 val results = batch.map { request ->
-                    async { request to runCatching { request.toSection() } }
+                    async {
+                        request to runCatching {
+                            request.toSection(forceRefresh = force)
+                        }
+                    }
                 }.awaitAll()
 
                 if (activeRequestKey != requestKey) return@launch
@@ -141,9 +124,6 @@ object HomeRepository {
 
             cachedSections = loadedSections.toMap()
             lastErrorMessage = firstErrorMessage
-            if (cachedSections.values.any { section -> section.items.isNotEmpty() }) {
-                completedRequestKey = requestKey
-            }
             activeRequestKey = null
             publishCurrentState(
                 isLoading = false,
@@ -151,7 +131,8 @@ object HomeRepository {
             )
             ensureCollectionHeroFallback(
                 addons = activeAddons,
-                force = force,
+                forceRefresh = force,
+                refreshSources = true,
                 requestKey = requestKey,
             )
         }
@@ -160,12 +141,13 @@ object HomeRepository {
     fun applyCurrentSettings() {
         publishCurrentState(
             isLoading = _uiState.value.isLoading,
-            requestKey = activeRequestKey ?: completedRequestKey,
+            requestKey = currentRequestKey,
         )
         ensureCollectionHeroFallback(
             addons = AddonRepository.uiState.value.addons.enabledAddons(),
-            force = false,
-            requestKey = activeRequestKey ?: completedRequestKey,
+            forceRefresh = false,
+            refreshSources = false,
+            requestKey = currentRequestKey,
         )
     }
 
@@ -173,7 +155,7 @@ object HomeRepository {
         activeJob?.cancel()
         activeJob = null
         activeRequestKey = null
-        completedRequestKey = null
+        currentRequestKey = null
         currentDefinitions = emptyList()
         cachedSections = emptyMap()
         cachedCollectionHeroItems = emptyList()
@@ -184,9 +166,6 @@ object HomeRepository {
         lastErrorMessage = null
         _uiState.value = HomeUiState()
     }
-
-    private fun hasRenderableCachedSection(cacheKey: String): Boolean =
-        cachedSections[cacheKey]?.items?.isNotEmpty() == true
 
     private fun publishCurrentState(
         isLoading: Boolean,
@@ -240,12 +219,13 @@ object HomeRepository {
         )
     }
 
-    private suspend fun HomeCatalogDefinition.toSection(): HomeCatalogSection {
+    private suspend fun HomeCatalogDefinition.toSection(forceRefresh: Boolean): HomeCatalogSection {
         val page = fetchCatalogPage(
             manifestUrl = manifestUrl,
             type = type,
             catalogId = catalogId,
             maxItems = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
+            forceRefresh = forceRefresh,
         )
         val items = page.items
         if (items.isEmpty()) {
@@ -285,7 +265,8 @@ object HomeRepository {
 
     private fun ensureCollectionHeroFallback(
         addons: List<ManagedAddon>,
-        force: Boolean,
+        forceRefresh: Boolean,
+        refreshSources: Boolean,
         requestKey: String?,
     ) {
         if (!lastPublishedCatalogHeroEmpty) return
@@ -304,7 +285,7 @@ object HomeRepository {
             snapshot = snapshot,
             requestKey = requestKey,
         )
-        if (!force && collectionHeroRequestKey == nextRequestKey) return
+        if (!refreshSources && collectionHeroRequestKey == nextRequestKey) return
 
         collectionHeroJob?.cancel()
         collectionHeroRequestKey = nextRequestKey
@@ -319,7 +300,10 @@ object HomeRepository {
             val sourceResults = sources.map { source ->
                 async {
                     runCatching {
-                        source.resolveCollectionHeroItems(addons)
+                        source.resolveCollectionHeroItems(
+                            addons = addons,
+                            forceRefresh = forceRefresh,
+                        )
                     }.getOrDefault(emptyList())
                 }
             }.awaitAll()
@@ -353,7 +337,10 @@ object HomeRepository {
             .flatMap { folder -> folder.resolvedSources }
             .take(HOME_COLLECTION_HERO_SOURCE_LIMIT)
 
-    private suspend fun CollectionSource.resolveCollectionHeroItems(addons: List<ManagedAddon>): List<MetaPreview> {
+    private suspend fun CollectionSource.resolveCollectionHeroItems(
+        addons: List<ManagedAddon>,
+        forceRefresh: Boolean,
+    ): List<MetaPreview> {
         val page = when {
             isTmdb -> TmdbCollectionSourceResolver.resolve(source = this, page = 1)
             isTrakt -> TraktPublicListSourceResolver.resolve(source = this, page = 1)
@@ -366,6 +353,7 @@ object HomeRepository {
                     catalogId = catalogSource.catalogId,
                     genre = catalogSource.genre,
                     maxItems = HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT,
+                    forceRefresh = forceRefresh,
                 )
             }
         }
