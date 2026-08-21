@@ -1,4 +1,13 @@
 <resources>
+    <string name="theme_gold">Gold</string>
+    <string name="theme_jade">Jade</string>
+    <string name="theme_rose_gold">Rose Gold</string>
+    <string name="theme_arctic_blue">Arctic Blue</string>
+    <string name="theme_graphite">Graphite</string>
+    <string name="profile_choose_background">Choose Profile Background</string>
+    <string name="profile_background_member_note">Custom background URLs can be configured from the Nuvio web panel.</string>
+    <string name="profile_background_normal">Normal</string>
+    <string name="profile_background_custom">Custom</string>
     <string name="about_licenses_attributions_subtitle">Data sources, acknowledgements, and platform licenses</string>
     <string name="about_supporters_contributors_subtitle">Open recognition and project credits</string>
     <string name="action_back">Back</string>
@@ -575,6 +584,7 @@
     <string name="compose_tracking_list_picker_loading">Loading lists…</string>
     <string name="compose_tracking_list_picker_subtitle">Choose where to save this title</string>
     <string name="action_donate">Donate</string>
+    <string name="action_support_nuvio">Support Nuvio</string>
     <string name="cw_action_go_to_details">Go to details</string>
     <string name="cw_action_remove">Remove</string>
     <string name="cw_action_start_from_beginning">Start from beginning</string>
@@ -1100,6 +1110,8 @@
     <string name="settings_playback_subtitle_show_preferred_only">Show Only Preferred Languages</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Only show subtitles matching your preferred subtitle languages.</string>
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
+    <string name="settings_playback_subtitle_strip_sdh">Strip SDH Subtitles</string>
+    <string name="settings_playback_subtitle_strip_sdh_description">Hide sound descriptions and speaker labels from text subtitles.</string>
     <string name="settings_playback_subtitle_text_color">Text Color</string>
     <string name="settings_playback_subtitle_use_forced">Use Forced Subtitles</string>
     <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when audio matches the subtitle language; if unavailable, select nothing.</string>

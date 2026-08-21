@@ -243,6 +243,15 @@ VARIANTS = [
 ]
 
 
+THEME_VARIANTS = [
+    {
+        "slug": "gold",
+        "swatches": ["#E8A91C", "#FFD45C", "#FFF1A8", "#FFD45C", "#E8A91C"],
+        "hues": [42, 46, 50, 46, 42],
+    },
+]
+
+
 def hex_rgb(value):
     value = value.lstrip("#")
     return tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
@@ -274,7 +283,7 @@ def recolor(source, variant):
     if not variant.get("preserve"):
         color_mask = (alpha > 0) & (saturation > 0.12) & (value > 0.22)
         position = np.clip((hue - 184) / 110, 0, 1)
-        stops = np.array([0, 0.5, 1], dtype=np.float32)
+        stops = np.linspace(0, 1, len(variant["swatches"]), dtype=np.float32)
         target_hue = np.interp(position, stops, variant["hues"]) % 360
         targets = swatch_hsv(variant["swatches"])
         target_saturation = np.interp(position, stops, targets[:, 1])
@@ -479,6 +488,11 @@ def main():
     draw_master(rendered)
     for family in FAMILIES:
         draw_family_board(family, rendered_by_slug)
+    for variant in THEME_VARIANTS:
+        logo = recolor(source, variant)
+        filename = f"theme-{variant['slug']}.png"
+        logo.save(transparent_dir / filename, optimize=True)
+        composite_black(logo).save(black_dir / filename, optimize=True)
     write_guide()
 
 
