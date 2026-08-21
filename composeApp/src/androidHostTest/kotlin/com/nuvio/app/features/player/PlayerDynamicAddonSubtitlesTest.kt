@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
+import androidx.media3.common.util.Clock
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
@@ -17,6 +18,8 @@ import androidx.media3.datasource.TransferListener
 import androidx.media3.decoder.DecoderInputBuffer
 import androidx.media3.exoplayer.FormatHolder
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.RendererConfiguration
+import androidx.media3.exoplayer.analytics.PlayerId
 import androidx.media3.exoplayer.source.MediaPeriod
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -24,6 +27,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SampleStream
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.exoplayer.source.WrappingMediaSource
+import androidx.media3.exoplayer.text.TextRenderer
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection
 import androidx.media3.exoplayer.trackselection.FixedTrackSelection
 import androidx.media3.exoplayer.upstream.Allocator
@@ -176,7 +180,7 @@ class PlayerDynamicAddonSubtitlesTest {
 
         val snapshot = state.snapshot()
         assertEquals(100L, snapshot.generation)
-        assertEquals(200L, snapshot.streamRevision)
+        assertEquals(100L, snapshot.streamRevision)
         assertEquals("addon:99", snapshot.request?.trackId)
         assertEquals("99", snapshot.content?.samples?.single()?.data?.decodeToString())
     }
@@ -210,23 +214,63 @@ class PlayerDynamicAddonSubtitlesTest {
         assertEquals(C.RESULT_FORMAT_READ, stream.readData(formatHolder, buffer, 0))
         assertEquals(C.RESULT_NOTHING_READ, stream.readData(formatHolder, buffer, 0))
         assertTrue(state.publish(request, dynamicContent("A")))
-        assertEquals(C.RESULT_NOTHING_READ, stream.readData(formatHolder, buffer, 0))
-        val loadedStream = DynamicAddonSubtitleSampleStream(
-            state = state,
-            streamRevision = state.snapshot().streamRevision,
-            format = dynamicFormat(),
-            startPositionUs = 0L,
-        )
-        assertEquals(C.RESULT_FORMAT_READ, loadedStream.readData(formatHolder, buffer, 0))
-        assertEquals(C.RESULT_BUFFER_READ, loadedStream.readData(formatHolder, buffer, 0))
+        assertEquals(C.RESULT_BUFFER_READ, stream.readData(formatHolder, buffer, 0))
         buffer.flip()
         assertContentEquals("A".encodeToByteArray(), buffer.data!!.let { bytes ->
             ByteArray(bytes.remaining()).also(bytes::get)
         })
 
         buffer.clear()
-        assertEquals(C.RESULT_BUFFER_READ, loadedStream.readData(formatHolder, buffer, 0))
+        assertEquals(C.RESULT_BUFFER_READ, stream.readData(formatHolder, buffer, 0))
         assertTrue(buffer.isEndOfStream)
+    }
+
+    @Test
+    fun textRendererAlreadyPollingBeforePayloadRendersWhenPayloadArrives() {
+        val state = DynamicAddonSubtitleState()
+        val request = state.beginSelection("addon:a", "https://subs.example/a")
+        val format = dynamicFormat()
+        val stream = DynamicAddonSubtitleSampleStream(
+            state = state,
+            streamRevision = state.snapshot().streamRevision,
+            format = format,
+            startPositionUs = 0L,
+        )
+        var renderedTexts = emptyList<String>()
+        val renderer = TextRenderer(
+            { cueGroup ->
+                renderedTexts = cueGroup.cues.mapNotNull { cue -> cue.text?.toString() }
+            },
+            null,
+        )
+        renderer.init(0, PlayerId.UNSET, Clock.DEFAULT)
+        renderer.enable(
+            RendererConfiguration.DEFAULT,
+            arrayOf(format),
+            stream,
+            0L,
+            false,
+            true,
+            0L,
+            0L,
+            MediaSource.MediaPeriodId(Any()),
+        )
+
+        try {
+            renderer.start()
+            renderer.render(0L, 0L) // Format.
+            renderer.render(0L, 0L) // Payload is not available yet.
+            assertTrue(renderedTexts.isEmpty())
+
+            assertTrue(state.publish(request, renderedContent("A")))
+            renderer.render(0L, 0L)
+
+            assertEquals(listOf("A"), renderedTexts)
+        } finally {
+            renderer.stop()
+            renderer.disable()
+            renderer.release()
+        }
     }
 
     @Test
@@ -465,6 +509,37 @@ class PlayerDynamicAddonSubtitlesTest {
             }
             selectAndPublishAddon(player, state, "addon:a", "A after off")
             awaitCondition { renderedTexts == listOf("A after off") }
+
+            val emptyRequest = state.beginSelection(
+                "addon:empty",
+                "https://subs.example/empty",
+            )
+            selectDynamicTrack(player)
+            assertTrue(
+                state.publish(
+                    emptyRequest,
+                    DynamicAddonSubtitleContent(
+                        mimeType = MimeTypes.APPLICATION_SUBRIP,
+                        samples = emptyList(),
+                    ),
+                ),
+            )
+            awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
+                renderedTexts.isEmpty()
+            }
+            selectAndPublishAddon(player, state, "addon:after-empty", "valid after empty")
+            awaitCondition { renderedTexts == listOf("valid after empty") }
+
+            state.beginSelection(
+                "addon:failed",
+                "https://subs.example/failed",
+            )
+            selectDynamicTrack(player)
+            awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
+                renderedTexts.isEmpty()
+            }
+            selectAndPublishAddon(player, state, "addon:after-failure", "valid after failure")
+            awaitCondition { renderedTexts == listOf("valid after failure") }
 
             val supersededPending = state.beginSelection(
                 "addon:pending",

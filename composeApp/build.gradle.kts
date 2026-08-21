@@ -432,6 +432,9 @@ kotlin {
             if (androidDistribution == "full") {
                 kotlin.srcDir(project.file("src/androidFullHostTest/kotlin"))
             }
+            dependencies {
+                implementation(libs.robolectric)
+            }
         }
         commonMain.dependencies {
             implementation("io.coil-kt.coil3:coil-compose:${libs.versions.coil.get()}") {
@@ -470,11 +473,6 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-        }
-        val androidHostTest by getting {
-            dependencies {
-                implementation(libs.robolectric)
-            }
         }
     }
 }

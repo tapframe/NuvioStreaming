@@ -116,20 +116,16 @@ internal class DynamicAddonSubtitleState {
     fun publish(
         request: DynamicAddonSubtitleRequest,
         content: DynamicAddonSubtitleContent,
-    ): Boolean {
-        val published = synchronized(this) {
-            if (currentSnapshot.request != request) {
-                false
-            } else {
-                currentSnapshot = currentSnapshot.copy(
-                    streamRevision = currentSnapshot.streamRevision + 1L,
-                    content = content,
-                )
-                true
-            }
+    ): Boolean = synchronized(this) {
+        if (currentSnapshot.request != request) {
+            false
+        } else {
+            // TextRenderer is already polling this revision while the payload loads.
+            currentSnapshot = currentSnapshot.copy(
+                content = content,
+            )
+            true
         }
-        if (published) onStreamRevisionChanged?.invoke()
-        return published
     }
 
     fun clear() {
@@ -297,7 +293,7 @@ private class DynamicAddonSubtitleTrackSelectionFactory(
     }
 }
 
-/** Makes only the dynamic text selection non-equivalent after a content revision. */
+/** Makes only the dynamic text selection non-equivalent after a selection revision. */
 @OptIn(UnstableApi::class)
 private class RevisionTrackSelection(
     selection: ExoTrackSelection,
