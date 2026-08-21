@@ -456,18 +456,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         selectedAddonSubtitle = selectedAddonSubtitle,
         subtitleAutoSyncState = subtitleAutoSyncState,
         onBuiltInSubtitleTrackSelected = { index ->
-            selectedSubtitleIndex = index
-            selectedAddonSubtitleId = null
-            useCustomSubtitles = false
-            persistInternalSubtitlePreference(subtitleTracks.firstOrNull { it.index == index })
-            playerController?.selectSubtitleTrack(index)
+            selectBuiltInSubtitleFromUser(index)
         },
         onAddonSubtitleSelected = { addon ->
-            selectedAddonSubtitleId = addon.id
-            selectedSubtitleIndex = -1
-            useCustomSubtitles = true
-            persistAddonSubtitlePreference(addon)
-            playerController?.selectAddonSubtitle(addon)
+            selectAddonSubtitleFromUser(addon)
         },
         onFetchAddonSubtitles = { fetchAddonSubtitlesForActiveItem() },
         onSubtitleStyleChanged = PlayerSettingsRepository::setSubtitleStyle,

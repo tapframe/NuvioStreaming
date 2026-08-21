@@ -74,6 +74,24 @@ internal fun PlayerScreenRuntime.persistAddonSubtitlePreference(subtitle: AddonS
     }
 }
 
+internal fun PlayerScreenRuntime.selectBuiltInSubtitleFromUser(index: Int) {
+    preferredSubtitleSelectionApplied = true
+    selectedSubtitleIndex = index
+    selectedAddonSubtitleId = null
+    useCustomSubtitles = false
+    persistInternalSubtitlePreference(subtitleTracks.firstOrNull { it.index == index })
+    playerController?.selectSubtitleTrack(index)
+}
+
+internal fun PlayerScreenRuntime.selectAddonSubtitleFromUser(subtitle: AddonSubtitle) {
+    preferredSubtitleSelectionApplied = true
+    selectedAddonSubtitleId = subtitle.id
+    selectedSubtitleIndex = -1
+    useCustomSubtitles = true
+    persistAddonSubtitlePreference(subtitle)
+    playerController?.selectAddonSubtitle(subtitle)
+}
+
 internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
     if (trackPreferenceRestoreApplied) return
     val preference = PlayerTrackPreferenceStorage.load(parentMetaId)
