@@ -14,6 +14,8 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_close">Close</string>
     <string name="action_delete">Delete</string>
+    <string name="action_delete_confirm_message">Are you sure you want to delete it?</string>
+    <string name="action_delete_confirm_title">Delete?</string>
     <string name="action_done">Done</string>
     <string name="action_edit">Edit</string>
     <string name="action_import">Import</string>
@@ -42,6 +44,7 @@
     <string name="addons_badge_unavailable">Unavailable</string>
     <string name="addons_configure">Configure addon</string>
     <string name="addons_delete">Delete addon</string>
+    <string name="addons_delete_confirm_title">Delete addon?</string>
     <string name="addons_appstore_add_description">Bring your library into Nuvio with the addons you use.</string>
     <string name="addons_appstore_empty_subtitle">Add an addon to start building your library.</string>
     <string name="addons_appstore_empty_title">Make Nuvio yours.</string>

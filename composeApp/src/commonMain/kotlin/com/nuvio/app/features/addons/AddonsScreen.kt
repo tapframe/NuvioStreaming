@@ -93,6 +93,7 @@ internal fun AddonsSettingsPageContent(
     var addonUrl by rememberSaveable { mutableStateOf("") }
     var formMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var installModalState by remember { mutableStateOf<AddonInstallModalState?>(null) }
+    var addonPendingDeletionUrl by rememberSaveable { mutableStateOf<String?>(null) }
     val enterAddonUrlMessage = stringResource(Res.string.addons_error_enter_url)
     val usePersonalMediaCopy = AppFeaturePolicy.personalMediaAddonCopyEnabled
 
@@ -179,10 +180,26 @@ internal fun AddonsSettingsPageContent(
                     } else {
                         null
                     },
-                    onDeleteClick = { AddonRepository.removeAddon(addon.manifestUrl) },
+                    onDeleteClick = { addonPendingDeletionUrl = addon.manifestUrl },
                 )
             }
         }
+    }
+
+    val pendingDeletionUrl = addonPendingDeletionUrl
+    if (pendingDeletionUrl != null) {
+        NuvioStatusModal(
+            title = stringResource(Res.string.addons_delete_confirm_title),
+            message = stringResource(Res.string.action_delete_confirm_message),
+            isVisible = true,
+            confirmText = stringResource(Res.string.action_yes),
+            dismissText = stringResource(Res.string.action_no),
+            onConfirm = {
+                AddonRepository.removeAddon(pendingDeletionUrl)
+                addonPendingDeletionUrl = null
+            },
+            onDismiss = { addonPendingDeletionUrl = null },
+        )
     }
 
     val modalState = installModalState
