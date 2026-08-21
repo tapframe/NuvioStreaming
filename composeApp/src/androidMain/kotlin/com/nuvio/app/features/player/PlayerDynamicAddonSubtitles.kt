@@ -109,23 +109,26 @@ internal class DynamicAddonSubtitleState {
                 content = null,
             )
         }
-        onStreamRevisionChanged?.invoke()
         return request
     }
 
     fun publish(
         request: DynamicAddonSubtitleRequest,
         content: DynamicAddonSubtitleContent,
-    ): Boolean = synchronized(this) {
-        if (currentSnapshot.request != request) {
-            false
-        } else {
-            // TextRenderer is already polling this revision while the payload loads.
-            currentSnapshot = currentSnapshot.copy(
-                content = content,
-            )
-            true
+    ): Boolean {
+        val published = synchronized(this) {
+            if (currentSnapshot.request != request) {
+                false
+            } else {
+                // Make the new payload readable before the selector replaces the active stream.
+                currentSnapshot = currentSnapshot.copy(
+                    content = content,
+                )
+                true
+            }
         }
+        if (published) onStreamRevisionChanged?.invoke()
+        return published
     }
 
     fun clear() {
@@ -477,10 +480,12 @@ internal class DynamicAddonSubtitleSampleStream(
         ensureContentInitialized(content)
         val sample = content.samples.getOrNull(readIndex)
         if (sample == null) {
+            buffer.clear()
             buffer.addFlag(C.BUFFER_FLAG_END_OF_STREAM)
             return C.RESULT_BUFFER_READ
         }
 
+        buffer.clear()
         buffer.timeUs = sample.timeUs
         buffer.addFlag(C.BUFFER_FLAG_KEY_FRAME)
         if ((readFlags and SampleStream.FLAG_OMIT_SAMPLE_DATA) == 0) {

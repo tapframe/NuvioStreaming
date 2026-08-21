@@ -518,7 +518,6 @@ private fun ExoPlayerSurface(
     fun selectAddonSubtitle(trackId: String, url: String) {
         cancelAddonSubtitleLoad()
         val request = dynamicAddonSubtitleState.beginSelection(trackId, url)
-        selectDynamicAddonSubtitleTrack()
         subtitleSelectionJob = coroutineScope.launch {
             val content = try {
                 dynamicAddonSubtitleLoader.load(request)
@@ -529,6 +528,7 @@ private fun ExoPlayerSurface(
                 return@launch
             }
             if (dynamicAddonSubtitleState.publish(request, content)) {
+                selectDynamicAddonSubtitleTrack()
                 selectedExternalSubtitleMimeType = content.mimeType
             }
         }
@@ -707,7 +707,9 @@ private fun ExoPlayerSurface(
                         exoPlayer.selectTrackByIndex(C.TRACK_TYPE_TEXT, idx)
                     }
                 }
-                dynamicAddonSubtitleState.snapshot().request?.let {
+                dynamicAddonSubtitleState.snapshot().takeIf { snapshot ->
+                    snapshot.request != null && snapshot.content != null
+                }?.let {
                     val dynamicTrackIsSelected = tracks.groups.any { group ->
                         group.type == C.TRACK_TYPE_TEXT &&
                             (0 until group.length).any { formatIndex ->
@@ -2133,7 +2135,7 @@ private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-private class SubtitleOffsetRenderersFactory(
+internal class SubtitleOffsetRenderersFactory(
     context: Context,
     private val subtitleDelayUsProvider: () -> Long,
     private val shouldNormalizeCuePositionProvider: () -> Boolean,

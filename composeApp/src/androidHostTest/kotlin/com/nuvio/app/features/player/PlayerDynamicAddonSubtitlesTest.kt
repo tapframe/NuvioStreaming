@@ -226,6 +226,44 @@ class PlayerDynamicAddonSubtitlesTest {
     }
 
     @Test
+    fun replacementSampleClearsEndOfStreamFlagFromReusedDecoderBuffer() {
+        val state = DynamicAddonSubtitleState()
+        val format = dynamicFormat()
+        val formatHolder = FormatHolder()
+        val buffer = DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_NORMAL)
+
+        val firstRequest = state.beginSelection("addon:a", "https://subs.example/a")
+        assertTrue(state.publish(firstRequest, dynamicContent("A")))
+        val firstStream = DynamicAddonSubtitleSampleStream(
+            state = state,
+            streamRevision = state.snapshot().streamRevision,
+            format = format,
+            startPositionUs = 0L,
+        )
+        assertEquals(C.RESULT_FORMAT_READ, firstStream.readData(formatHolder, buffer, 0))
+        assertEquals(C.RESULT_BUFFER_READ, firstStream.readData(formatHolder, buffer, 0))
+        buffer.clear()
+        assertEquals(C.RESULT_BUFFER_READ, firstStream.readData(formatHolder, buffer, 0))
+        assertTrue(buffer.isEndOfStream)
+
+        val secondRequest = state.beginSelection("addon:b", "https://subs.example/b")
+        assertTrue(state.publish(secondRequest, dynamicContent("B")))
+        val secondStream = DynamicAddonSubtitleSampleStream(
+            state = state,
+            streamRevision = state.snapshot().streamRevision,
+            format = format,
+            startPositionUs = 0L,
+        )
+        assertEquals(C.RESULT_FORMAT_READ, secondStream.readData(formatHolder, buffer, 0))
+        assertEquals(C.RESULT_BUFFER_READ, secondStream.readData(formatHolder, buffer, 0))
+        assertFalse(buffer.isEndOfStream)
+        buffer.flip()
+        assertContentEquals("B".encodeToByteArray(), buffer.data!!.let { bytes ->
+            ByteArray(bytes.remaining()).also(bytes::get)
+        })
+    }
+
+    @Test
     fun textRendererAlreadyPollingBeforePayloadRendersWhenPayloadArrives() {
         val state = DynamicAddonSubtitleState()
         val request = state.beginSelection("addon:a", "https://subs.example/a")
@@ -270,6 +308,141 @@ class PlayerDynamicAddonSubtitlesTest {
             renderer.stop()
             renderer.disable()
             renderer.release()
+        }
+    }
+
+    @Test
+    fun textRendererRendersAfterReplacingAnExhaustedDynamicStream() {
+        val state = DynamicAddonSubtitleState()
+        val format = dynamicFormat()
+        var renderedTexts = emptyList<String>()
+        val renderer = TextRenderer(
+            { cueGroup ->
+                renderedTexts = cueGroup.cues.mapNotNull { cue -> cue.text?.toString() }
+            },
+            null,
+        )
+        renderer.init(0, PlayerId.UNSET, Clock.DEFAULT)
+
+        val firstRequest = state.beginSelection("addon:a", "https://subs.example/a")
+        assertTrue(state.publish(firstRequest, renderedContent("A")))
+        val firstStream = DynamicAddonSubtitleSampleStream(
+            state = state,
+            streamRevision = state.snapshot().streamRevision,
+            format = format,
+            startPositionUs = 0L,
+        )
+        renderer.enable(
+            RendererConfiguration.DEFAULT,
+            arrayOf(format),
+            firstStream,
+            0L,
+            false,
+            true,
+            0L,
+            0L,
+            MediaSource.MediaPeriodId(Any()),
+        )
+
+        try {
+            renderer.start()
+            renderer.render(0L, 0L) // Format.
+            renderer.render(0L, 0L) // Cue.
+            assertEquals(listOf("A"), renderedTexts)
+            renderer.render(0L, 0L) // Leaves Media3's reusable input buffer at EOS.
+
+            val secondRequest = state.beginSelection("addon:b", "https://subs.example/b")
+            assertTrue(state.publish(secondRequest, renderedContent("B")))
+            val secondStream = DynamicAddonSubtitleSampleStream(
+                state = state,
+                streamRevision = state.snapshot().streamRevision,
+                format = format,
+                startPositionUs = 0L,
+            )
+            renderer.replaceStream(
+                arrayOf(format),
+                secondStream,
+                0L,
+                0L,
+                MediaSource.MediaPeriodId(Any()),
+            )
+            renderer.resetPosition(0L)
+            renderer.render(0L, 0L) // Format.
+            renderer.render(0L, 0L) // Cue from the replacement stream.
+
+            assertEquals(listOf("B"), renderedTexts)
+        } finally {
+            renderer.stop()
+            renderer.disable()
+            renderer.release()
+        }
+    }
+
+    @Test
+    fun exoPlayerRendersTheCurrentCueAfterASecondDynamicSelection() {
+        val context = RuntimeEnvironment.getApplication()
+        val state = DynamicAddonSubtitleState()
+        val trackSelector = DynamicAddonSubtitleTrackSelector(context, state)
+        state.setOnStreamRevisionChanged(trackSelector::invalidateAddonSubtitleSelection)
+        val player = ExoPlayer.Builder(
+            context,
+            SubtitleOffsetRenderersFactory(
+                context = context,
+                subtitleDelayUsProvider = { 0L },
+                shouldNormalizeCuePositionProvider = { false },
+                shouldStripSdhProvider = { false },
+                videoBoundsFractionProvider = { null },
+            ),
+        )
+            .setTrackSelector(trackSelector)
+            .build()
+        var renderedTexts = emptyList<String>()
+        player.addListener(
+            object : Player.Listener {
+                override fun onCues(cueGroup: CueGroup) {
+                    renderedTexts = cueGroup.cues.mapNotNull { cue -> cue.text?.toString() }
+                }
+            },
+        )
+
+        try {
+            player.setMediaSource(
+                MergingMediaSource(
+                    SilenceMediaSource(60_000_000L),
+                    DynamicAddonSubtitleMediaSource(state),
+                ),
+            )
+            player.prepare()
+            awaitCondition { player.playbackState == Player.STATE_READY }
+            player.pause()
+            player.seekTo(5_142L)
+            awaitCondition { player.currentPosition == 5_142L }
+
+            val first = state.beginSelection("addon:a", "https://subs.example/a")
+            assertTrue(state.publish(first, perSecondRenderedContent("A")))
+            selectDynamicTrack(player)
+            awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
+                renderedTexts == listOf("A-5")
+            }
+
+            player.play()
+            awaitCondition { player.isPlaying }
+            val second = state.beginSelection("addon:b", "https://subs.example/b")
+            repeat(50) {
+                ShadowSystemClock.advanceBy(Duration.ofMillis(10L))
+                shadowOf(Looper.getMainLooper()).idle()
+                Thread.sleep(1L)
+            }
+            assertEquals(listOf("A-5"), renderedTexts)
+
+            assertTrue(state.publish(second, perSecondRenderedContent("B")))
+            selectDynamicTrack(player)
+            awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
+                renderedTexts == listOf("B-5")
+            }
+        } finally {
+            state.setOnStreamRevisionChanged(null)
+            player.release()
         }
     }
 
@@ -477,8 +650,8 @@ class PlayerDynamicAddonSubtitlesTest {
                     trackId = "addon:$index",
                     url = "https://subs.example/$index?token=signed-$index",
                 )
-                selectDynamicTrack(player)
                 assertTrue(state.publish(request, renderedContent(index.toString())))
+                selectDynamicTrack(player)
                 awaitCondition(timeoutMs = 10_000L, diagnostic = {
                     "index=$index revision=${state.snapshot().streamRevision} " +
                         "rendered=$renderedTexts ${player.trackSummary()} " +
@@ -514,7 +687,6 @@ class PlayerDynamicAddonSubtitlesTest {
                 "addon:empty",
                 "https://subs.example/empty",
             )
-            selectDynamicTrack(player)
             assertTrue(
                 state.publish(
                     emptyRequest,
@@ -524,6 +696,7 @@ class PlayerDynamicAddonSubtitlesTest {
                     ),
                 ),
             )
+            selectDynamicTrack(player)
             awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
                 renderedTexts.isEmpty()
             }
@@ -534,9 +707,8 @@ class PlayerDynamicAddonSubtitlesTest {
                 "addon:failed",
                 "https://subs.example/failed",
             )
-            selectDynamicTrack(player)
             awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
-                renderedTexts.isEmpty()
+                renderedTexts == listOf("valid after empty")
             }
             selectAndPublishAddon(player, state, "addon:after-failure", "valid after failure")
             awaitCondition { renderedTexts == listOf("valid after failure") }
@@ -545,18 +717,17 @@ class PlayerDynamicAddonSubtitlesTest {
                 "addon:pending",
                 "https://subs.example/pending",
             )
-            selectDynamicTrack(player)
             awaitCondition(diagnostic = { "rendered=$renderedTexts ${player.trackSummary()}" }) {
-                renderedTexts.isEmpty()
+                renderedTexts == listOf("valid after failure")
             }
             val rapidA = state.beginSelection("addon:rapid-a", "https://subs.example/rapid-a")
             val rapidB = state.beginSelection("addon:rapid-b", "https://subs.example/rapid-b")
             val rapidC = state.beginSelection("addon:rapid-c", "https://subs.example/rapid-c")
-            selectDynamicTrack(player)
             assertFalse(state.publish(supersededPending, renderedContent("stale pending")))
             assertFalse(state.publish(rapidA, renderedContent("stale A")))
             assertFalse(state.publish(rapidB, renderedContent("stale B")))
             assertTrue(state.publish(rapidC, renderedContent("rapid C")))
+            selectDynamicTrack(player)
             awaitCondition { renderedTexts == listOf("rapid C") }
 
             assertFalse(playbackStates.contains(Player.STATE_BUFFERING))
@@ -607,6 +778,32 @@ class PlayerDynamicAddonSubtitlesTest {
                 ),
             ),
         )
+
+    private fun perSecondRenderedContent(prefix: String): DynamicAddonSubtitleContent {
+        val srt = buildString {
+            repeat(60) { index ->
+                appendLine(index + 1)
+                append("00:00:")
+                append(index.toString().padStart(2, '0'))
+                append(",000 --> 00:00:")
+                append(index.toString().padStart(2, '0'))
+                appendLine(",900")
+                appendLine("$prefix-$index")
+                appendLine()
+            }
+        }
+        return loadDynamicAddonSubtitleContent(
+            request = DynamicAddonSubtitleRequest(
+                generation = 1L,
+                trackId = "addon:$prefix",
+                url = "memory://$prefix",
+            ),
+            dataSourceFactory = DataSource.Factory {
+                ByteArrayDataSource(srt.encodeToByteArray())
+            },
+            parserFactory = DefaultSubtitleParserFactory(),
+        )
+    }
 
     private fun noOpParserFactory() = object : SubtitleParser.Factory {
         override fun supportsFormat(format: Format): Boolean = true
@@ -681,8 +878,8 @@ class PlayerDynamicAddonSubtitlesTest {
         value: String,
     ) {
         val request = state.beginSelection(trackId, "https://subs.example/$trackId")
-        selectDynamicTrack(player)
         assertTrue(state.publish(request, renderedContent(value)))
+        selectDynamicTrack(player)
     }
 
     private fun selectInternalTrack(player: ExoPlayer) {
