@@ -874,6 +874,8 @@ private fun ExoPlayerSurface(
                         exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
                         exoPlayer.prepare()
                         exoPlayer.playWhenReady = wasPlaying
+                    } else {
+                        selectSubtitleTrack(-1)
                     }
                     Log.d(TAG, "clearExternalSubtitle: done, position=$currentPosition")
                 }
@@ -883,12 +885,12 @@ private fun ExoPlayerSurface(
                     subtitleSelectionJob?.cancel()
                     sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     selectedExternalSubtitleMimeType = null
-                    pendingSubtitleTrackIndex.clear()
-                    pendingSubtitleTrackIndex.add(trackIndex)
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
                     val currentMediaItem = exoPlayer.currentMediaItem ?: return
                     if (currentMediaItem.localConfiguration?.subtitleConfigurations?.isNotEmpty() == true) {
+                        pendingSubtitleTrackIndex.clear()
+                        pendingSubtitleTrackIndex.add(trackIndex)
                         preserveAudioSelectionForReload("clearExternalSubtitleAndSelect")
                         val newMediaItem = currentMediaItem.buildUpon()
                             .setSubtitleConfigurations(emptyList())
@@ -896,6 +898,9 @@ private fun ExoPlayerSurface(
                         exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
                         exoPlayer.prepare()
                         exoPlayer.playWhenReady = wasPlaying
+                    } else {
+                        pendingSubtitleTrackIndex.clear()
+                        selectSubtitleTrack(trackIndex)
                     }
                     Log.d(TAG, "clearExternalSubtitleAndSelect: done, pending=$trackIndex position=$currentPosition")
                 }
@@ -1522,6 +1527,9 @@ private class NuvioLibmpvView(
                 hasActiveSubtitle: Boolean,
                 useCustomSubtitles: Boolean,
             ) {
+                if (hasActiveSubtitle || useCustomSubtitles) {
+                    return
+                }
                 val languages = listOfNotNull(
                     preferredLanguage.takeIf { language ->
                         language.isNotBlank() &&
@@ -1909,13 +1917,17 @@ private fun ExoPlayer.applySubtitleTrackPreferences(
     hasActiveSubtitle: Boolean,
     useCustomSubtitles: Boolean,
 ) {
+    if (hasActiveSubtitle || useCustomSubtitles) {
+        return
+    }
+
     val builder = trackSelectionParameters.buildUpon()
     val resolvedPreferred = exoPreferredTextLanguage(preferredLanguage)
 
     if (resolvedPreferred == null) {
         builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
         builder.setPreferredTextLanguage(null)
-    } else if (!useCustomSubtitles) {
+    } else {
         val userDisabledSubtitles = autoSelectionApplied && !hasActiveSubtitle
         val shouldSuppressExoAutoSelect = useForcedSubtitles && !autoSelectionApplied
         if (!userDisabledSubtitles && !shouldSuppressExoAutoSelect) {
