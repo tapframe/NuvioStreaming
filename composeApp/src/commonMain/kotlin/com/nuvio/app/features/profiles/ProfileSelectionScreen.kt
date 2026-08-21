@@ -58,12 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
-import com.nuvio.app.core.ui.ProfileMeshBackground
 import com.nuvio.app.features.membership.CosmeticEntitlement
-import com.nuvio.app.features.membership.MemberAccessRepository
-import com.nuvio.app.features.membership.ProfileBackgroundRepository
-import com.nuvio.app.features.membership.ProfileBackgroundSelection
-import com.nuvio.app.features.membership.resolveProfileBackground
 import com.nuvio.app.features.settings.MemberBrandWordmark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -79,11 +74,6 @@ fun ProfileSelectionScreen(
 ) {
     val authState by AuthRepository.state.collectAsStateWithLifecycle()
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
-    val memberAccess by remember {
-        MemberAccessRepository.ensureStarted()
-        MemberAccessRepository.access
-    }.collectAsStateWithLifecycle()
-    val backgroundCatalog by ProfileBackgroundRepository.catalog.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var pinDialogProfile by remember { mutableStateOf<NuvioProfile?>(null) }
     var isEditMode by remember { mutableStateOf(false) }
@@ -120,54 +110,17 @@ fun ProfileSelectionScreen(
     }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val backgroundProfileColor = remember(profileState.activeProfile, profileState.profiles) {
-        val sourceProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
-        sourceProfile?.avatarColorHex?.let(::parseHexColor) ?: Color(0xFF1E88E5)
-    }
     val backgroundProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
-    val backgroundSelection = backgroundProfile?.let { resolveProfileBackground(it, memberAccess.entitlements) }
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize(),
     ) {
         val isTabletLayout = maxWidth >= 768.dp
-        val isPortrait = maxHeight > maxWidth
-        LaunchedEffect(backgroundSelection, isPortrait) {
-            val selectedId = (backgroundSelection as? ProfileBackgroundSelection.Catalog)?.id
-            if (selectedId != null) {
-                ProfileBackgroundRepository.loadSelectedAndPreload(selectedId, isPortrait)
-            }
-        }
-        val backgroundModel: Any? = when (backgroundSelection) {
-            is ProfileBackgroundSelection.Catalog -> backgroundCatalog
-                .firstOrNull { it.id == backgroundSelection.id }
-                ?.let { background ->
-                    if (isPortrait) {
-                        background.portraitImageBytes ?: background.landscapeImageBytes
-                    } else {
-                        background.landscapeImageBytes
-                    }
-                }
-            is ProfileBackgroundSelection.Custom -> backgroundSelection.url
-            null -> null
-        }
-
-        if (backgroundModel == null) {
-            ProfileMeshBackground(profileColor = backgroundProfileColor)
-        } else {
-            AsyncImage(
-                model = backgroundModel,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.28f)),
-            )
-        }
+        ProfileBackgroundBackdrop(
+            profile = backgroundProfile,
+            modifier = Modifier.fillMaxSize(),
+        )
 
         Column(
             modifier = Modifier
