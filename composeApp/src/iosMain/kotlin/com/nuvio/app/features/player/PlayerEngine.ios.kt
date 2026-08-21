@@ -80,7 +80,9 @@ actual fun PlatformPlayerSurface(
         return
     }
 
-    val controller = remember(bridge) {
+    val runtimeAddonSubtitleState = remember(bridge) { RuntimeAddonSubtitleState() }
+
+    val controller = remember(bridge, runtimeAddonSubtitleState) {
         object : PlayerEngineController {
             override fun play() {
                 bridge.play()
@@ -195,13 +197,13 @@ actual fun PlatformPlayerSurface(
             }
 
             override fun selectSubtitleTrack(index: Int) {
-                if (index < 0) {
-                    bridge.selectSubtitleTrack(-1) // disable
+                val trackId = if (index < 0) {
+                    -1
                 } else {
                     val count = bridge.getSubtitleTrackCount()
                     if (count <= 0) return
 
-                    val trackId = (0 until count)
+                    (0 until count)
                         .firstNotNullOfOrNull { at ->
                             if (bridge.getSubtitleTrackIndex(at) == index) {
                                 bridge.getSubtitleTrackId(at).toIntOrNull()
@@ -214,19 +216,24 @@ actual fun PlatformPlayerSurface(
                         } else {
                             null
                         }
+                        ?: return
+                }
 
-                    if (trackId != null) {
-                        bridge.selectSubtitleTrack(trackId)
-                    }
+                if (runtimeAddonSubtitleState.consumeAttached()) {
+                    bridge.clearExternalSubtitleAndSelect(trackId)
+                } else {
+                    bridge.selectSubtitleTrack(trackId)
                 }
             }
 
             override fun setSubtitleUri(url: String) {
                 Logger.d(TAG) { "setSubtitleUri: $url" }
                 bridge.setSubtitleUrl(url)
+                runtimeAddonSubtitleState.markAttached()
             }
 
             override fun clearExternalSubtitle() {
+                runtimeAddonSubtitleState.clear()
                 bridge.clearExternalSubtitle()
             }
 
@@ -253,6 +260,7 @@ actual fun PlatformPlayerSurface(
                             }
                     }
                 }
+                runtimeAddonSubtitleState.clear()
                 bridge.clearExternalSubtitleAndSelect(trackId)
             }
 
@@ -281,6 +289,7 @@ actual fun PlatformPlayerSurface(
 
     // Load file and set initial state
     LaunchedEffect(bridge, sourceUrl, sourceAudioUrl, sourceHeaders, externalSubtitles) {
+        runtimeAddonSubtitleState.clear()
         bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
         bridge.loadFileWithAudio(
             videoUrl = sourceUrl,
@@ -399,6 +408,20 @@ actual fun PlatformPlayerSurface(
                 }
             }
         }
+    }
+}
+
+private class RuntimeAddonSubtitleState {
+    private var isAttached = false
+
+    fun markAttached() {
+        isAttached = true
+    }
+
+    fun consumeAttached(): Boolean = isAttached.also { isAttached = false }
+
+    fun clear() {
+        isAttached = false
     }
 }
 
