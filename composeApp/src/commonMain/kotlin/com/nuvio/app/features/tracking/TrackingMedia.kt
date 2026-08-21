@@ -116,11 +116,10 @@ fun parseTrackingExternalIds(rawValue: String?): TrackingExternalIds {
 
 fun trackingMediaKind(contentType: String, ids: TrackingExternalIds = TrackingExternalIds()): TrackingMediaKind {
     val normalized = contentType.trim().lowercase()
+    val hasAnimeIds = ids.mal != null || ids.anidb != null || ids.anilist != null || ids.kitsu != null
     return when {
+        hasAnimeIds || normalized == "anime" -> TrackingMediaKind.ANIME
         normalized in setOf("movie", "film") -> TrackingMediaKind.MOVIE
-        normalized == "anime" || ids.mal != null || ids.anidb != null || ids.anilist != null || ids.kitsu != null -> {
-            TrackingMediaKind.ANIME
-        }
         else -> TrackingMediaKind.SHOW
     }
 }
