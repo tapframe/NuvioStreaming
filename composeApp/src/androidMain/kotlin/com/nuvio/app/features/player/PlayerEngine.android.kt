@@ -1219,6 +1219,7 @@ private fun LibmpvPlayerSurface(
         },
         onRelease = { view ->
             if (playerViewRef === view) playerViewRef = null
+            view.releaseAddonSubtitleResources()
             runCatching { view.destroy() }
         },
     )
@@ -1243,7 +1244,13 @@ private class NuvioLibmpvView(
     private var currentRequestHeaders: Map<String, String> = emptyMap()
     private var currentExternalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle> = emptyList()
     private var pendingAddonSubtitleTrackId: String? = null
-    private val loadingAddonSubtitleTrackIds = mutableSetOf<String>()
+    private var addonSubtitleLoadJob: Job? = null
+    private val addonSubtitleLoader = LibmpvAddonSubtitleLoader(
+        cacheDirectory = File(context.cacheDir, "libmpv-addon-subtitles-${hashCode()}"),
+        dataSourceFactory = {
+            PlayerPlaybackNetworking.createHttpDataSourceFactory(currentRequestHeaders)
+        },
+    )
     private val subtitleSelectionMutex = Mutex()
     @Volatile private var subtitleSelectionGeneration = 0L
     @Volatile private var subtitleSourceGeneration = 0L
@@ -1314,9 +1321,8 @@ private class NuvioLibmpvView(
     private fun loadCurrentSource(playWhenReady: Boolean) {
         val sourceUrl = currentSourceUrl ?: return
         subtitleSourceGeneration += 1
-        subtitleSelectionGeneration += 1
-        pendingAddonSubtitleTrackId = null
-        loadingAddonSubtitleTrackIds.clear()
+        cancelPendingAddonSubtitleLoad()
+        addonSubtitleLoader.clearSource()
         applyRequestHeaders(currentRequestHeaders)
         setPaused(!playWhenReady)
         mpv.command("loadfile", sourceUrl.toMpvSource(), "replace")
@@ -1473,7 +1479,7 @@ private class NuvioLibmpvView(
             }
 
             override fun selectSubtitleTrack(index: Int) {
-                pendingAddonSubtitleTrackId = null
+                cancelPendingAddonSubtitleLoad()
                 if (index < 0) {
                     requestSubtitleSelection(trackId = null, coroutineScope)
                 } else {
@@ -1502,7 +1508,7 @@ private class NuvioLibmpvView(
             }
 
             override fun clearExternalSubtitle() {
-                pendingAddonSubtitleTrackId = null
+                cancelPendingAddonSubtitleLoad()
                 requestSubtitleSelection(trackId = null, coroutineScope)
             }
 
@@ -1550,34 +1556,56 @@ private class NuvioLibmpvView(
                 (track.title == trackId || track.externalFilename == url)
         }
         if (attachedTrack != null) {
-            pendingAddonSubtitleTrackId = null
+            cancelPendingAddonSubtitleLoad()
             requestSubtitleSelection(attachedTrack.id, coroutineScope)
             return
         }
 
+        if (pendingAddonSubtitleTrackId == trackId && addonSubtitleLoadJob?.isActive == true) return
+        cancelPendingAddonSubtitleLoad()
         pendingAddonSubtitleTrackId = trackId
-        subtitleSelectionGeneration += 1
-        if (!loadingAddonSubtitleTrackIds.add(trackId)) return
+        val selectionGeneration = ++subtitleSelectionGeneration
         val sourceGeneration = subtitleSourceGeneration
-        coroutineScope.launch(Dispatchers.IO) {
-            val loaded = subtitleSelectionMutex.withLock {
+        val request = LibmpvAddonSubtitleRequest(trackId, url)
+        addonSubtitleLoadJob = coroutineScope.launch(Dispatchers.IO) {
+            val localSubtitle = try {
+                addonSubtitleLoader.load(request)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (!isActive) return@launch
+                Log.w(TAG, "Failed to stage libmpv addon subtitle", error)
+                null
+            }
+            val loaded = localSubtitle != null && subtitleSelectionMutex.withLock {
                 if (
                     sourceGeneration != subtitleSourceGeneration ||
+                    selectionGeneration != subtitleSelectionGeneration ||
                     pendingAddonSubtitleTrackId != trackId
                 ) {
                     return@withLock false
                 }
                 runCatching {
-                    mpv.command("sub-add", url, "auto", trackId, language)
+                    mpv.command("sub-add", localSubtitle.absolutePath, "auto", trackId, language)
                 }.isSuccess
             }
             withContext(Dispatchers.Main.immediate) {
-                loadingAddonSubtitleTrackIds.remove(trackId)
+                if (selectionGeneration == subtitleSelectionGeneration) {
+                    addonSubtitleLoadJob = null
+                }
                 if (
                     !loaded ||
                     sourceGeneration != subtitleSourceGeneration ||
+                    selectionGeneration != subtitleSelectionGeneration ||
                     pendingAddonSubtitleTrackId != trackId
                 ) {
+                    if (
+                        sourceGeneration == subtitleSourceGeneration &&
+                        selectionGeneration == subtitleSelectionGeneration &&
+                        pendingAddonSubtitleTrackId == trackId
+                    ) {
+                        pendingAddonSubtitleTrackId = null
+                    }
                     return@withContext
                 }
                 val loadedTrack = extractLibmpvTracks(context, type = "sub").firstOrNull { track ->
@@ -1587,6 +1615,19 @@ private class NuvioLibmpvView(
                 requestSubtitleSelection(loadedTrack.id, coroutineScope)
             }
         }
+    }
+
+    private fun cancelPendingAddonSubtitleLoad() {
+        subtitleSelectionGeneration += 1L
+        pendingAddonSubtitleTrackId = null
+        addonSubtitleLoadJob?.cancel()
+        addonSubtitleLoadJob = null
+        addonSubtitleLoader.cancelActive()
+    }
+
+    fun releaseAddonSubtitleResources() {
+        cancelPendingAddonSubtitleLoad()
+        addonSubtitleLoader.clearSource()
     }
 
     private fun requestSubtitleSelection(trackId: Int?, coroutineScope: CoroutineScope) {

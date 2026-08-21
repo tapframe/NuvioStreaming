@@ -19,8 +19,8 @@ class PlayerTrackSelectionTest {
         val trackId = buildAddonSubtitleTrackId(subtitle)
 
         assertEquals(trackId, buildAddonSubtitleTrackId(subtitle))
+        assertEquals(trackId, buildAddonSubtitleTrackId(subtitle.url))
         assertTrue(trackId.startsWith(ADDON_SUBTITLE_TRACK_ID_PREFIX))
-        assertTrue(trackId.contains("opensubs-42"))
         assertEquals("https://example.com/sub.srt?token=signed&expires=4102444800", subtitle.url)
     }
 
