@@ -2,9 +2,49 @@ package com.nuvio.app.features.player
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SubtitleSelectionModelTest {
+
+    @Test
+    fun unhandledStationaryTapFallsBackToSelection() {
+        assertTrue(
+            isUnhandledTap(
+                standardClickWasHandled = false,
+                downX = 20f,
+                downY = 40f,
+                upX = 22f,
+                upY = 43f,
+                touchSlop = 8f,
+            ),
+        )
+    }
+
+    @Test
+    fun handledTapAndRootSpaceDragDoNotUseFallbackSelection() {
+        assertFalse(
+            isUnhandledTap(
+                standardClickWasHandled = true,
+                downX = 20f,
+                downY = 40f,
+                upX = 20f,
+                upY = 40f,
+                touchSlop = 8f,
+            ),
+        )
+        assertFalse(
+            isUnhandledTap(
+                standardClickWasHandled = false,
+                downX = 20f,
+                downY = 40f,
+                upX = 20f,
+                upY = 60f,
+                touchSlop = 8f,
+            ),
+        )
+    }
 
     @Test
     fun groupsTracksAndAddonsByLanguageWithPreferredLanguagesFirst() {

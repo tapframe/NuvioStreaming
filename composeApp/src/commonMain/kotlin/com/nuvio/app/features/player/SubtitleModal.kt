@@ -6,6 +6,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,13 +36,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -298,6 +308,101 @@ fun SubtitleModal(
     }
 }
 
+internal fun isUnhandledTap(
+    standardClickWasHandled: Boolean,
+    downX: Float,
+    downY: Float,
+    upX: Float,
+    upY: Float,
+    touchSlop: Float,
+): Boolean {
+    if (standardClickWasHandled) return false
+    val deltaX = upX - downX
+    val deltaY = upY - downY
+    return deltaX * deltaX + deltaY * deltaY <= touchSlop * touchSlop
+}
+
+private suspend fun PointerInputScope.detectUnhandledTap(
+    handledClickCount: () -> Int,
+    positionInRoot: (Offset) -> Offset?,
+    onUnhandledClick: () -> Unit,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(
+            requireUnconsumed = false,
+            pass = PointerEventPass.Initial,
+        )
+        val downPositionInRoot = positionInRoot(down.position) ?: return@awaitEachGesture
+        val handledClickCountOnDown = handledClickCount()
+
+        var upPositionInRoot: Offset? = null
+        var cancelled = false
+        while (upPositionInRoot == null && !cancelled) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.changes.size != 1) {
+                cancelled = true
+                continue
+            }
+            val change = event.changes.firstOrNull { it.id == down.id }
+            if (change == null) {
+                cancelled = true
+            } else if (!change.pressed) {
+                upPositionInRoot = positionInRoot(change.position)
+                if (upPositionInRoot == null) cancelled = true
+            }
+        }
+
+        val resolvedUpPositionInRoot = upPositionInRoot
+        if (!cancelled && resolvedUpPositionInRoot != null) {
+            awaitPointerEvent(PointerEventPass.Final)
+        }
+        val standardClickWasHandled = handledClickCount() != handledClickCountOnDown
+        if (
+            !cancelled &&
+            resolvedUpPositionInRoot != null &&
+            isUnhandledTap(
+                standardClickWasHandled = standardClickWasHandled,
+                downX = downPositionInRoot.x,
+                downY = downPositionInRoot.y,
+                upX = resolvedUpPositionInRoot.x,
+                upY = resolvedUpPositionInRoot.y,
+                touchSlop = viewConfiguration.touchSlop,
+            )
+        ) {
+            onUnhandledClick()
+        }
+    }
+}
+
+@Composable
+private fun Modifier.clickableIncludingFlingStop(
+    pointerInputKey: String,
+    onClick: () -> Unit,
+): Modifier {
+    // A scrollable consumes the first stationary touch that stops a fling. Keep clickable for
+    // semantics/ripple, then invoke the same row only when clickable did not handle that tap.
+    var handledClickCount by remember(pointerInputKey) { mutableIntStateOf(0) }
+    var layoutCoordinates by remember(pointerInputKey) { mutableStateOf<LayoutCoordinates?>(null) }
+    val currentOnClick by rememberUpdatedState(onClick)
+
+    return onGloballyPositioned { layoutCoordinates = it }
+        .pointerInput(pointerInputKey) {
+            detectUnhandledTap(
+                handledClickCount = { handledClickCount },
+                positionInRoot = { position ->
+                    layoutCoordinates
+                        ?.takeIf { it.isAttached }
+                        ?.localToRoot(position)
+                },
+                onUnhandledClick = { currentOnClick() },
+            )
+        }
+        .clickable {
+            handledClickCount++
+            currentOnClick()
+        }
+}
+
 @Composable
 private fun SubtitleRail(
     title: String,
@@ -339,7 +444,7 @@ private fun SubtitleLanguageRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
-            .clickable(onClick = onClick)
+            .clickableIncludingFlingStop(item.key, onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -408,7 +513,7 @@ private fun SubtitleOptionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
-            .clickable(onClick = onClick)
+            .clickableIncludingFlingStop(option.id, onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
