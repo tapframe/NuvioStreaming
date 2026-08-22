@@ -20,9 +20,7 @@ internal val PlayerScreenRuntime.visibleAddonSubtitles: List<AddonSubtitle>
     )
 
 internal val PlayerScreenRuntime.selectedAddonSubtitle: AddonSubtitle?
-    get() = visibleAddonSubtitles.firstOrNull { subtitle ->
-        subtitle.id == selectedAddonSubtitleId || subtitle.url == selectedAddonSubtitleId
-    }
+    get() = activeAddonSubtitle
 
 internal fun PlayerScreenRuntime.updateTrackPreference(
     update: (PersistedPlayerTrackPreference) -> PersistedPlayerTrackPreference,
@@ -78,6 +76,8 @@ internal fun PlayerScreenRuntime.selectBuiltInSubtitleFromUser(index: Int) {
     preferredSubtitleSelectionApplied = true
     selectedSubtitleIndex = index
     selectedAddonSubtitleId = null
+    activeAddonSubtitle = null
+    pendingRestoredAddonSubtitle = null
     useCustomSubtitles = false
     persistInternalSubtitlePreference(subtitleTracks.firstOrNull { it.index == index })
     playerController?.selectSubtitleTrack(index)
@@ -86,6 +86,8 @@ internal fun PlayerScreenRuntime.selectBuiltInSubtitleFromUser(index: Int) {
 internal fun PlayerScreenRuntime.selectAddonSubtitleFromUser(subtitle: AddonSubtitle) {
     preferredSubtitleSelectionApplied = true
     selectedAddonSubtitleId = subtitle.id
+    activeAddonSubtitle = subtitle
+    pendingRestoredAddonSubtitle = null
     selectedSubtitleIndex = -1
     useCustomSubtitles = true
     persistAddonSubtitlePreference(subtitle)
@@ -119,6 +121,8 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
             playerController?.selectSubtitleTrack(-1)
             selectedSubtitleIndex = -1
             selectedAddonSubtitleId = null
+            activeAddonSubtitle = null
+            pendingRestoredAddonSubtitle = null
             useCustomSubtitles = false
             preferredSubtitleSelectionApplied = true
         }
@@ -133,6 +137,8 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
                     }
                     selectedSubtitleIndex = restoredSubtitleIndex
                     selectedAddonSubtitleId = null
+                    activeAddonSubtitle = null
+                    pendingRestoredAddonSubtitle = null
                     useCustomSubtitles = false
                     preferredSubtitleSelectionApplied = true
                 }
@@ -142,6 +148,12 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
             val url = preference.addonSubtitleUrl?.takeIf { it.isNotBlank() }
             if (url != null) {
                 selectedAddonSubtitleId = preference.addonSubtitleId ?: url
+                activeAddonSubtitle = null
+                pendingRestoredAddonSubtitle = RestoredAddonSubtitleReference(
+                    subtitleId = preference.addonSubtitleId,
+                    subtitleUrl = url,
+                    addonName = preference.addonSubtitleAddonName,
+                )
                 selectedSubtitleIndex = -1
                 useCustomSubtitles = true
                 playerController?.setSubtitleUri(url)
@@ -233,6 +245,8 @@ internal fun PlayerScreenRuntime.refreshTracks() {
                 playerController?.selectSubtitleTrack(preferredSubtitleIndex)
                 selectedSubtitleIndex = preferredSubtitleIndex
                 selectedAddonSubtitleId = null
+                activeAddonSubtitle = null
+                pendingRestoredAddonSubtitle = null
                 useCustomSubtitles = false
             } else if (preferredSubtitleIndex < 0) {
                 val activeSubtitleTrack = subtitleTracks.firstOrNull { track ->
@@ -256,5 +270,20 @@ private fun PlayerScreenRuntime.disableAutomaticSubtitleSelection() {
     }
     selectedSubtitleIndex = -1
     selectedAddonSubtitleId = null
+    activeAddonSubtitle = null
+    pendingRestoredAddonSubtitle = null
     useCustomSubtitles = false
+}
+
+internal fun PlayerScreenRuntime.resolvePendingRestoredAddonSubtitle() {
+    val restored = pendingRestoredAddonSubtitle ?: return
+    val resolved = resolveRestoredAddonSubtitle(
+        subtitles = addonSubtitles,
+        subtitleId = restored.subtitleId,
+        subtitleUrl = restored.subtitleUrl,
+        addonName = restored.addonName,
+    ) ?: return
+    activeAddonSubtitle = resolved
+    selectedAddonSubtitleId = resolved.id
+    pendingRestoredAddonSubtitle = null
 }

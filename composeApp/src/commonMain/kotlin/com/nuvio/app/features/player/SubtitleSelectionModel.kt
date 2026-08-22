@@ -14,19 +14,258 @@ internal enum class SubtitleOptionsRailEmptyContent {
     FETCH,
 }
 
+internal enum class AddonSubtitleDiscriminatorKind {
+    FILE_NAME,
+    LANGUAGE,
+    FORMAT,
+}
+
+internal data class AddonSubtitleIdentityDiscriminator(
+    val kind: AddonSubtitleDiscriminatorKind,
+    val value: String,
+)
+
+internal data class AddonSubtitleSessionIdentity(
+    val providerOrigin: String,
+    val providerSubtitleId: String?,
+    val discriminator: AddonSubtitleIdentityDiscriminator? = null,
+    val fallbackToken: Long? = null,
+)
+
+internal data class AddonSubtitleSessionEntry(
+    val identity: AddonSubtitleSessionIdentity,
+    val subtitle: AddonSubtitle,
+)
+
+internal data class RestoredAddonSubtitleReference(
+    val subtitleId: String?,
+    val subtitleUrl: String,
+    val addonName: String?,
+)
+
+internal sealed interface SubtitleSelectionKey {
+    data class BuiltIn(
+        val trackIndex: Int,
+        val trackId: String,
+    ) : SubtitleSelectionKey
+
+    data class Addon(
+        val identity: AddonSubtitleSessionIdentity,
+    ) : SubtitleSelectionKey
+}
+
+internal data class SubtitleModalSelectionState(
+    val activeLanguageKey: String,
+    val requestedOptionKey: SubtitleSelectionKey?,
+    val isUserOwned: Boolean,
+) {
+    fun selectLanguage(
+        languageKey: String,
+        optionKeyInLanguage: SubtitleSelectionKey?,
+    ): SubtitleModalSelectionState = copy(
+        activeLanguageKey = languageKey,
+        requestedOptionKey = optionKeyInLanguage,
+        isUserOwned = true,
+    )
+
+    fun selectOption(
+        languageKey: String,
+        optionKey: SubtitleSelectionKey?,
+    ): SubtitleModalSelectionState = copy(
+        activeLanguageKey = languageKey,
+        requestedOptionKey = optionKey,
+        isUserOwned = true,
+    )
+
+    fun observePlayback(
+        languageKey: String,
+        optionKey: SubtitleSelectionKey?,
+    ): SubtitleModalSelectionState {
+        if (!isUserOwned) return fromPlayback(languageKey, optionKey)
+        return if (languageKey == activeLanguageKey && optionKey == requestedOptionKey) {
+            copy(isUserOwned = false)
+        } else {
+            this
+        }
+    }
+
+    companion object {
+        fun fromPlayback(
+            languageKey: String,
+            optionKey: SubtitleSelectionKey?,
+        ) = SubtitleModalSelectionState(
+            activeLanguageKey = languageKey,
+            requestedOptionKey = optionKey,
+            isUserOwned = false,
+        )
+    }
+}
+
+internal class AddonSubtitleSessionRegistry {
+    private data class PrimaryKey(
+        val providerOrigin: String,
+        val providerSubtitleId: String?,
+    )
+
+    private data class StableMetadata(
+        val fileName: String?,
+        val language: String?,
+        val format: String?,
+    )
+
+    private class Record(
+        val identity: AddonSubtitleSessionIdentity,
+        val primaryKey: PrimaryKey,
+        val stableMetadata: StableMetadata,
+        var latestSubtitle: AddonSubtitle,
+    ) {
+        val observedSubtitles = mutableListOf(latestSubtitle)
+
+        fun update(subtitle: AddonSubtitle) {
+            latestSubtitle = subtitle
+            if (observedSubtitles.none { it == subtitle }) observedSubtitles += subtitle
+        }
+    }
+
+    private val records = mutableListOf<Record>()
+    private var nextFallbackToken = 1L
+
+    fun reconcile(
+        subtitles: List<AddonSubtitle>,
+        pinnedSubtitle: AddonSubtitle? = null,
+    ): List<AddonSubtitleSessionEntry> {
+        val usedIdentities = mutableSetOf<AddonSubtitleSessionIdentity>()
+        val entries = subtitles.map { subtitle ->
+            val record = findRecord(subtitle, usedIdentities) ?: createRecord(subtitle)
+            record.update(subtitle)
+            usedIdentities += record.identity
+            AddonSubtitleSessionEntry(record.identity, subtitle)
+        }.distinctBy { it.identity }
+
+        val pinnedRecord = pinnedSubtitle?.let(::recordForPreviouslyObservedSubtitle)
+        if (pinnedRecord == null || entries.any { it.identity == pinnedRecord.identity }) return entries
+        return entries + AddonSubtitleSessionEntry(pinnedRecord.identity, pinnedSubtitle)
+    }
+
+    fun identityOf(subtitle: AddonSubtitle): AddonSubtitleSessionIdentity? =
+        recordForPreviouslyObservedSubtitle(subtitle)?.identity
+
+    private fun findRecord(
+        subtitle: AddonSubtitle,
+        usedIdentities: Set<AddonSubtitleSessionIdentity>,
+    ): Record? {
+        val primaryKey = subtitle.primaryKey()
+        val candidates = records.filter { it.primaryKey == primaryKey }
+        if (candidates.isEmpty()) return null
+
+        candidates.singleOrNull { record ->
+            record.observedSubtitles.any { observed -> observed == subtitle }
+        }?.let { return it }
+
+        candidates.singleOrNull { record ->
+            record.observedSubtitles.any { observed ->
+                observed.url == subtitle.url
+            }
+        }?.let { return it }
+
+        val metadata = subtitle.stableMetadata()
+        val stableMatches = candidates.filter { record -> record.stableMetadata == metadata }
+        stableMatches.singleOrNull { it.identity !in usedIdentities }?.let { return it }
+
+        if (candidates.size == 1) {
+            val only = candidates.single()
+            if (only.identity !in usedIdentities) return only
+        }
+        return null
+    }
+
+    private fun createRecord(subtitle: AddonSubtitle): Record {
+        val primaryKey = subtitle.primaryKey()
+        val candidates = records.filter { it.primaryKey == primaryKey }
+        val discriminator = subtitle.stableDiscriminators().firstOrNull { discriminator ->
+            candidates.none { record -> record.stableValue(discriminator.kind) == discriminator.value }
+        }
+        val identity = if (candidates.isEmpty()) {
+            AddonSubtitleSessionIdentity(
+                providerOrigin = primaryKey.providerOrigin,
+                providerSubtitleId = primaryKey.providerSubtitleId,
+            )
+        } else if (discriminator != null) {
+            AddonSubtitleSessionIdentity(
+                providerOrigin = primaryKey.providerOrigin,
+                providerSubtitleId = primaryKey.providerSubtitleId,
+                discriminator = discriminator,
+            )
+        } else {
+            AddonSubtitleSessionIdentity(
+                providerOrigin = primaryKey.providerOrigin,
+                providerSubtitleId = primaryKey.providerSubtitleId,
+                fallbackToken = nextFallbackToken++,
+            )
+        }
+        return Record(
+            identity = identity,
+            primaryKey = primaryKey,
+            stableMetadata = subtitle.stableMetadata(),
+            latestSubtitle = subtitle,
+        ).also(records::add)
+    }
+
+    private fun recordForPreviouslyObservedSubtitle(subtitle: AddonSubtitle): Record? {
+        val candidates = records.filter { it.primaryKey == subtitle.primaryKey() }
+        return candidates.singleOrNull { record ->
+            record.observedSubtitles.any { observed -> observed == subtitle }
+        } ?: candidates.singleOrNull { record ->
+            record.observedSubtitles.any { observed -> observed.url == subtitle.url }
+        }
+    }
+
+    private fun AddonSubtitle.primaryKey() = PrimaryKey(
+        providerOrigin = providerOrigin.ifBlank { addonName.orEmpty() },
+        providerSubtitleId = providerSubtitleId?.takeIf { it.isNotBlank() },
+    )
+
+    private fun AddonSubtitle.stableMetadata() = StableMetadata(
+        fileName = providerFileName?.trim()?.takeIf { it.isNotBlank() },
+        language = normalizeLanguageCode(language),
+        format = providerFormat?.trim()?.lowercase()?.takeIf { it.isNotBlank() },
+    )
+
+    private fun AddonSubtitle.stableDiscriminators(): List<AddonSubtitleIdentityDiscriminator> =
+        listOfNotNull(
+            providerFileName?.trim()?.takeIf { it.isNotBlank() }?.let {
+                AddonSubtitleIdentityDiscriminator(AddonSubtitleDiscriminatorKind.FILE_NAME, it)
+            },
+            normalizeLanguageCode(language)?.let {
+                AddonSubtitleIdentityDiscriminator(AddonSubtitleDiscriminatorKind.LANGUAGE, it)
+            },
+            providerFormat?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let {
+                AddonSubtitleIdentityDiscriminator(AddonSubtitleDiscriminatorKind.FORMAT, it)
+            },
+        )
+
+    private fun Record.stableValue(kind: AddonSubtitleDiscriminatorKind): String? = when (kind) {
+        AddonSubtitleDiscriminatorKind.FILE_NAME -> stableMetadata.fileName
+        AddonSubtitleDiscriminatorKind.LANGUAGE -> stableMetadata.language
+        AddonSubtitleDiscriminatorKind.FORMAT -> stableMetadata.format
+    }
+
+}
+
 internal sealed interface SubtitleSelectionOption {
-    val id: String
+    val key: SubtitleSelectionKey
 
     data class BuiltIn(
         val track: SubtitleTrack,
     ) : SubtitleSelectionOption {
-        override val id: String = "internal:${track.index}:${track.id}"
+        override val key = SubtitleSelectionKey.BuiltIn(track.index, track.id)
     }
 
     data class Addon(
-        val subtitle: AddonSubtitle,
+        val entry: AddonSubtitleSessionEntry,
     ) : SubtitleSelectionOption {
-        override val id: String = "addon:${subtitle.addonName}:${subtitle.id}:${subtitle.url}"
+        val subtitle: AddonSubtitle get() = entry.subtitle
+        override val key = SubtitleSelectionKey.Addon(entry.identity)
     }
 }
 
@@ -70,18 +309,18 @@ internal fun buildSubtitleLanguageItems(
 internal fun buildSubtitleSelectionOptions(
     languageKey: String,
     subtitleTracks: List<SubtitleTrack>,
-    addonSubtitles: List<AddonSubtitle>,
+    addonSubtitles: List<AddonSubtitleSessionEntry>,
 ): List<SubtitleSelectionOption> {
     if (languageKey == SubtitleOffLanguageKey) return emptyList()
 
     val builtInOptions = subtitleTracks
         .filter { it.subtitleLanguageKey() == languageKey }
         .map { SubtitleSelectionOption.BuiltIn(it) }
-    val seenAddonIds = mutableSetOf<String>()
+    val seenAddonIds = mutableSetOf<SubtitleSelectionKey>()
     val addonOptions = addonSubtitles
-        .filter { subtitleLanguageKey(it.language) == languageKey }
+        .filter { subtitleLanguageKey(it.subtitle.language) == languageKey }
         .map(SubtitleSelectionOption::Addon)
-        .filter { seenAddonIds.add(it.id) }
+        .filter { seenAddonIds.add(it.key) }
 
     return builtInOptions + addonOptions
 }
@@ -114,20 +353,35 @@ internal fun selectedSubtitleLanguageKey(
         ?: SubtitleOffLanguageKey
 }
 
-internal fun selectedSubtitleOptionId(
+internal fun selectedSubtitleOptionKey(
     subtitleTracks: List<SubtitleTrack>,
     selectedSubtitleIndex: Int,
-    selectedAddonSubtitle: AddonSubtitle?,
-): String? {
-    selectedAddonSubtitle?.let { return SubtitleSelectionOption.Addon(it).id }
+    selectedAddonIdentity: AddonSubtitleSessionIdentity?,
+): SubtitleSelectionKey? {
+    selectedAddonIdentity?.let { return SubtitleSelectionKey.Addon(it) }
     return subtitleTracks
         .firstOrNull { it.index == selectedSubtitleIndex }
-        ?.let { SubtitleSelectionOption.BuiltIn(it) }
-        ?.id
+        ?.let { SubtitleSelectionKey.BuiltIn(it.index, it.id) }
         ?: subtitleTracks
             .firstOrNull { it.isSelected }
-            ?.let { SubtitleSelectionOption.BuiltIn(it) }
-            ?.id
+            ?.let { SubtitleSelectionKey.BuiltIn(it.index, it.id) }
+}
+
+internal fun resolveRestoredAddonSubtitle(
+    subtitles: List<AddonSubtitle>,
+    subtitleId: String?,
+    subtitleUrl: String?,
+    addonName: String?,
+): AddonSubtitle? {
+    subtitleUrl?.takeIf { it.isNotBlank() }?.let { exactUrl ->
+        subtitles.singleOrNull { it.url == exactUrl }?.let { return it }
+    }
+    val id = subtitleId?.takeIf { it.isNotBlank() } ?: return null
+    val idMatches = subtitles.filter { it.id == id }
+    if (!addonName.isNullOrBlank()) {
+        idMatches.singleOrNull { it.addonName == addonName }?.let { return it }
+    }
+    return idMatches.singleOrNull()
 }
 
 internal fun subtitleLanguageKey(language: String?): String {

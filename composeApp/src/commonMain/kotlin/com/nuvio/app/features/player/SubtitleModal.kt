@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -73,7 +74,7 @@ fun SubtitleModal(
     subtitleTracks: List<SubtitleTrack>,
     selectedSubtitleIndex: Int,
     addonSubtitles: List<AddonSubtitle>,
-    selectedAddonSubtitleId: String?,
+    subtitleSessionKey: String,
     isLoadingAddonSubtitles: Boolean,
     preferredSubtitleLanguage: String,
     secondaryPreferredSubtitleLanguage: String?,
@@ -93,22 +94,27 @@ fun SubtitleModal(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val effectiveSelectedAddonSubtitle = selectedAddonSubtitle ?: addonSubtitles.firstOrNull { subtitle ->
-        subtitle.id == selectedAddonSubtitleId || subtitle.url == selectedAddonSubtitleId
+    val addonIdentityRegistry = remember(subtitleSessionKey) { AddonSubtitleSessionRegistry() }
+    val sessionAddonSubtitles = remember(addonIdentityRegistry, addonSubtitles, selectedAddonSubtitle) {
+        addonIdentityRegistry.reconcile(
+            subtitles = addonSubtitles,
+            pinnedSubtitle = selectedAddonSubtitle,
+        )
     }
+    val selectedAddonIdentity = selectedAddonSubtitle?.let(addonIdentityRegistry::identityOf)
     val playbackLanguageKey = selectedSubtitleLanguageKey(
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,
-        selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
+        selectedAddonSubtitle = selectedAddonSubtitle,
     )
-    val playbackOptionId = selectedSubtitleOptionId(
+    val playbackOptionKey = selectedSubtitleOptionKey(
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,
-        selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
+        selectedAddonIdentity = selectedAddonIdentity,
     )
     val languageItems = remember(
         subtitleTracks,
-        addonSubtitles,
+        sessionAddonSubtitles,
         preferredSubtitleLanguage,
         secondaryPreferredSubtitleLanguage,
         subtitleStyle.showOnlyPreferredLanguages,
@@ -116,40 +122,65 @@ fun SubtitleModal(
     ) {
         buildSubtitleLanguageItems(
             subtitleTracks = subtitleTracks,
-            addonSubtitles = addonSubtitles,
+            addonSubtitles = sessionAddonSubtitles.map { it.subtitle },
             preferredLanguage = preferredSubtitleLanguage,
             secondaryPreferredLanguage = secondaryPreferredSubtitleLanguage,
             showOnlyPreferredLanguages = subtitleStyle.showOnlyPreferredLanguages,
             selectedLanguageKey = playbackLanguageKey,
         )
     }
-    var activeLanguageKey by remember(visible) {
+    val initialLanguageKey = playbackLanguageKey.takeIf { key -> languageItems.any { it.key == key } }
+        ?: languageItems.firstOrNull { it.key != SubtitleOffLanguageKey }?.key
+        ?: SubtitleOffLanguageKey
+    var selectionState by remember(visible, subtitleSessionKey) {
         mutableStateOf(
-            playbackLanguageKey.takeIf { key -> languageItems.any { it.key == key } }
-                ?: languageItems.firstOrNull { it.key != SubtitleOffLanguageKey }?.key
-                ?: SubtitleOffLanguageKey,
+            SubtitleModalSelectionState.fromPlayback(
+                languageKey = initialLanguageKey,
+                optionKey = playbackOptionKey,
+            ),
         )
     }
-    var pendingOptionId by remember(visible) { mutableStateOf<String?>(playbackOptionId) }
-    val options = remember(activeLanguageKey, subtitleTracks, addonSubtitles) {
-        buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, addonSubtitles)
+    val activeLanguageKey = selectionState.activeLanguageKey
+    val options = remember(activeLanguageKey, subtitleTracks, sessionAddonSubtitles) {
+        buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, sessionAddonSubtitles)
     }
-    val selectedOptionId = pendingOptionId ?: playbackOptionId
+    val selectedOptionKey = selectionState.requestedOptionKey
     val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
-        selectedOptionId != null && options.any { it.id == selectedOptionId }
+        selectedOptionKey != null && options.any { it.key == selectedOptionKey }
+    val languageListState = rememberLazyListState()
+    val optionListState = rememberLazyListState()
+    var initialScrollPending by remember(visible, subtitleSessionKey) { mutableStateOf(visible) }
 
-    LaunchedEffect(languageItems) {
-        if (languageItems.none { it.key == activeLanguageKey }) {
-            activeLanguageKey = playbackLanguageKey.takeIf { key -> languageItems.any { it.key == key } }
+    LaunchedEffect(languageItems, playbackLanguageKey, playbackOptionKey) {
+        if (!selectionState.isUserOwned && languageItems.none { it.key == selectionState.activeLanguageKey }) {
+            val fallbackLanguageKey = playbackLanguageKey.takeIf { key -> languageItems.any { it.key == key } }
                 ?: languageItems.firstOrNull { it.key != SubtitleOffLanguageKey }?.key
                 ?: SubtitleOffLanguageKey
+            selectionState = SubtitleModalSelectionState.fromPlayback(
+                languageKey = fallbackLanguageKey,
+                optionKey = playbackOptionKey,
+            )
         }
     }
 
-    LaunchedEffect(playbackLanguageKey, playbackOptionId) {
-        if (playbackOptionId != null || playbackLanguageKey == SubtitleOffLanguageKey) {
-            activeLanguageKey = playbackLanguageKey
-            pendingOptionId = playbackOptionId
+    LaunchedEffect(playbackLanguageKey, playbackOptionKey) {
+        if (playbackOptionKey != null || playbackLanguageKey == SubtitleOffLanguageKey) {
+            selectionState = selectionState.observePlayback(playbackLanguageKey, playbackOptionKey)
+        }
+    }
+
+    LaunchedEffect(visible, languageItems, options, selectedOptionKey, subtitleSessionKey) {
+        if (!visible || !initialScrollPending) return@LaunchedEffect
+        languageItems.indexOfFirst { it.key == activeLanguageKey }.takeIf { it >= 0 }?.let { index ->
+            languageListState.scrollToItem(index)
+        }
+        if (selectedOptionKey == null) {
+            initialScrollPending = false
+        } else {
+            options.indexOfFirst { it.key == selectedOptionKey }.takeIf { it >= 0 }?.let { index ->
+                optionListState.scrollToItem(index)
+                initialScrollPending = false
+            }
         }
     }
 
@@ -183,6 +214,7 @@ fun SubtitleModal(
                         width = 200.dp,
                     ) {
                         LazyColumn(
+                            state = languageListState,
                             modifier = Modifier.heightIn(max = railMaxHeight),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                             contentPadding = PaddingValues(vertical = 8.dp),
@@ -192,15 +224,18 @@ fun SubtitleModal(
                                     item = item,
                                     selected = item.key == activeLanguageKey,
                                     onClick = {
-                                        activeLanguageKey = item.key
                                         val availableOptions = buildSubtitleSelectionOptions(
                                             item.key,
                                             subtitleTracks,
-                                            addonSubtitles,
+                                            sessionAddonSubtitles,
                                         )
-                                        pendingOptionId = playbackOptionId?.takeIf { id ->
-                                            availableOptions.any { it.id == id }
+                                        val optionKeyInLanguage = playbackOptionKey?.takeIf { key ->
+                                            availableOptions.any { it.key == key }
                                         }
+                                        selectionState = selectionState.selectLanguage(
+                                            languageKey = item.key,
+                                            optionKeyInLanguage = optionKeyInLanguage,
+                                        )
                                         if (item.key == SubtitleOffLanguageKey) {
                                             onBuiltInTrackSelected(-1)
                                         }
@@ -244,16 +279,20 @@ fun SubtitleModal(
 
                             else -> {
                                 LazyColumn(
+                                    state = optionListState,
                                     modifier = Modifier.heightIn(max = railMaxHeight),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                     contentPadding = PaddingValues(vertical = 8.dp),
                                 ) {
-                                    items(options, key = { it.id }) { option ->
+                                    items(options, key = { it.key }) { option ->
                                         SubtitleOptionRow(
                                             option = option,
-                                            selected = option.id == selectedOptionId,
+                                            selected = option.key == selectedOptionKey,
                                             onClick = {
-                                                pendingOptionId = option.id
+                                                selectionState = selectionState.selectOption(
+                                                    languageKey = activeLanguageKey,
+                                                    optionKey = option.key,
+                                                )
                                                 when (option) {
                                                     is SubtitleSelectionOption.BuiltIn -> {
                                                         onBuiltInTrackSelected(option.track.index)
@@ -288,7 +327,7 @@ fun SubtitleModal(
                                 SubtitleStylePanel(
                                     style = subtitleStyle,
                                     subtitleDelayMs = subtitleDelayMs,
-                                    selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
+                                    selectedAddonSubtitle = selectedAddonSubtitle,
                                     subtitleAutoSyncState = subtitleAutoSyncState,
                                     isCompact = railMaxHeight < 420.dp,
                                     showHeader = false,
@@ -376,7 +415,7 @@ private suspend fun PointerInputScope.detectUnhandledTap(
 
 @Composable
 private fun Modifier.clickableIncludingFlingStop(
-    pointerInputKey: String,
+    pointerInputKey: Any,
     onClick: () -> Unit,
 ): Modifier {
     // A scrollable consumes the first stationary touch that stops a fling. Keep clickable for
@@ -513,7 +552,7 @@ private fun SubtitleOptionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
-            .clickableIncludingFlingStop(option.id, onClick)
+            .clickableIncludingFlingStop(option.key, onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,

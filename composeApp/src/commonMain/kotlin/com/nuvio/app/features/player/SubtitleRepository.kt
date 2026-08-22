@@ -49,7 +49,6 @@ object SubtitleRepository {
             val requestType = canonicalSubtitleType(type)
             _isLoading.value = true
             _error.value = null
-            _addonSubtitles.value = emptyList()
 
             val addons = AddonRepository.uiState.value.addons.enabledAddons()
             val allSubs = mutableListOf<AddonSubtitle>()
@@ -74,17 +73,14 @@ object SubtitleRepository {
                     val subtitlesArray = parsed["subtitles"]?.jsonArray ?: continue
 
                     for (element in subtitlesArray) {
-                        val obj = element.jsonObject
-                        val id = obj.stringValue("id")
-                            ?: "${manifest.id}_${allSubs.size}"
-                        val url = obj.stringValue("url") ?: continue
-                        val rawLang = obj.subtitleLanguage() ?: "unknown"
+                        val payload = parseAddonSubtitlePayload(element.jsonObject) ?: continue
+                        val rawLang = payload.language
                         val normalizedLang = normalizeLanguageCode(rawLang) ?: rawLang
 
                         allSubs.add(
                             AddonSubtitle(
-                                id = id,
-                                url = url,
+                                id = payload.id,
+                                url = payload.url,
                                 language = normalizedLang,
                                 display = getString(
                                     Res.string.player_addon_subtitle_display_format,
@@ -92,6 +88,10 @@ object SubtitleRepository {
                                     addon.displayTitle,
                                 ),
                                 addonName = addon.displayTitle,
+                                providerOrigin = addon.manifestUrl,
+                                providerSubtitleId = payload.providerSubtitleId,
+                                providerFileName = payload.fileName,
+                                providerFormat = payload.format,
                             )
                         )
                     }
@@ -114,6 +114,28 @@ object SubtitleRepository {
         _isLoading.value = false
         _error.value = null
     }
+}
+
+internal data class AddonSubtitlePayload(
+    val id: String,
+    val providerSubtitleId: String?,
+    val url: String,
+    val language: String,
+    val fileName: String?,
+    val format: String?,
+)
+
+internal fun parseAddonSubtitlePayload(value: JsonObject): AddonSubtitlePayload? {
+    val providerSubtitleId = value.stringValue("id")
+    val fileName = value.firstStringValue("fileName", "filename", "name")
+    return AddonSubtitlePayload(
+        id = providerSubtitleId ?: fileName ?: MissingProviderSubtitleId,
+        providerSubtitleId = providerSubtitleId,
+        url = value.payloadValue("url") ?: return null,
+        language = value.subtitleLanguage() ?: "unknown",
+        fileName = fileName,
+        format = value.firstStringValue("format", "type"),
+    )
 }
 
 private fun canonicalSubtitleType(type: String): String =
@@ -142,3 +164,14 @@ private fun JsonObject.stringValue(name: String): String? =
         ?.contentOrNull
         ?.trim()
         ?.takeIf { it.isNotBlank() }
+
+private fun JsonObject.firstStringValue(vararg names: String): String? =
+    names.firstNotNullOfOrNull(::stringValue)
+
+private fun JsonObject.payloadValue(name: String): String? =
+    this[name]
+        ?.jsonPrimitive
+        ?.contentOrNull
+        ?.takeIf { it.isNotBlank() }
+
+private const val MissingProviderSubtitleId = "subtitle"

@@ -32,6 +32,10 @@ data class AddonSubtitle(
     val display: String,
     val addonName: String? = null,
     val isSelected: Boolean = false,
+    val providerOrigin: String = addonName.orEmpty(),
+    val providerSubtitleId: String? = id.takeIf { it.isNotBlank() },
+    val providerFileName: String? = null,
+    val providerFormat: String? = null,
 )
 
 enum class AddonSubtitleStartupMode {

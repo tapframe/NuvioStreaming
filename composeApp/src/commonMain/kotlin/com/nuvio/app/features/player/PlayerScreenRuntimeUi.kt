@@ -449,7 +449,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,
         addonSubtitles = visibleAddonSubtitles,
-        selectedAddonSubtitleId = selectedAddonSubtitleId,
+        subtitleSessionKey = activeSourceIdentityKey ?: activePlaybackIdentity,
         isLoadingAddonSubtitles = isLoadingAddonSubtitles,
         subtitleStyle = subtitleStyle,
         subtitleDelayMs = subtitleDelayMs,

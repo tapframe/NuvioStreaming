@@ -40,6 +40,28 @@ class PlayerSubtitleUserSelectionTest {
     }
 
     @Test
+    fun selectedAddonKeepsTheExactEntryAcrossRawIdCollisions() {
+        val controller = RecordingPlayerController(subtitles = emptyList())
+        val first = addonSubtitle(
+            url = "https://first.example/subtitle.srt?token=first",
+            providerOrigin = "https://first.example/manifest.json",
+        )
+        val selected = addonSubtitle(
+            url = "https://second.example/subtitle.srt?token=second",
+            providerOrigin = "https://second.example/manifest.json",
+        )
+        val runtime = PlayerScreenRuntime(testPlayerScreenArgs()).apply {
+            playerController = controller
+            addonSubtitles = listOf(first, selected)
+        }
+
+        runtime.selectAddonSubtitleFromUser(selected)
+
+        assertEquals(selected, runtime.selectedAddonSubtitle)
+        assertEquals(listOf(selected), controller.addonSelections)
+    }
+
+    @Test
     fun internalTapWinsOverPendingAutomaticSubtitleSelection() {
         val controller = RecordingPlayerController(
             subtitles = listOf(
@@ -64,11 +86,82 @@ class PlayerSubtitleUserSelectionTest {
         assertEquals(listOf(1), controller.internalSubtitleSelections)
     }
 
+    @Test
+    fun addonToInternalAndOffUseThePlatformSelectionContract() {
+        val controller = RecordingPlayerController(
+            subtitles = listOf(
+                SubtitleTrack(index = 0, id = "embedded-en", label = "English", language = "en"),
+            ),
+        )
+        val runtime = PlayerScreenRuntime(testPlayerScreenArgs()).apply {
+            playerController = controller
+            subtitleTracks = controller.getSubtitleTracks()
+        }
+        val addon = addonSubtitle(
+            url = "https://example.com/external.srt?token=signed",
+            providerOrigin = "https://provider.example/manifest.json",
+        )
+
+        runtime.selectAddonSubtitleFromUser(addon)
+        runtime.selectBuiltInSubtitleFromUser(0)
+        runtime.selectAddonSubtitleFromUser(addon)
+        runtime.selectBuiltInSubtitleFromUser(-1)
+
+        assertEquals(listOf(0, -1), controller.internalSubtitleSelections)
+        assertEquals(emptyList(), controller.clearThenSelectCalls)
+        assertEquals(null, runtime.selectedAddonSubtitle)
+        assertEquals(false, runtime.useCustomSubtitles)
+    }
+
+    @Test
+    fun restoredAddonReferenceResolvesOnceOnlyWhenUnique() {
+        val resolved = addonSubtitle(
+            url = "https://cdn.example/subtitle.srt?token=refreshed",
+            providerOrigin = "https://provider.example/manifest.json",
+        )
+        val runtime = PlayerScreenRuntime(testPlayerScreenArgs()).apply {
+            addonSubtitles = listOf(resolved)
+            pendingRestoredAddonSubtitle = RestoredAddonSubtitleReference(
+                subtitleId = resolved.id,
+                subtitleUrl = "https://cdn.example/subtitle.srt?token=expired",
+                addonName = resolved.addonName,
+            )
+        }
+
+        runtime.resolvePendingRestoredAddonSubtitle()
+
+        assertEquals(resolved, runtime.selectedAddonSubtitle)
+        assertEquals(null, runtime.pendingRestoredAddonSubtitle)
+    }
+
+    @Test
+    fun ambiguousRestoredAddonReferenceDoesNotSelectAnArbitraryEntry() {
+        val first = addonSubtitle(
+            url = "https://cdn.example/a.srt?token=refreshed",
+            providerOrigin = "https://provider.example/manifest.json",
+        )
+        val second = first.copy(url = "https://cdn.example/b.srt?token=refreshed")
+        val runtime = PlayerScreenRuntime(testPlayerScreenArgs()).apply {
+            addonSubtitles = listOf(first, second)
+            pendingRestoredAddonSubtitle = RestoredAddonSubtitleReference(
+                subtitleId = first.id,
+                subtitleUrl = "https://cdn.example/subtitle.srt?token=expired",
+                addonName = first.addonName,
+            )
+        }
+
+        runtime.resolvePendingRestoredAddonSubtitle()
+
+        assertEquals(null, runtime.selectedAddonSubtitle)
+        assertEquals(first.id, runtime.pendingRestoredAddonSubtitle?.subtitleId)
+    }
+
     private class RecordingPlayerController(
         private val subtitles: List<SubtitleTrack>,
     ) : PlayerEngineController {
         val internalSubtitleSelections = mutableListOf<Int>()
         val addonSelections = mutableListOf<AddonSubtitle>()
+        val clearThenSelectCalls = mutableListOf<Int>()
 
         override fun play() = Unit
         override fun pause() = Unit
@@ -87,8 +180,23 @@ class PlayerSubtitleUserSelectionTest {
             addonSelections += subtitle
         }
         override fun clearExternalSubtitle() = Unit
-        override fun clearExternalSubtitleAndSelect(trackIndex: Int) = Unit
+        override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
+            clearThenSelectCalls += trackIndex
+        }
     }
+
+    private fun addonSubtitle(
+        url: String,
+        providerOrigin: String,
+    ) = AddonSubtitle(
+        id = "shared-id",
+        url = url,
+        language = "en",
+        display = "English",
+        addonName = "Same display name",
+        providerOrigin = providerOrigin,
+        providerSubtitleId = "shared-id",
+    )
 
     private fun testPlayerScreenArgs() = PlayerScreenArgs(
         profileId = 1,

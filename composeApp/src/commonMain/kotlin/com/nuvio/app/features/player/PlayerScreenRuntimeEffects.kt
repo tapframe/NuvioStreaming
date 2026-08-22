@@ -78,6 +78,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         speedBoostRestoreSpeed = null
         preferredAudioSelectionApplied = false
         preferredSubtitleSelectionApplied = false
+        activeAddonSubtitle = null
+        pendingRestoredAddonSubtitle = null
         showSourcesPanel = false
         showEpisodesPanel = false
         episodeStreamsPanelState = EpisodeStreamsPanelState()
@@ -166,6 +168,10 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
 
     LaunchedEffect(selectedAddonSubtitleId, useCustomSubtitles, activeSourceUrl) {
         subtitleAutoSyncState = SubtitleAutoSyncUiState()
+    }
+
+    LaunchedEffect(addonSubtitles, pendingRestoredAddonSubtitle) {
+        resolvePendingRestoredAddonSubtitle()
     }
 
     LaunchedEffect(playerController, subtitleStyle) {
