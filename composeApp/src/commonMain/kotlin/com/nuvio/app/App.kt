@@ -242,6 +242,7 @@ import com.nuvio.app.features.updater.rememberAppUpdaterController
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
+import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -3459,6 +3460,13 @@ private fun MainAppContent(
                             imageUrl = cloudLibraryDisplayArtworkUrl(anchor.imageUrl ?: item.poster ?: item.imageUrl),
                             title = item.title,
                             subtitle = localizedContinueWatchingSubtitle(item),
+                            blurred = continueWatchingPreferencesUiState.blurNextUp &&
+                                continueWatchingPreferencesUiState.useEpisodeThumbnails &&
+                                item.isNextUp &&
+                                (
+                                    continueWatchingPreferencesUiState.style != ContinueWatchingSectionStyle.Poster ||
+                                        anchor.imageUrl?.trim() == item.episodeThumbnail?.trim()
+                                ),
                             depthSurface = NuvioCardDepthSurface.ContinueWatching,
                             anchor = anchor,
                             actions = buildList {
