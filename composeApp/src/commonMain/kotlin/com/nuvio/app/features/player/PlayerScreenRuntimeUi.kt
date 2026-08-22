@@ -194,7 +194,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 seasonNumber = activeSeasonNumber,
                 episodeNumber = activeEpisodeNumber,
                 episodeTitle = activeEpisodeTitle,
-                pauseDescription = pauseDescription ?: activeStreamSubtitle,
+                pauseDescription = activePauseDescription ?: activeStreamSubtitle,
                 providerName = activeProviderName,
                 metrics = metrics,
                 horizontalSafePadding = horizontalSafePadding,
