@@ -115,26 +115,10 @@ private fun MemberBadge(
 ) {
     val badgeStyle = remember(tier) { tier.badgeStyle() }
     var badgeSize by remember(tier) { mutableStateOf(IntSize.Zero) }
-    val gradientTransition = rememberInfiniteTransition(label = "memberBadgeGradient")
-    val gradientProgress by gradientTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = MemberBadgeSweepHalfDurationMs,
-                easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f),
-            ),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "memberBadgeGradientProgress",
+    val gradientBrush = rememberMemberBadgeGradientBrush(
+        style = badgeStyle,
+        size = badgeSize,
     )
-    val gradientBrush = remember(badgeStyle, badgeSize, gradientProgress) {
-        memberBadgeGradientBrush(
-            style = badgeStyle,
-            size = badgeSize,
-            progress = gradientProgress,
-        )
-    }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Spacer(modifier = Modifier.width(height * 0.14f))
@@ -148,6 +132,33 @@ private fun MemberBadge(
             modifier = Modifier
                 .offset(y = height * MemberWordmarkVerticalOffsetRatio)
                 .onSizeChanged { badgeSize = it },
+        )
+    }
+}
+
+@Composable
+internal fun rememberMemberBadgeGradientBrush(
+    style: MemberBadgeStyle,
+    size: IntSize,
+): Brush {
+    val gradientTransition = rememberInfiniteTransition(label = "memberBadgeGradient")
+    val gradientProgress by gradientTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = MemberBadgeSweepHalfDurationMs,
+                easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f),
+            ),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "memberBadgeGradientProgress",
+    )
+    return remember(style, size, gradientProgress) {
+        memberBadgeGradientBrush(
+            style = style,
+            size = size,
+            progress = gradientProgress,
         )
     }
 }

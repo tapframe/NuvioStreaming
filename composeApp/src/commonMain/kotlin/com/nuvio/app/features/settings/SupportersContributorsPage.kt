@@ -23,10 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,11 +49,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.features.addons.httpRequestRaw
+import com.nuvio.app.features.membership.MembershipOverviewRepository
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -69,6 +69,8 @@ private enum class CommunityTab {
     Contributors,
     Supporters,
 }
+
+private const val PatreonMembershipUrl = "https://www.patreon.com/settings/memberships"
 
 private data class CommunityUiState(
     val selectedTab: CommunityTab = CommunityTab.Contributors,
@@ -297,6 +299,10 @@ private fun SupportersContributorsBody(
     val donateConfigured = donateUrl.isNotBlank()
     val contributorsErrorFallback = stringResource(Res.string.community_error_unable_load_contributors)
     val supportersErrorFallback = stringResource(Res.string.community_error_unable_load_supporters)
+    val membershipState by remember {
+        MembershipOverviewRepository.ensureStarted()
+        MembershipOverviewRepository.state
+    }.collectAsStateWithLifecycle()
 
     var uiState by remember { mutableStateOf(CommunityUiState()) }
     var selectedContributor by remember { mutableStateOf<CommunityContributor?>(null) }
@@ -374,50 +380,37 @@ private fun SupportersContributorsBody(
     Column(
         verticalArrangement = Arrangement.spacedBy(if (isTablet) 18.dp else 14.dp),
     ) {
-        NuvioSurfaceCard {
-            Text(
-                text = stringResource(Res.string.community_section_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = stringResource(Res.string.community_section_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (AppFeaturePolicy.donationProgressEnabled && donationsConfigured) {
-                Spacer(modifier = Modifier.height(16.dp))
-                DonationProgressSection(
-                    progress = uiState.donationProgress,
-                    isLoading = uiState.isSupportersLoading,
-                    errorMessage = uiState.supportersErrorMessage,
-                )
-            }
-            if (AppFeaturePolicy.donationActionsEnabled) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { if (donateConfigured) uriHandler.openUri(donateUrl) },
-                    enabled = donateConfigured,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Favorite,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(Res.string.action_support_nuvio))
+        SupporterMembershipCard(
+            state = membershipState,
+            isTablet = isTablet,
+            showAction = AppFeaturePolicy.donationActionsEnabled,
+            actionEnabled = membershipState.overview?.subscriptionActive == true || donateConfigured,
+            onAction = {
+                val url = if (membershipState.overview?.subscriptionActive == true) {
+                    PatreonMembershipUrl
+                } else {
+                    donateUrl
                 }
-            }
-            if (AppFeaturePolicy.donationProgressEnabled && !donationsConfigured) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = stringResource(Res.string.community_supporters_not_configured),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                if (url.isNotBlank()) uriHandler.openUri(url)
+            },
+            onRefresh = MembershipOverviewRepository::refresh,
+        )
+
+        if (AppFeaturePolicy.donationProgressEnabled) {
+            NuvioSurfaceCard {
+                if (donationsConfigured) {
+                    DonationProgressSection(
+                        progress = uiState.donationProgress,
+                        isLoading = uiState.isSupportersLoading,
+                        errorMessage = uiState.supportersErrorMessage,
+                    )
+                } else {
+                    Text(
+                        text = stringResource(Res.string.community_supporters_not_configured),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
 
@@ -977,7 +970,7 @@ private fun formatMembershipLevel(rawLevel: String): String = rawLevel
     .joinToString(" ") { word -> word.lowercase().replaceFirstChar { it.titlecase() } }
 
 @Composable
-private fun formatDonationDate(rawDate: String): String {
+internal fun formatDonationDate(rawDate: String): String {
     val datePart = rawDate.substringBefore('T')
     val parts = datePart.split('-')
     if (parts.size != 3) return rawDate
