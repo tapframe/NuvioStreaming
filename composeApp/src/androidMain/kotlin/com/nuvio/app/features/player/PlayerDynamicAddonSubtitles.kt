@@ -102,11 +102,9 @@ internal class DynamicAddonSubtitleState {
                 trackId = trackId,
                 url = url,
             )
-            currentSnapshot = DynamicAddonSubtitleSnapshot(
+            currentSnapshot = currentSnapshot.copy(
                 generation = request.generation,
-                streamRevision = currentSnapshot.streamRevision + 1L,
                 request = request,
-                content = null,
             )
         }
         return request
@@ -122,6 +120,7 @@ internal class DynamicAddonSubtitleState {
             } else {
                 // Make the new payload readable before the selector replaces the active stream.
                 currentSnapshot = currentSnapshot.copy(
+                    streamRevision = currentSnapshot.streamRevision + 1L,
                     content = content,
                 )
                 true
@@ -499,10 +498,17 @@ internal class DynamicAddonSubtitleSampleStream(
     }
 
     override fun skipData(positionUs: Long): Int {
-        val content = state.snapshot().content ?: return 0
+        seekPositionUs = positionUs
+        val snapshot = state.snapshot()
+        if (snapshot.streamRevision != streamRevision || snapshot.request == null) return 0
+        val content = snapshot.content ?: return 0
         ensureContentInitialized(content)
         val startIndex = readIndex
-        while (readIndex < content.samples.size && content.samples[readIndex].timeUs < positionUs) {
+        while (
+            readIndex < content.samples.size &&
+            content.samples[readIndex].endTimeUs != C.TIME_UNSET &&
+            content.samples[readIndex].endTimeUs < positionUs
+        ) {
             readIndex += 1
         }
         return readIndex - startIndex

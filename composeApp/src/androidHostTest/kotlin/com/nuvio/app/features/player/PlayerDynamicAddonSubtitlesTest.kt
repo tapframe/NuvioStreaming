@@ -168,14 +168,17 @@ class PlayerDynamicAddonSubtitlesTest {
     @Test
     fun oneHundredUniqueSelectionsRetainOnlyTheCurrentContent() {
         val state = DynamicAddonSubtitleState()
+        var previousContent: DynamicAddonSubtitleContent? = null
 
         repeat(100) { index ->
             val request = state.beginSelection(
                 trackId = "addon:$index",
                 url = "https://subs.example/$index?token=signed-$index",
             )
-            assertNull(state.snapshot().content)
-            assertTrue(state.publish(request, dynamicContent(index.toString())))
+            assertEquals(previousContent, state.snapshot().content)
+            val content = dynamicContent(index.toString())
+            assertTrue(state.publish(request, content))
+            previousContent = content
         }
 
         val snapshot = state.snapshot()
@@ -199,12 +202,21 @@ class PlayerDynamicAddonSubtitlesTest {
     }
 
     @Test
-    fun sampleStreamWaitsWithoutEndingThenEmitsPublishedContent() {
+    fun pendingSelectionKeepsPublishedStreamUntilReplacementPayloadArrives() {
         val state = DynamicAddonSubtitleState()
-        val request = state.beginSelection("addon:a", "https://subs.example/a")
+        val firstRequest = state.beginSelection("addon:a", "https://subs.example/a")
+        val firstContent = dynamicContent("A")
+        assertTrue(state.publish(firstRequest, firstContent))
+        val firstRevision = state.snapshot().streamRevision
+
+        val secondRequest = state.beginSelection("addon:b", "https://subs.example/b")
+
+        assertEquals(firstRevision, state.snapshot().streamRevision)
+        assertEquals(firstContent, state.snapshot().content)
+
         val stream = DynamicAddonSubtitleSampleStream(
             state = state,
-            streamRevision = state.snapshot().streamRevision,
+            streamRevision = firstRevision,
             format = dynamicFormat(),
             startPositionUs = 0L,
         )
@@ -212,17 +224,62 @@ class PlayerDynamicAddonSubtitlesTest {
         val buffer = DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_NORMAL)
 
         assertEquals(C.RESULT_FORMAT_READ, stream.readData(formatHolder, buffer, 0))
-        assertEquals(C.RESULT_NOTHING_READ, stream.readData(formatHolder, buffer, 0))
-        assertTrue(state.publish(request, dynamicContent("A")))
         assertEquals(C.RESULT_BUFFER_READ, stream.readData(formatHolder, buffer, 0))
         buffer.flip()
         assertContentEquals("A".encodeToByteArray(), buffer.data!!.let { bytes ->
             ByteArray(bytes.remaining()).also(bytes::get)
         })
 
-        buffer.clear()
+        assertTrue(state.publish(secondRequest, dynamicContent("B")))
+        assertEquals(firstRevision + 1L, state.snapshot().streamRevision)
+        assertEquals(C.RESULT_NOTHING_READ, stream.readData(formatHolder, buffer, 0))
+    }
+
+    @Test
+    fun sampleStreamRetainsCueThatIsActiveAtSkipPosition() {
+        val state = DynamicAddonSubtitleState()
+        val request = state.beginSelection("addon:a", "https://subs.example/a")
+        assertTrue(
+            state.publish(
+                request,
+                DynamicAddonSubtitleContent(
+                    mimeType = MimeTypes.APPLICATION_SUBRIP,
+                    samples = listOf(
+                        DynamicAddonSubtitleSample(
+                            timeUs = 5_000_000L,
+                            durationUs = 1_000_000L,
+                            data = "expired".encodeToByteArray(),
+                        ),
+                        DynamicAddonSubtitleSample(
+                            timeUs = 8_000_000L,
+                            durationUs = 1_000_000L,
+                            data = "active".encodeToByteArray(),
+                        ),
+                        DynamicAddonSubtitleSample(
+                            timeUs = 10_000_000L,
+                            durationUs = 1_000_000L,
+                            data = "future".encodeToByteArray(),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val stream = DynamicAddonSubtitleSampleStream(
+            state = state,
+            streamRevision = state.snapshot().streamRevision,
+            format = dynamicFormat(),
+            startPositionUs = 8_500_000L,
+        )
+        val formatHolder = FormatHolder()
+        val buffer = DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_NORMAL)
+
+        assertEquals(C.RESULT_FORMAT_READ, stream.readData(formatHolder, buffer, 0))
+        assertEquals(0, stream.skipData(8_500_000L))
         assertEquals(C.RESULT_BUFFER_READ, stream.readData(formatHolder, buffer, 0))
-        assertTrue(buffer.isEndOfStream)
+        buffer.flip()
+        assertContentEquals("active".encodeToByteArray(), buffer.data!!.let { bytes ->
+            ByteArray(bytes.remaining()).also(bytes::get)
+        })
     }
 
     @Test
@@ -264,9 +321,10 @@ class PlayerDynamicAddonSubtitlesTest {
     }
 
     @Test
-    fun textRendererAlreadyPollingBeforePayloadRendersWhenPayloadArrives() {
+    fun textRendererKeepsCurrentCueWhileReplacementPayloadIsPending() {
         val state = DynamicAddonSubtitleState()
-        val request = state.beginSelection("addon:a", "https://subs.example/a")
+        val firstRequest = state.beginSelection("addon:a", "https://subs.example/a")
+        assertTrue(state.publish(firstRequest, renderedContent("A")))
         val format = dynamicFormat()
         val stream = DynamicAddonSubtitleSampleStream(
             state = state,
@@ -297,10 +355,10 @@ class PlayerDynamicAddonSubtitlesTest {
         try {
             renderer.start()
             renderer.render(0L, 0L) // Format.
-            renderer.render(0L, 0L) // Payload is not available yet.
-            assertTrue(renderedTexts.isEmpty())
+            renderer.render(0L, 0L) // Current payload.
+            assertEquals(listOf("A"), renderedTexts)
 
-            assertTrue(state.publish(request, renderedContent("A")))
+            state.beginSelection("addon:b", "https://subs.example/b")
             renderer.render(0L, 0L)
 
             assertEquals(listOf("A"), renderedTexts)
@@ -428,6 +486,8 @@ class PlayerDynamicAddonSubtitlesTest {
             player.play()
             awaitCondition { player.isPlaying }
             val second = state.beginSelection("addon:b", "https://subs.example/b")
+            // Model an unrelated selector refresh while the replacement payload is pending.
+            trackSelector.invalidateAddonSubtitleSelection()
             repeat(50) {
                 ShadowSystemClock.advanceBy(Duration.ofMillis(10L))
                 shadowOf(Looper.getMainLooper()).idle()
@@ -447,9 +507,10 @@ class PlayerDynamicAddonSubtitlesTest {
     }
 
     @Test
-    fun generationChangeRecreatesOnlyTheDynamicPeriodStreamAtTheSamePosition() {
+    fun publishedRevisionRecreatesOnlyTheDynamicPeriodStreamAtTheSamePosition() {
         val state = DynamicAddonSubtitleState()
-        state.beginSelection("addon:a", "https://subs.example/a")
+        val firstRequest = state.beginSelection("addon:a", "https://subs.example/a")
+        assertTrue(state.publish(firstRequest, dynamicContent("A")))
         val period = DynamicAddonSubtitleMediaPeriod(state)
         val selection = FixedTrackSelection(period.trackGroups[0], 0)
         val selections = arrayOf<ExoTrackSelection?>(selection)
@@ -460,9 +521,10 @@ class PlayerDynamicAddonSubtitlesTest {
         val firstStream = streams.single()
         assertTrue(resets.single())
 
-        state.beginSelection("addon:b", "https://subs.example/b")
+        val secondRequest = state.beginSelection("addon:b", "https://subs.example/b")
+        assertTrue(state.publish(secondRequest, dynamicContent("B")))
         resets[0] = false
-        assertEquals(12_345_000L, period.selectTracks(selections, booleanArrayOf(false), streams, resets, 12_345_000L))
+        assertEquals(12_345_000L, period.selectTracks(selections, booleanArrayOf(true), streams, resets, 12_345_000L))
 
         assertNotSame(firstStream, streams.single())
         assertTrue(resets.single())
