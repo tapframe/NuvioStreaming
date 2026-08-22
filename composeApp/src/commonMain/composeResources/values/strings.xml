@@ -757,7 +757,7 @@
     <string name="settings_show_secret">Show value</string>
     <string name="settings_continue_watching_resume_prompt_description">Show a popup to continue where you left off when opening the app after leaving from the player.</string>
     <string name="settings_continue_watching_resume_prompt_title">Resume prompt on launch</string>
-    <string name="settings_continue_watching_blur_next_up_description">Blur next episode thumbnails in Continue Watching to avoid spoilers.</string>
+    <string name="settings_continue_watching_blur_next_up_description">Blur unwatched episode thumbnails in Continue Watching to avoid spoilers.</string>
     <string name="settings_continue_watching_blur_next_up_title">Blur Unwatched in Continue Watching</string>
     <string name="settings_continue_watching_show_unaired_next_up_description">Include upcoming episodes in Continue Watching before they air.</string>
     <string name="settings_continue_watching_show_unaired_next_up_title">Show Unaired Next Up Episodes</string>
