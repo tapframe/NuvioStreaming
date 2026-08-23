@@ -7,13 +7,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import platform.Foundation.NSNotificationCenter
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
-import platform.UIKit.UIApplicationStateActive
+import platform.UIKit.UIApplicationState
 import platform.UIKit.UIApplicationWillResignActiveNotification
 
 internal actual object AppForegroundMonitor {
     actual fun events(): Flow<AppVisibility> = callbackFlow {
         trySend(
-            if (UIApplication.sharedApplication.applicationState == UIApplicationStateActive) {
+            if (UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive) {
                 AppVisibility.Foreground
             } else {
                 AppVisibility.Background
