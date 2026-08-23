@@ -50,6 +50,8 @@ class SyncManagerTest {
         )
 
         val lastPrerequisite = events.indexOf("settings:end")
+        assertTrue(events.indexOf("addons") > lastPrerequisite)
+        assertTrue(events.indexOf("plugins") > lastPrerequisite)
         assertTrue(events.indexOf("credentials") > lastPrerequisite)
         assertTrue(events.indexOf("library") > lastPrerequisite)
         assertTrue(events.indexOf("active-watch-source") > lastPrerequisite)

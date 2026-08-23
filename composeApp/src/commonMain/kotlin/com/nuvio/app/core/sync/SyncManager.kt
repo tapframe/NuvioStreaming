@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 
 private const val FOREGROUND_PULL_DELAY_MS = 2500L
 private const val FOREGROUND_ACTIVITY_PULL_MIN_INTERVAL_MS = 2 * 60_000L
+private const val FULL_PULL_MIN_INTERVAL_MS = 10_000L
 private const val PERIODIC_NUVIO_SYNC_PULL_INTERVAL_MS = 15 * 60_000L
 
 internal enum class ProfileSyncStep {
@@ -116,13 +117,12 @@ internal suspend fun runOrderedProfileSync(
         }
     }
 
+    runStep(ProfileSyncStep.ProfileSettings, operations.pullProfileSettings)
+    runStep(ProfileSyncStep.ProviderCredentials, operations.syncProviderCredentials)
     runStep(ProfileSyncStep.Addons, operations.pullAddons)
     if (pluginsEnabled) {
         runStep(ProfileSyncStep.Plugins, operations.pullPlugins)
     }
-
-    runStep(ProfileSyncStep.ProfileSettings, operations.pullProfileSettings)
-    runStep(ProfileSyncStep.ProviderCredentials, operations.syncProviderCredentials)
 
     coroutineScope {
         launch {
@@ -274,6 +274,7 @@ object SyncManager {
     private var periodicNuvioSyncPullJob: Job? = null
     private var periodicNuvioSyncProfileId: Int? = null
     private var activityPullFreshness = ProfilePullFreshness()
+    private var fullPullFreshness = ProfilePullFreshness()
 
     private val profileSyncOperations = ProfileSyncOperations(
         pullAddons = { profileId -> AddonRepository.pullFromServer(profileId) },
@@ -320,6 +321,7 @@ object SyncManager {
                 foregroundPullJob = null
                 foregroundPullProfileId = null
                 activityPullFreshness = ProfilePullFreshness()
+                fullPullFreshness = ProfilePullFreshness()
             }
         }
         foregroundJob?.cancel()
@@ -389,6 +391,7 @@ object SyncManager {
         val authState = AuthRepository.state.value
         if (authState !is AuthState.Authenticated || authState.isAnonymous) return
         if (ProfileRepository.activeProfileId != profileId) return
+        if (hasRecentFullPull(profileId)) return
 
         val result = syncRequestGate.launch(
             scope = accountScopeSnapshot(),
@@ -419,6 +422,11 @@ object SyncManager {
                     completedAtEpochMs = EpisodeReleaseDatePlatform.nowEpochMs(),
                     result = syncResult,
                 )
+                fullPullFreshness = fullPullFreshness.recordIfSuccessful(
+                    profileId = profileId,
+                    completedAtEpochMs = EpisodeReleaseDatePlatform.nowEpochMs(),
+                    result = syncResult,
+                )
             }
             if (!syncResult.succeeded) {
                 log.w {
@@ -439,6 +447,15 @@ object SyncManager {
             }
         }
     }
+
+    private fun hasRecentFullPull(profileId: Int): Boolean =
+        synchronized(pullStateLock) {
+            fullPullFreshness.isRecent(
+                profileId = profileId,
+                nowEpochMs = EpisodeReleaseDatePlatform.nowEpochMs(),
+                minIntervalMs = FULL_PULL_MIN_INTERVAL_MS,
+            )
+        }
 
     private fun startActivityProfilePull(
         profileId: Int,
