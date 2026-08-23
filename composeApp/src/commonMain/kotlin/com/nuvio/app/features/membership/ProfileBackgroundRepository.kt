@@ -18,6 +18,9 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private const val ProfileBackgroundBucket = "membership-profile-backgrounds"
 
@@ -32,28 +35,27 @@ data class ProfileBackgroundCatalogItem(
 object ProfileBackgroundRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("ProfileBackgroundRepository")
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val _catalog = MutableStateFlow<List<ProfileBackgroundCatalogItem>>(emptyList())
     val catalog: StateFlow<List<ProfileBackgroundCatalogItem>> = _catalog.asStateFlow()
     private var loadJob: Job? = null
     private var assetLoadJob: Job? = null
     private var remoteCatalog = emptyList<SupabaseProfileBackgroundCatalogItem>()
-    private var loaded = false
+    private var cacheHydrated = false
+    private var remoteLoaded = false
 
     fun ensureLoaded() {
-        if (loaded || loadJob?.isActive == true) return
+        hydrateFromCacheIfNeeded()
+        if (remoteLoaded || loadJob?.isActive == true) return
         loadJob = scope.launch {
             try {
-                remoteCatalog = SupabaseProvider.client.postgrest
+                val items = SupabaseProvider.client.postgrest
                     .rpc("get_member_profile_background_catalog")
-                    .decodeList()
-                _catalog.value = remoteCatalog.map { item ->
-                    ProfileBackgroundCatalogItem(
-                        id = item.id,
-                        displayName = item.displayName,
-                        assetVersion = item.assetVersion,
-                    )
-                }
-                loaded = true
+                    .decodeList<SupabaseProfileBackgroundCatalogItem>()
+                remoteCatalog = items
+                publishMetadata(items)
+                saveCachedCatalog(items)
+                remoteLoaded = true
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -64,11 +66,18 @@ object ProfileBackgroundRepository {
 
     fun loadSelectedAndPreload(id: String, portrait: Boolean) {
         ensureLoaded()
+        remoteCatalog.firstOrNull { it.id == id }?.let { item ->
+            loadCachedAndPublish(item, portrait)
+        }
         assetLoadJob?.cancel()
         assetLoadJob = scope.launch {
+            val initialSelected = remoteCatalog.firstOrNull { it.id == id }
+            initialSelected?.let { loadAndPublish(it, portrait) }
             loadJob?.join()
             val selected = remoteCatalog.firstOrNull { it.id == id } ?: return@launch
-            loadAndPublish(selected, portrait)
+            if (selected.assetVersion != initialSelected?.assetVersion) {
+                loadAndPublish(selected, portrait)
+            }
             coroutineScope {
                 remoteCatalog
                     .filterNot { it.id == id }
@@ -82,15 +91,19 @@ object ProfileBackgroundRepository {
         ensureLoaded()
         assetLoadJob?.cancel()
         assetLoadJob = scope.launch {
+            val initialVersions = remoteCatalog.associate { it.id to it.assetVersion }
+            preload(remoteCatalog, portrait = false)
             loadJob?.join()
-            coroutineScope {
-                remoteCatalog.map { item -> launch { loadAndPublish(item, portrait = false) } }.joinAll()
-            }
+            preload(
+                items = remoteCatalog.filter { initialVersions[it.id] != it.assetVersion },
+                portrait = false,
+            )
         }
     }
 
     fun invalidate() {
-        loaded = false
+        cacheHydrated = false
+        remoteLoaded = false
         loadJob?.cancel()
         loadJob = null
         assetLoadJob?.cancel()
@@ -99,24 +112,84 @@ object ProfileBackgroundRepository {
         _catalog.value = emptyList()
     }
 
+    private fun hydrateFromCacheIfNeeded() {
+        if (cacheHydrated) return
+        cacheHydrated = true
+        val payload = MemberAssetStorage.loadProfileBackgroundCatalogPayload().orEmpty().trim()
+        if (payload.isEmpty()) return
+        val stored = runCatching {
+            json.decodeFromString<StoredProfileBackgroundCatalogPayload>(payload)
+        }.getOrNull() ?: return
+        remoteCatalog = stored.items
+        publishMetadata(stored.items)
+    }
+
+    private fun publishMetadata(items: List<SupabaseProfileBackgroundCatalogItem>) {
+        val current = _catalog.value.associateBy(ProfileBackgroundCatalogItem::id)
+        _catalog.value = items.map { item ->
+            val cached = current[item.id]?.takeIf { it.assetVersion == item.assetVersion }
+            ProfileBackgroundCatalogItem(
+                id = item.id,
+                displayName = item.displayName,
+                landscapeImageBytes = cached?.landscapeImageBytes,
+                portraitImageBytes = cached?.portraitImageBytes,
+                assetVersion = item.assetVersion,
+            )
+        }
+    }
+
+    private fun saveCachedCatalog(items: List<SupabaseProfileBackgroundCatalogItem>) {
+        MemberAssetStorage.saveProfileBackgroundCatalogPayload(
+            json.encodeToString(StoredProfileBackgroundCatalogPayload(items)),
+        )
+    }
+
+    private fun loadCachedAndPublish(item: SupabaseProfileBackgroundCatalogItem, portrait: Boolean) {
+        val landscape = MemberAssetStorage.loadProfileBackground(
+            "${item.id}-v${item.assetVersion}",
+        )
+        val bytes = if (portrait) {
+            item.portraitStoragePath?.let {
+                MemberAssetStorage.loadProfileBackground("${item.id}-portrait-v${item.assetVersion}")
+            } ?: landscape
+        } else {
+            landscape
+        } ?: return
+        publishImage(item, portrait, bytes)
+    }
+
+    private suspend fun preload(items: List<SupabaseProfileBackgroundCatalogItem>, portrait: Boolean) {
+        coroutineScope {
+            items.map { item -> launch { loadAndPublish(item, portrait) } }.joinAll()
+        }
+    }
+
     private suspend fun loadAndPublish(item: SupabaseProfileBackgroundCatalogItem, portrait: Boolean) {
         try {
             val bytes = if (portrait) loadPortraitImage(item) else loadLandscapeImage(item)
-            _catalog.update { catalog ->
-                catalog.map { background ->
-                    if (background.id != item.id) {
-                        background
-                    } else if (portrait) {
-                        background.copy(portraitImageBytes = bytes)
-                    } else {
-                        background.copy(landscapeImageBytes = bytes)
-                    }
-                }
-            }
+            publishImage(item, portrait, bytes)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             log.w(error) { "Unable to load supporter profile background ${item.id}" }
+        }
+    }
+
+    private fun publishImage(
+        item: SupabaseProfileBackgroundCatalogItem,
+        portrait: Boolean,
+        bytes: ByteArray,
+    ) {
+        _catalog.update { catalog ->
+            catalog.map { background ->
+                if (background.id != item.id || background.assetVersion != item.assetVersion) {
+                    background
+                } else if (portrait) {
+                    background.copy(portraitImageBytes = bytes)
+                } else {
+                    background.copy(landscapeImageBytes = bytes)
+                }
+            }
         }
     }
 
@@ -147,6 +220,11 @@ object ProfileBackgroundRepository {
                 .downloadAuthenticated(storagePath)
                 .also { MemberAssetStorage.saveProfileBackground(cacheKey, it) }
 }
+
+@Serializable
+private data class StoredProfileBackgroundCatalogPayload(
+    val items: List<SupabaseProfileBackgroundCatalogItem> = emptyList(),
+)
 
 @Serializable
 private data class SupabaseProfileBackgroundCatalogItem(

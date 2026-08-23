@@ -35,6 +35,7 @@ import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.auth.AuthScreen
+import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.profiles.AvatarRepository
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileEditScreen
@@ -105,6 +106,7 @@ internal fun AppGate(
     LaunchedEffect(Unit) {
         if (!ownsAppRuntime) return@LaunchedEffect
         NetworkStatusRepository.ensureStarted()
+        MemberAccessRepository.ensureStarted()
         ProfileRepository.loadCachedProfiles()
         AvatarRepository.fetchAvatars()
     }

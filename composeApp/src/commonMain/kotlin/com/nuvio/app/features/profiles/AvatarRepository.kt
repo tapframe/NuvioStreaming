@@ -31,6 +31,7 @@ private const val MemberAvatarBucket = "membership-profile-avatars"
 @Serializable
 private data class StoredAvatarCatalogPayload(
     val items: List<AvatarCatalogItem> = emptyList(),
+    val memberItems: List<MemberAvatarCatalogItem> = emptyList(),
 )
 
 @Serializable
@@ -60,6 +61,7 @@ object AvatarRepository {
 
     private var standardCatalog = emptyList<AvatarCatalogItem>()
     private var memberCatalog = emptyList<AvatarCatalogItem>()
+    private var memberCatalogMetadata = emptyList<MemberAvatarCatalogItem>()
     private var standardLoaded = false
     private var cacheHydrated = false
     private var accessObserverStarted = false
@@ -98,8 +100,11 @@ object AvatarRepository {
         standardCatalog = stored.items
             .filter { it.isActive }
             .sortedWith(compareBy({ it.category }, { it.sortOrder }))
-        if (standardCatalog.isEmpty()) return
-        standardLoaded = true
+        memberCatalogMetadata = stored.memberItems
+        memberCatalog = memberCatalogMetadata
+            .mapNotNull(::loadCachedMemberAvatar)
+            .sortedWith(compareBy({ it.category }, { it.sortOrder }))
+        standardLoaded = standardCatalog.isNotEmpty()
         publishCatalog()
     }
 
@@ -107,6 +112,10 @@ object AvatarRepository {
         if (accessObserverStarted) return
         accessObserverStarted = true
         MemberAccessRepository.ensureStarted()
+        hasMemberAccess = MemberAccessRepository.access.value.entitlements
+            .includes(CosmeticEntitlement.PROFILE_AVATARS)
+        publishCatalog()
+        if (hasMemberAccess) scope.launch { fetchMemberCatalog() }
         scope.launch {
             MemberAccessRepository.access.collectLatest { access ->
                 val nextAccess = access.entitlements.includes(CosmeticEntitlement.PROFILE_AVATARS)
@@ -132,11 +141,7 @@ object AvatarRepository {
             )
             standardLoaded = true
             publishCatalog()
-            AvatarStorage.savePayload(
-                json.encodeToString(
-                    StoredAvatarCatalogPayload(items = standardCatalog),
-                ),
-            )
+            saveCachedCatalog()
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -153,6 +158,8 @@ object AvatarRepository {
             val remote = SupabaseProvider.client.postgrest
                 .rpc("get_member_profile_avatar_catalog")
                 .decodeList<MemberAvatarCatalogItem>()
+            memberCatalogMetadata = remote
+            saveCachedCatalog()
             memberCatalog = coroutineScope {
                 remote.map { item ->
                     async { loadMemberAvatar(item) }
@@ -170,31 +177,54 @@ object AvatarRepository {
 
     private suspend fun loadMemberAvatar(item: MemberAvatarCatalogItem): AvatarCatalogItem? {
         return try {
-            val extension = item.storagePath.substringAfterLast('.', "img")
-                .takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
-                ?: "img"
-            val cacheKey = "${item.id}-v${item.assetVersion}.$extension"
+            val cacheKey = memberAvatarCacheKey(item)
             val localImageUrl = MemberAssetStorage.loadProfileAvatar(cacheKey)
                 ?: SupabaseProvider.client.storage[MemberAvatarBucket]
                     .downloadAuthenticated(item.storagePath)
                     .let { bytes -> MemberAssetStorage.saveProfileAvatar(cacheKey, bytes) }
                 ?: return null
-            AvatarCatalogItem(
-                id = item.id,
-                displayName = item.displayName,
-                storagePath = item.storagePath,
-                category = item.category,
-                sortOrder = item.sortOrder,
-                bgColor = item.bgColor,
-                localImageUrl = localImageUrl,
-                memberOnly = true,
-            )
+            item.toAvatarCatalogItem(localImageUrl)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             log.w(error) { "Unable to load supporter avatar ${item.id}" }
             null
         }
+    }
+
+    private fun loadCachedMemberAvatar(item: MemberAvatarCatalogItem): AvatarCatalogItem? {
+        val localImageUrl = MemberAssetStorage.loadProfileAvatar(memberAvatarCacheKey(item)) ?: return null
+        return item.toAvatarCatalogItem(localImageUrl)
+    }
+
+    private fun memberAvatarCacheKey(item: MemberAvatarCatalogItem): String {
+        val extension = item.storagePath.substringAfterLast('.', "img")
+            .takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
+            ?: "img"
+        return "${item.id}-v${item.assetVersion}.$extension"
+    }
+
+    private fun MemberAvatarCatalogItem.toAvatarCatalogItem(localImageUrl: String): AvatarCatalogItem =
+        AvatarCatalogItem(
+            id = id,
+            displayName = displayName,
+            storagePath = storagePath,
+            category = category,
+            sortOrder = sortOrder,
+            bgColor = bgColor,
+            localImageUrl = localImageUrl,
+            memberOnly = true,
+        )
+
+    private fun saveCachedCatalog() {
+        AvatarStorage.savePayload(
+            json.encodeToString(
+                StoredAvatarCatalogPayload(
+                    items = standardCatalog,
+                    memberItems = memberCatalogMetadata,
+                ),
+            ),
+        )
     }
 
     private fun publishCatalog() {
