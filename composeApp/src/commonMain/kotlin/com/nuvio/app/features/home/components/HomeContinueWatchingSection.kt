@@ -65,6 +65,7 @@ import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.tracking.WatchProgressSource
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
+import com.nuvio.app.features.watchprogress.WatchProgressCompletionPercentThreshold
 import com.nuvio.app.features.watchprogress.continueWatchingItemKey
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import com.nuvio.app.features.watchprogress.computeAirDateBadgeText
@@ -221,6 +222,18 @@ private fun ContinueWatchingItem.continueWatchingCardArtworkUrl(
 
 private fun firstNonBlank(vararg values: String?): String? =
     values.firstOrNull { value -> !value.isNullOrBlank() }?.trim()
+
+internal fun ContinueWatchingItem.shouldBlurContinueWatchingArtwork(
+    blurUnwatchedEpisodes: Boolean,
+    useEpisodeThumbnails: Boolean,
+    artworkUrl: String?,
+): Boolean {
+    if (!blurUnwatchedEpisodes || !useEpisodeThumbnails) return false
+    val thumbnail = episodeThumbnail?.trim()?.takeIf { it.isNotBlank() } ?: return false
+    val artwork = artworkUrl?.trim()?.takeIf { it.isNotBlank() } ?: return false
+    val isUnwatched = isNextUp || progressFraction < WatchProgressCompletionPercentThreshold / 100f
+    return isUnwatched && artwork == thumbnail
+}
 
 @Composable
 internal fun HomeContinueWatchingSection(
@@ -650,7 +663,11 @@ private fun ContinueWatchingCard(
         useEpisodeThumbnails = useEpisodeThumbnails,
         preferBackdropForNextUp = preferBackdropForNextUp,
     )
-    val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
+    val shouldBlurArtwork = item.shouldBlurContinueWatchingArtwork(
+        blurUnwatchedEpisodes = blurNextUp,
+        useEpisodeThumbnails = useEpisodeThumbnails,
+        artworkUrl = imageUrl,
+    )
     val episodeCode = if (item.seasonNumber != null && item.episodeNumber != null) {
         stringResource(Res.string.streams_episode_badge, item.seasonNumber, item.episodeNumber)
     } else {
@@ -861,8 +878,12 @@ private fun ContinueWatchingWideCard(
                 onLongClick = onLongClick,
             ),
     ) {
-        val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
         val artworkUrl = item.continueWatchingArtworkUrl(useEpisodeThumbnails)
+        val shouldBlurArtwork = item.shouldBlurContinueWatchingArtwork(
+            blurUnwatchedEpisodes = blurNextUp,
+            useEpisodeThumbnails = useEpisodeThumbnails,
+            artworkUrl = artworkUrl,
+        )
         ArtworkPanel(
             imageUrl = artworkUrl,
             width = layout.widePosterStripWidth,
@@ -993,10 +1014,11 @@ private fun ContinueWatchingPosterCard(
                     zoomCornerRadius = layout.cardRadius,
                 ),
         ) {
-            val shouldBlurArtwork = blurNextUp &&
-                useEpisodeThumbnails &&
-                item.isNextUp &&
-                imageUrl == firstNonBlank(item.episodeThumbnail)
+            val shouldBlurArtwork = item.shouldBlurContinueWatchingArtwork(
+                blurUnwatchedEpisodes = blurNextUp,
+                useEpisodeThumbnails = useEpisodeThumbnails,
+                artworkUrl = imageUrl,
+            )
             if (imageUrl != null) {
                 AsyncImage(
                     model = cloudLibraryDisplayArtworkUrl(imageUrl),

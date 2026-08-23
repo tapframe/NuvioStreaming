@@ -18,6 +18,8 @@ import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.hasLikelyExpiringPlaybackCredentials
 import com.nuvio.app.features.tracking.TrackingScrobbleAction
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -462,7 +464,13 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
     }
 
-    LaunchedEffect(playerMetaVideos, activeSeasonNumber, activeEpisodeNumber) {
+    LaunchedEffect(
+        playerMetaVideos,
+        activeSeasonNumber,
+        activeEpisodeNumber,
+        watchProgressUiState.entries,
+        watchedUiState.watchedKeys,
+    ) {
         if (!isSeries || playerMetaVideos.isEmpty()) {
             nextEpisodeInfo = null
             return@LaunchedEffect
@@ -477,6 +485,23 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         val nextSeason = nextVideo?.season
         val nextEpisode = nextVideo?.episode
         nextEpisodeInfo = if (nextVideo != null && nextSeason != null && nextEpisode != null) {
+            val playbackVideoId = buildPlaybackVideoId(
+                parentMetaId = parentMetaId,
+                seasonNumber = nextSeason,
+                episodeNumber = nextEpisode,
+                fallbackVideoId = nextVideo.id,
+            )
+            val isWatched = watchProgressUiState.progressForVideo(
+                videoId = playbackVideoId,
+                parentMetaId = parentMetaId,
+                seasonNumber = nextSeason,
+                episodeNumber = nextEpisode,
+            )?.isEffectivelyCompleted == true || WatchingState.isEpisodeWatched(
+                watchedKeys = watchedUiState.watchedKeys,
+                metaType = parentMetaType,
+                metaId = parentMetaId,
+                episode = nextVideo,
+            )
             NextEpisodeInfo(
                 videoId = nextVideo.id,
                 season = nextSeason,
@@ -486,6 +511,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
                 overview = nextVideo.overview,
                 released = nextVideo.released,
                 hasAired = PlayerNextEpisodeRules.hasEpisodeAired(nextVideo.released),
+                isWatched = isWatched,
                 unairedMessage = if (!PlayerNextEpisodeRules.hasEpisodeAired(nextVideo.released)) {
                     "$airsPrefix ${nextVideo.released ?: tbaLabel}"
                 } else null,

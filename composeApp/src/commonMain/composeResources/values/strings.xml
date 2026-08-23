@@ -14,6 +14,8 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_close">Close</string>
     <string name="action_delete">Delete</string>
+    <string name="action_delete_confirm_message">Are you sure you want to delete it?</string>
+    <string name="action_delete_confirm_title">Delete?</string>
     <string name="action_done">Done</string>
     <string name="action_edit">Edit</string>
     <string name="action_import">Import</string>
@@ -43,6 +45,7 @@
     <string name="addons_badge_unavailable">Unavailable</string>
     <string name="addons_configure">Configure addon</string>
     <string name="addons_delete">Delete addon</string>
+    <string name="addons_delete_confirm_title">Delete addon?</string>
     <string name="addons_appstore_add_description">Bring your library into Nuvio with the addons you use.</string>
     <string name="addons_appstore_empty_subtitle">Add an addon to start building your library.</string>
     <string name="addons_appstore_empty_title">Make Nuvio yours.</string>
@@ -801,7 +804,7 @@
     <string name="settings_show_secret">Show value</string>
     <string name="settings_continue_watching_resume_prompt_description">Show a popup to continue where you left off when opening the app after leaving from the player.</string>
     <string name="settings_continue_watching_resume_prompt_title">Resume prompt on launch</string>
-    <string name="settings_continue_watching_blur_next_up_description">Blur next episode thumbnails in Continue Watching to avoid spoilers.</string>
+    <string name="settings_continue_watching_blur_next_up_description">Blur unwatched episode thumbnails in Continue Watching to avoid spoilers.</string>
     <string name="settings_continue_watching_blur_next_up_title">Blur Unwatched in Continue Watching</string>
     <string name="settings_continue_watching_show_unaired_next_up_description">Include upcoming episodes in Continue Watching before they air.</string>
     <string name="settings_continue_watching_show_unaired_next_up_title">Show Unaired Next Up Episodes</string>
@@ -1033,6 +1036,20 @@
     <string name="settings_notifications_test_title">Test notification</string>
     <string name="community_section_title">Community</string>
     <string name="community_section_description">See the people building and supporting Nuvio across Mobile, TV, and Web.</string>
+    <string name="community_membership_title">Nuvio Supporter Membership</string>
+    <string name="community_membership_description">Supporting Nuvio helps cover infrastructure and ongoing development while keeping the core experience free for everyone.</string>
+    <string name="community_view_supporter_membership">View Supporter Membership</string>
+    <string name="community_membership_you_are">You’re a</string>
+    <string name="community_membership_thank_you">Thank you.</string>
+    <string name="community_membership_supporter_since">Supporter since %1$s.</string>
+    <string name="community_membership_connected_title">Patreon is connected</string>
+    <string name="community_membership_connected_description">No active Nuvio tier was found on this Patreon account. View the available options or refresh after changing your Patreon membership.</string>
+    <string name="community_membership_manage">Manage membership</string>
+    <string name="community_membership_refresh">Refresh</string>
+    <string name="community_membership_refreshing">Refreshing</string>
+    <string name="community_membership_unable_load">Unable to load membership status. Please try again.</string>
+    <string name="community_membership_tier_supporter">Supporter</string>
+    <string name="community_membership_tier_supporter_plus">Supporter Plus</string>
     <string name="community_donation_progress_title">This month&apos;s server &amp; maintenance</string>
     <string name="community_donation_progress_complete">Covered. Additional support now goes to development.</string>
     <string name="community_donation_progress_remaining">After 100%, additional support goes to development.</string>

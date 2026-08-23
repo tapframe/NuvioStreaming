@@ -79,6 +79,7 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.features.downloads.DownloadsRepository
+import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -90,6 +91,8 @@ import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watched.watchedItemKeys
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -142,6 +145,14 @@ fun StreamsScreen(
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
+    val metaScreenSettings by remember {
+        MetaScreenSettingsRepository.ensureLoaded()
+        MetaScreenSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
     remember {
         DownloadsRepository.ensureLoaded()
     }
@@ -154,15 +165,16 @@ fun StreamsScreen(
     var preferredFilterApplied by remember(videoId) { mutableStateOf(false) }
     var autoPlayOverlayLogoLoadError by remember(logo) { mutableStateOf(false) }
     val autoPlayOverlayLogoUrl = logo?.takeIf { it.isNotBlank() }
+    val episodeProgress = watchProgressUiState.progressForVideo(
+        videoId = videoId,
+        parentMetaId = parentMetaId,
+        seasonNumber = seasonNumber,
+        episodeNumber = episodeNumber,
+    )
     val storedProgress = if (startFromBeginning) {
         null
     } else {
-        watchProgressUiState.progressForVideo(
-            videoId = videoId,
-            parentMetaId = parentMetaId,
-            seasonNumber = seasonNumber,
-            episodeNumber = episodeNumber,
-        )
+        episodeProgress
     }
     val storedProgressFraction = storedProgress
         ?.takeIf { it.isResumable }
@@ -212,6 +224,16 @@ fun StreamsScreen(
     } else {
         background ?: poster
     }
+    val isEpisodeWatched = episodeProgress?.isEffectivelyCompleted == true || watchedItemKeys(
+        type = parentMetaType,
+        id = parentMetaId,
+        season = seasonNumber,
+        episode = episodeNumber,
+    ).any(watchedUiState.watchedKeys::contains)
+    val blurEpisodeThumbnail = metaScreenSettings.blurUnwatchedEpisodes &&
+        isEpisode &&
+        !isEpisodeWatched &&
+        !episodeThumbnail.isNullOrBlank()
     val reloadStreams: () -> Unit = {
         StreamsRepository.reload(
             type = type,
@@ -261,6 +283,7 @@ fun StreamsScreen(
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
                 episodeTitle = episodeTitle,
+                blurEpisodeThumbnail = blurEpisodeThumbnail,
                 uiState = uiState,
                 debridEnabled = debridSettings.canResolvePlayableLinks,
                 appendInstantServiceToDefaultName = debridSettings.canResolvePlayableLinks && !debridSettings.hasCustomStreamFormatting,
@@ -453,6 +476,7 @@ private fun MobileStreamsLayout(
     seasonNumber: Int?,
     episodeNumber: Int?,
     episodeTitle: String?,
+    blurEpisodeThumbnail: Boolean,
     uiState: StreamsUiState,
     debridEnabled: Boolean,
     appendInstantServiceToDefaultName: Boolean,
@@ -489,6 +513,7 @@ private fun MobileStreamsLayout(
                     episodeNumber = episodeNumber,
                     episodeTitle = episodeTitle ?: title,
                     thumbnail = heroArtwork,
+                    blurred = blurEpisodeThumbnail,
                     showTitle = title,
                 )
             } else {
@@ -643,6 +668,7 @@ private fun EpisodeHeroBlock(
     episodeNumber: Int,
     episodeTitle: String,
     thumbnail: String?,
+    blurred: Boolean,
     showTitle: String,
     modifier: Modifier = Modifier,
 ) {
@@ -658,7 +684,9 @@ private fun EpisodeHeroBlock(
             AsyncImage(
                 model = thumbnail,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (blurred) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
             )
         }
