@@ -55,6 +55,7 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.sync.AppForegroundMonitor
+import com.nuvio.app.core.sync.AppVisibility
 import com.nuvio.app.core.sync.ProfileSettingsSync
 import com.nuvio.app.core.sync.SyncManager
 import com.nuvio.app.core.ui.DisintegrationRequestController
@@ -460,15 +461,6 @@ internal fun MainAppContent(
         initialHomeReady = true
     }
 
-    LaunchedEffect(Unit) {
-        if (!ownsAppRuntime) return@LaunchedEffect
-        AppForegroundMonitor.events().collect {
-            NetworkStatusRepository.requestForegroundRefresh()
-            DeviceSessionRegistration.registerIfAuthenticated()
-            MemberAccessRepository.refreshIfStale()
-        }
-    }
-
     LaunchedEffect(networkStatusUiState.condition) {
         if (!ownsAppRuntime) return@LaunchedEffect
         val condition = networkStatusUiState.condition
@@ -526,7 +518,7 @@ internal fun MainAppContent(
                     ?: ProfileRepository.activeProfileId
                 val authenticatedState = authState as? AuthState.Authenticated
                 if (authenticatedState != null && !authenticatedState.isAnonymous) {
-                    SyncManager.requestForegroundPull(profileId = profileId, force = true)
+                    SyncManager.requestForegroundPull(profileId = profileId)
                     watchSourceReconnectPending = false
                 } else {
                     val result = WatchProgressSourceCoordinator.refreshActiveSource(
@@ -580,28 +572,33 @@ internal fun MainAppContent(
         }
     }
 
-    DisposableEffect(authState, profileState.activeProfile?.profileIndex) {
-        val authenticatedState = authState as? AuthState.Authenticated
-        val activeProfileId = profileState.activeProfile?.profileIndex
-        if (ownsAppRuntime && authenticatedState != null && !authenticatedState.isAnonymous && activeProfileId != null) {
-            SyncManager.startPeriodicNuvioSyncPull(activeProfileId)
-        } else if (ownsAppRuntime) {
-            SyncManager.stopPeriodicNuvioSyncPull()
-        }
-        onDispose {
-            if (ownsAppRuntime) SyncManager.stopPeriodicNuvioSyncPull()
-        }
-    }
-
     LaunchedEffect(authState, profileState.activeProfile?.profileIndex) {
         if (!ownsAppRuntime) return@LaunchedEffect
-        val authenticatedState = authState as? AuthState.Authenticated ?: return@LaunchedEffect
-        if (authenticatedState.isAnonymous) return@LaunchedEffect
-
-        val activeProfileId = profileState.activeProfile?.profileIndex ?: return@LaunchedEffect
-        SyncManager.pullAllForProfile(activeProfileId)
-        AppForegroundMonitor.events().collect {
-            SyncManager.requestForegroundPull(activeProfileId, force = true)
+        val authenticatedState = authState as? AuthState.Authenticated
+        val activeProfileId = profileState.activeProfile?.profileIndex
+        val syncProfileId = activeProfileId?.takeIf {
+            authenticatedState != null && !authenticatedState.isAnonymous
+        }
+        syncProfileId?.let(SyncManager::pullAllForProfile)
+        try {
+            AppForegroundMonitor.events().collect { visibility ->
+                when (visibility) {
+                    AppVisibility.Foreground -> {
+                        NetworkStatusRepository.requestForegroundRefresh()
+                        DeviceSessionRegistration.registerIfAuthenticated()
+                        MemberAccessRepository.refreshIfStale()
+                        if (syncProfileId != null) {
+                            SyncManager.startPeriodicNuvioSyncPull(syncProfileId)
+                            SyncManager.requestForegroundPull(syncProfileId)
+                        } else {
+                            SyncManager.stopPeriodicNuvioSyncPull()
+                        }
+                    }
+                    AppVisibility.Background -> SyncManager.stopPeriodicNuvioSyncPull()
+                }
+            }
+        } finally {
+            SyncManager.stopPeriodicNuvioSyncPull()
         }
     }
     var resumePromptItem by remember { mutableStateOf<ContinueWatchingItem?>(null) }

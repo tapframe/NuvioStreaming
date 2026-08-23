@@ -3,6 +3,14 @@ package com.nuvio.app.features.plugins
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+internal const val PLUGIN_REPOSITORY_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1_000L
+
+internal fun isPluginRepositoryRefreshDue(
+    lastUpdatedEpochMs: Long,
+    nowEpochMs: Long,
+): Boolean = lastUpdatedEpochMs <= 0L ||
+    nowEpochMs - lastUpdatedEpochMs >= PLUGIN_REPOSITORY_REFRESH_INTERVAL_MS
+
 @Serializable
 data class PluginManifest(
     val name: String,

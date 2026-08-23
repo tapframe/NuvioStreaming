@@ -25,8 +25,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 private const val MemberAvatarBucket = "membership-profile-avatars"
+private val AvatarCatalogRefreshInterval = 15.minutes
 
 @Serializable
 private data class StoredAvatarCatalogPayload(
@@ -68,6 +72,8 @@ object AvatarRepository {
     private var standardFetchInFlight = false
     private var memberFetchInFlight = false
     private var hasMemberAccess = false
+    private var lastStandardRefresh: TimeMark? = null
+    private var lastMemberRefresh: TimeMark? = null
 
     suspend fun fetchAvatars() {
         hydrateFromCacheIfNeeded()
@@ -79,12 +85,19 @@ object AvatarRepository {
         fetchStandardCatalog()
     }
 
-    suspend fun refreshAvatars() {
+    suspend fun refreshAvatars(force: Boolean = false) {
         hydrateFromCacheIfNeeded()
         ensureMemberAccessObserver()
-        fetchStandardCatalog()
-        if (hasMemberAccess) fetchMemberCatalog()
+        if (force || isRefreshDue(lastStandardRefresh)) {
+            fetchStandardCatalog()
+        }
+        if (hasMemberAccess && (force || isRefreshDue(lastMemberRefresh))) {
+            fetchMemberCatalog()
+        }
     }
+
+    private fun isRefreshDue(lastRefresh: TimeMark?): Boolean =
+        lastRefresh == null || lastRefresh.elapsedNow() >= AvatarCatalogRefreshInterval
 
     private fun hydrateFromCacheIfNeeded() {
         if (cacheHydrated) return
@@ -140,6 +153,7 @@ object AvatarRepository {
                 compareBy({ it.category }, { it.sortOrder }),
             )
             standardLoaded = true
+            lastStandardRefresh = TimeSource.Monotonic.markNow()
             publishCatalog()
             saveCachedCatalog()
         } catch (error: CancellationException) {
@@ -158,6 +172,7 @@ object AvatarRepository {
             val remote = SupabaseProvider.client.postgrest
                 .rpc("get_member_profile_avatar_catalog")
                 .decodeList<MemberAvatarCatalogItem>()
+            lastMemberRefresh = TimeSource.Monotonic.markNow()
             memberCatalogMetadata = remote
             saveCachedCatalog()
             memberCatalog = coroutineScope {

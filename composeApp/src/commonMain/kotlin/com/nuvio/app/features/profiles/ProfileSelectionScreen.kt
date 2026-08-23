@@ -59,8 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.nuvio.app.core.auth.AuthRepository
-import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.features.membership.CosmeticEntitlement
 import com.nuvio.app.features.settings.MemberBrandWordmark
 import kotlinx.coroutines.delay
@@ -77,7 +75,6 @@ fun ProfileSelectionScreen(
     contentVisible: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val authState by AuthRepository.state.collectAsStateWithLifecycle()
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var pinDialogProfile by remember { mutableStateOf<NuvioProfile?>(null) }
@@ -99,14 +96,7 @@ fun ProfileSelectionScreen(
     }
 
     LaunchedEffect(Unit) {
-        AvatarRepository.fetchAvatars()
         AvatarRepository.refreshAvatars()
-    }
-
-    LaunchedEffect(authState) {
-        if (authState is AuthState.Authenticated) {
-            ProfileRepository.pullProfiles()
-        }
     }
 
     LaunchedEffect(Unit) {
