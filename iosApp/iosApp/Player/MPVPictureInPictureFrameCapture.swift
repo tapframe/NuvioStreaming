@@ -33,6 +33,8 @@ final class MPVPictureInPictureFrameCapture {
     private var enqueuedFrameCount: UInt64 = 0
     private var loggedUnsupportedFormat = false
 
+    private static let primingCaptureInterval: CFTimeInterval = 1.0
+
     init?(
         displayLayer: AVSampleBufferDisplayLayer,
         metalLayer: MetalLayer,
@@ -190,10 +192,14 @@ final class MPVPictureInPictureFrameCapture {
             return
         }
         let now = CACurrentMediaTime()
-        let minimumInterval = 1.0 / (frameRate * max(0.5, playbackRateProvider()))
-        if burst == 0 && (now - lastCaptureTime) < minimumInterval * 0.5 {
-            stateLock.unlock()
-            return
+        if burst == 0 {
+            let minimumInterval = active
+                ? 1.0 / (frameRate * max(0.5, playbackRateProvider())) * 0.5
+                : Self.primingCaptureInterval
+            if (now - lastCaptureTime) < minimumInterval {
+                stateLock.unlock()
+                return
+            }
         }
         lastCaptureTime = now
         if burstFramesRemaining > 0 { burstFramesRemaining -= 1 }
