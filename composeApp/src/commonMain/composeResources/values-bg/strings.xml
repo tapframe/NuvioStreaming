@@ -2139,8 +2139,8 @@
     <string name="cw_airs_today">Ще се излъчи днес</string>
     <string name="cw_airs_tomorrow">Ще се излъчи утре</string>
     <plurals name="cw_airs_in_days">
-        <item quantity="one">Ще се излъчи се след %1$d ден</item>
-        <item quantity="other">Ще се излъчи се след %1$d дни</item>
+        <item quantity="one">Ще се излъчи след %1$d ден</item>
+        <item quantity="other">Ще се излъчи след %1$d дни</item>
     </plurals>
     <string name="cw_airs_date_short">%1$s</string>
     <string name="cw_airs_today_short">Днес</string>
