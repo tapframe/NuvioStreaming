@@ -227,10 +227,12 @@ internal fun SimklSyncSnapshot.enrichMediaReference(reference: TrackingMediaRefe
         candidate.media?.toTrackingExternalIds()?.sharesIdentityWith(reference.ids) == true
     } ?: return reference
     val media = entry.media ?: return reference
-    val kind = when (entry.mediaType) {
-        SimklMediaType.MOVIES -> TrackingMediaKind.MOVIE
-        SimklMediaType.SHOWS -> TrackingMediaKind.SHOW
-        SimklMediaType.ANIME -> TrackingMediaKind.ANIME
+    val kind = when {
+        entry.mediaType == SimklMediaType.MOVIES -> TrackingMediaKind.MOVIE
+        entry.mediaType == SimklMediaType.ANIME && entry.animeType == "movie" -> TrackingMediaKind.MOVIE
+        entry.mediaType == SimklMediaType.SHOWS -> TrackingMediaKind.SHOW
+        entry.mediaType == SimklMediaType.ANIME -> TrackingMediaKind.ANIME
+        else -> TrackingMediaKind.SHOW
     }
     return reference.copy(
         kind = kind,
@@ -382,11 +384,14 @@ internal fun SimklPlaybackSession.toWatchProgressEntry(
 ): WatchProgressEntry? {
     val media = media ?: return null
     val parentId = media.canonicalContentId() ?: return null
-    val isAnimeMovie = mediaType == SimklMediaType.ANIME && libraryEntries.any { entry ->
-        entry.mediaType == SimklMediaType.ANIME &&
-            entry.animeType == "movie" &&
-            entry.media?.toTrackingExternalIds()?.sharesIdentityWith(media.toTrackingExternalIds()) == true
-    }
+    val isAnimeMovie = mediaType == SimklMediaType.ANIME && (
+        type == "movie" ||
+        libraryEntries.any { entry ->
+            entry.mediaType == SimklMediaType.ANIME &&
+                entry.animeType == "movie" &&
+                entry.media?.toTrackingExternalIds()?.sharesIdentityWith(media.toTrackingExternalIds()) == true
+        }
+    )
     val isMovie = mediaType == SimklMediaType.MOVIES ||
         (mediaType == SimklMediaType.ANIME && episode == null) ||
         isAnimeMovie
