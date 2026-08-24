@@ -35,7 +35,7 @@ object CatalogRepository {
         force: Boolean = false,
     ) {
         val request = catalogRequest(target)
-        if (!force && activeRequest == request && _uiState.value.isLoading) {
+        if (!force && activeRequest == request && (_uiState.value.items.isNotEmpty() || _uiState.value.isLoading)) {
             return
         }
         activeRequest = request
