@@ -25,12 +25,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 private const val MemberAvatarBucket = "membership-profile-avatars"
+private val AvatarCatalogRefreshInterval = 15.minutes
 
 @Serializable
 private data class StoredAvatarCatalogPayload(
     val items: List<AvatarCatalogItem> = emptyList(),
+    val memberItems: List<MemberAvatarCatalogItem> = emptyList(),
 )
 
 @Serializable
@@ -60,12 +65,15 @@ object AvatarRepository {
 
     private var standardCatalog = emptyList<AvatarCatalogItem>()
     private var memberCatalog = emptyList<AvatarCatalogItem>()
+    private var memberCatalogMetadata = emptyList<MemberAvatarCatalogItem>()
     private var standardLoaded = false
     private var cacheHydrated = false
     private var accessObserverStarted = false
     private var standardFetchInFlight = false
     private var memberFetchInFlight = false
     private var hasMemberAccess = false
+    private var lastStandardRefresh: TimeMark? = null
+    private var lastMemberRefresh: TimeMark? = null
 
     suspend fun fetchAvatars() {
         hydrateFromCacheIfNeeded()
@@ -77,12 +85,19 @@ object AvatarRepository {
         fetchStandardCatalog()
     }
 
-    suspend fun refreshAvatars() {
+    suspend fun refreshAvatars(force: Boolean = false) {
         hydrateFromCacheIfNeeded()
         ensureMemberAccessObserver()
-        fetchStandardCatalog()
-        if (hasMemberAccess) fetchMemberCatalog()
+        if (force || isRefreshDue(lastStandardRefresh)) {
+            fetchStandardCatalog()
+        }
+        if (hasMemberAccess && (force || isRefreshDue(lastMemberRefresh))) {
+            fetchMemberCatalog()
+        }
     }
+
+    private fun isRefreshDue(lastRefresh: TimeMark?): Boolean =
+        lastRefresh == null || lastRefresh.elapsedNow() >= AvatarCatalogRefreshInterval
 
     private fun hydrateFromCacheIfNeeded() {
         if (cacheHydrated) return
@@ -98,8 +113,11 @@ object AvatarRepository {
         standardCatalog = stored.items
             .filter { it.isActive }
             .sortedWith(compareBy({ it.category }, { it.sortOrder }))
-        if (standardCatalog.isEmpty()) return
-        standardLoaded = true
+        memberCatalogMetadata = stored.memberItems
+        memberCatalog = memberCatalogMetadata
+            .mapNotNull(::loadCachedMemberAvatar)
+            .sortedWith(compareBy({ it.category }, { it.sortOrder }))
+        standardLoaded = standardCatalog.isNotEmpty()
         publishCatalog()
     }
 
@@ -107,6 +125,10 @@ object AvatarRepository {
         if (accessObserverStarted) return
         accessObserverStarted = true
         MemberAccessRepository.ensureStarted()
+        hasMemberAccess = MemberAccessRepository.access.value.entitlements
+            .includes(CosmeticEntitlement.PROFILE_AVATARS)
+        publishCatalog()
+        if (hasMemberAccess) scope.launch { fetchMemberCatalog() }
         scope.launch {
             MemberAccessRepository.access.collectLatest { access ->
                 val nextAccess = access.entitlements.includes(CosmeticEntitlement.PROFILE_AVATARS)
@@ -131,12 +153,9 @@ object AvatarRepository {
                 compareBy({ it.category }, { it.sortOrder }),
             )
             standardLoaded = true
+            lastStandardRefresh = TimeSource.Monotonic.markNow()
             publishCatalog()
-            AvatarStorage.savePayload(
-                json.encodeToString(
-                    StoredAvatarCatalogPayload(items = standardCatalog),
-                ),
-            )
+            saveCachedCatalog()
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -153,6 +172,9 @@ object AvatarRepository {
             val remote = SupabaseProvider.client.postgrest
                 .rpc("get_member_profile_avatar_catalog")
                 .decodeList<MemberAvatarCatalogItem>()
+            lastMemberRefresh = TimeSource.Monotonic.markNow()
+            memberCatalogMetadata = remote
+            saveCachedCatalog()
             memberCatalog = coroutineScope {
                 remote.map { item ->
                     async { loadMemberAvatar(item) }
@@ -170,31 +192,54 @@ object AvatarRepository {
 
     private suspend fun loadMemberAvatar(item: MemberAvatarCatalogItem): AvatarCatalogItem? {
         return try {
-            val extension = item.storagePath.substringAfterLast('.', "img")
-                .takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
-                ?: "img"
-            val cacheKey = "${item.id}-v${item.assetVersion}.$extension"
+            val cacheKey = memberAvatarCacheKey(item)
             val localImageUrl = MemberAssetStorage.loadProfileAvatar(cacheKey)
                 ?: SupabaseProvider.client.storage[MemberAvatarBucket]
                     .downloadAuthenticated(item.storagePath)
                     .let { bytes -> MemberAssetStorage.saveProfileAvatar(cacheKey, bytes) }
                 ?: return null
-            AvatarCatalogItem(
-                id = item.id,
-                displayName = item.displayName,
-                storagePath = item.storagePath,
-                category = item.category,
-                sortOrder = item.sortOrder,
-                bgColor = item.bgColor,
-                localImageUrl = localImageUrl,
-                memberOnly = true,
-            )
+            item.toAvatarCatalogItem(localImageUrl)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             log.w(error) { "Unable to load supporter avatar ${item.id}" }
             null
         }
+    }
+
+    private fun loadCachedMemberAvatar(item: MemberAvatarCatalogItem): AvatarCatalogItem? {
+        val localImageUrl = MemberAssetStorage.loadProfileAvatar(memberAvatarCacheKey(item)) ?: return null
+        return item.toAvatarCatalogItem(localImageUrl)
+    }
+
+    private fun memberAvatarCacheKey(item: MemberAvatarCatalogItem): String {
+        val extension = item.storagePath.substringAfterLast('.', "img")
+            .takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
+            ?: "img"
+        return "${item.id}-v${item.assetVersion}.$extension"
+    }
+
+    private fun MemberAvatarCatalogItem.toAvatarCatalogItem(localImageUrl: String): AvatarCatalogItem =
+        AvatarCatalogItem(
+            id = id,
+            displayName = displayName,
+            storagePath = storagePath,
+            category = category,
+            sortOrder = sortOrder,
+            bgColor = bgColor,
+            localImageUrl = localImageUrl,
+            memberOnly = true,
+        )
+
+    private fun saveCachedCatalog() {
+        AvatarStorage.savePayload(
+            json.encodeToString(
+                StoredAvatarCatalogPayload(
+                    items = standardCatalog,
+                    memberItems = memberCatalogMetadata,
+                ),
+            ),
+        )
     }
 
     private fun publishCatalog() {

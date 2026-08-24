@@ -35,9 +35,16 @@ object MemberAccessRepository {
     fun ensureStarted() {
         if (started) return
         started = true
+        hydrateCachedAccess()
         scope.launch {
             combine(AuthRepository.state, refreshGeneration) { auth, _ -> auth }
                 .collectLatest(::loadAccess)
+        }
+        scope.launch {
+            while (true) {
+                delay(VerificationIntervalMs)
+                refreshIfStale()
+            }
         }
     }
 
@@ -63,16 +70,27 @@ object MemberAccessRepository {
     }
 
     private suspend fun loadAccess(auth: AuthState) {
-        val account = auth as? AuthState.Authenticated
-        if (account == null || account.isAnonymous) {
-            _access.value = MemberAccess.None
-            return
+        when (auth) {
+            AuthState.Loading -> return
+            AuthState.Unauthenticated -> {
+                _access.value = MemberAccess.None
+                return
+            }
+            is AuthState.Authenticated -> {
+                if (auth.isAnonymous) {
+                    _access.value = MemberAccess.None
+                    return
+                }
+            }
         }
+        val account = auth as AuthState.Authenticated
         val cached = loadCached(account.userId)
         _access.value = cached ?: MemberAccess.None
+        warmMemberAssets(_access.value)
         val remote = fetchWithRetry() ?: return
         val effective = saveRemote(account.userId, remote)
         _access.value = effective
+        warmMemberAssets(effective)
         verifiedUserId = account.userId
         verifiedAtMs = EpisodeReleaseDatePlatform.nowEpochMs()
     }
@@ -95,18 +113,38 @@ object MemberAccessRepository {
     }
 
     private fun loadCached(userId: String): MemberAccess? {
-        val payload = MemberAssetStorage.loadAccessPayload() ?: return null
-        val stored = runCatching { json.decodeFromString<StoredMemberAccess>(payload) }.getOrNull() ?: return null
+        val stored = loadStoredAccess() ?: return null
         if (stored.userId != userId) return null
-        val tier = stored.tier?.let { name -> MemberTier.entries.firstOrNull { it.name == name } }
+        return stored.toMemberAccess()
+    }
+
+    private fun hydrateCachedAccess() {
+        val cached = loadStoredAccess()?.toMemberAccess() ?: return
+        _access.value = cached
+        warmMemberAssets(cached)
+    }
+
+    private fun loadStoredAccess(): StoredMemberAccess? {
+        val payload = MemberAssetStorage.loadAccessPayload() ?: return null
+        return runCatching { json.decodeFromString<StoredMemberAccess>(payload) }.getOrNull()
+    }
+
+    private fun StoredMemberAccess.toMemberAccess(): MemberAccess {
+        val tier = this.tier?.let { name -> MemberTier.entries.firstOrNull { it.name == name } }
             ?: return MemberAccess.None
-        val entitlements = stored.entitlements
+        val decodedEntitlements = this.entitlements
             .mapNotNull { name -> CosmeticEntitlement.entries.firstOrNull { it.name == name } }
             .toSet()
         return MemberAccess(
             tier = tier,
-            entitlements = CosmeticEntitlements(entitlements),
+            entitlements = CosmeticEntitlements(decodedEntitlements),
         )
+    }
+
+    private fun warmMemberAssets(access: MemberAccess) {
+        if (access.entitlements.includes(CosmeticEntitlement.PROFILE_BACKGROUNDS)) {
+            ProfileBackgroundRepository.ensureLoaded()
+        }
     }
 
     private fun saveRemote(userId: String, remote: MemberAccess): MemberAccess {

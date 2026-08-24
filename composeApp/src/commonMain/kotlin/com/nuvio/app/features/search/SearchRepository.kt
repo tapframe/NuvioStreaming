@@ -33,6 +33,17 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
+internal fun <T> canReuseRequestState(
+    forceRefresh: Boolean,
+    requestKey: T,
+    cachedRequestKey: T?,
+): Boolean = !forceRefresh && requestKey == cachedRequestKey
+
+private data class DiscoverRequestKey(
+    val sources: List<DiscoverCatalogOption>,
+    val hideUnreleasedContent: Boolean,
+)
+
 object SearchRepository {
     private val log = Logger.withTag("SearchRepository")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -45,7 +56,7 @@ object SearchRepository {
     private var activeDiscoverJob: Job? = null
     private var lastRequestKey: String? = null
     private var discoverSources: List<DiscoverCatalogOption> = emptyList()
-    private var lastDiscoverHideUnreleasedContent: Boolean? = null
+    private var lastDiscoverRequestKey: DiscoverRequestKey? = null
 
     fun search(
         query: String,
@@ -92,7 +103,7 @@ object SearchRepository {
                 },
             )
         }
-        if (!forceRefresh && requestKey == lastRequestKey && activeJob?.isActive == true) return
+        if (canReuseRequestState(forceRefresh, requestKey, lastRequestKey)) return
         lastRequestKey = requestKey
 
         activeJob?.cancel()
@@ -175,7 +186,7 @@ object SearchRepository {
         activeDiscoverJob?.cancel()
         lastRequestKey = null
         discoverSources = emptyList()
-        lastDiscoverHideUnreleasedContent = null
+        lastDiscoverRequestKey = null
         _uiState.value = SearchUiState()
         _discoverUiState.value = DiscoverUiState()
     }
@@ -188,7 +199,7 @@ object SearchRepository {
         if (activeAddons.isEmpty()) {
             activeDiscoverJob?.cancel()
             discoverSources = emptyList()
-            lastDiscoverHideUnreleasedContent = null
+            lastDiscoverRequestKey = null
             log.d { "Discover refresh aborted: no active addons" }
             _discoverUiState.value = DiscoverUiState(
                 emptyStateReason = DiscoverEmptyStateReason.NoActiveAddons,
@@ -199,12 +210,11 @@ object SearchRepository {
         val sources = buildDiscoverSources(activeAddons)
         val current = _discoverUiState.value
         val hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent
-        if (
-            !forceRefresh &&
-            sources == discoverSources &&
-            lastDiscoverHideUnreleasedContent == hideUnreleasedContent &&
-            activeDiscoverJob?.isActive == true
-        ) {
+        val requestKey = DiscoverRequestKey(
+            sources = sources,
+            hideUnreleasedContent = hideUnreleasedContent,
+        )
+        if (canReuseRequestState(forceRefresh, requestKey, lastDiscoverRequestKey)) {
             log.d {
                 "Reusing discover state type=${current.selectedType} catalog=${current.selectedCatalogKey} " +
                     "genre=${current.selectedGenre ?: "<all>"} items=${current.items.size} nextSkip=${current.nextSkip}"
@@ -213,7 +223,7 @@ object SearchRepository {
         }
 
         discoverSources = sources
-        lastDiscoverHideUnreleasedContent = hideUnreleasedContent
+        lastDiscoverRequestKey = requestKey
         if (sources.isEmpty()) {
             activeDiscoverJob?.cancel()
             log.d { "Discover refresh found no compatible discover catalogs" }

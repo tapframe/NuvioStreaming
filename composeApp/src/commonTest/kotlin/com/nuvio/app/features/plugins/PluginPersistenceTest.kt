@@ -12,6 +12,31 @@ class PluginPersistenceTest {
     private val json = Json { encodeDefaults = true }
 
     @Test
+    fun recentRepositoryDoesNotRequireRefresh() {
+        val now = 10 * PLUGIN_REPOSITORY_REFRESH_INTERVAL_MS
+
+        assertFalse(
+            isPluginRepositoryRefreshDue(
+                lastUpdatedEpochMs = now - PLUGIN_REPOSITORY_REFRESH_INTERVAL_MS + 1L,
+                nowEpochMs = now,
+            ),
+        )
+    }
+
+    @Test
+    fun staleOrUninitializedRepositoryRequiresRefresh() {
+        val now = 10 * PLUGIN_REPOSITORY_REFRESH_INTERVAL_MS
+
+        assertTrue(
+            isPluginRepositoryRefreshDue(
+                lastUpdatedEpochMs = now - PLUGIN_REPOSITORY_REFRESH_INTERVAL_MS,
+                nowEpochMs = now,
+            ),
+        )
+        assertTrue(isPluginRepositoryRefreshDue(lastUpdatedEpochMs = 0L, nowEpochMs = now))
+    }
+
+    @Test
     fun metadataStateDoesNotSerializeScraperSourceCode() {
         val sourceCode = "module.exports = " + "x".repeat(4 * 1024 * 1024)
         val stored = PluginsUiState(

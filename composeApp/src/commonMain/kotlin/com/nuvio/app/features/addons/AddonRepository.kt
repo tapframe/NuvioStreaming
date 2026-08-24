@@ -9,9 +9,11 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +47,8 @@ private data class AddonPushItem(
     @SerialName("sort_order") val sortOrder: Int = 0,
 )
 
+private const val ADDON_PUSH_DEBOUNCE_MS = 500L
+
 object AddonRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("AddonRepository")
@@ -56,6 +60,7 @@ object AddonRepository {
     private var pulledFromServer = false
     private var currentProfileId: Int = 1
     private val activeRefreshJobs = mutableMapOf<String, Job>()
+    private val pushJobsByProfile = mutableMapOf<Int, Job>()
 
     fun initialize() {
         val effectiveProfileId = resolveEffectiveProfileId(ProfileRepository.activeProfileId)
@@ -106,6 +111,8 @@ object AddonRepository {
     fun clearLocalState() {
         InAppLogger.info("Addons/Repository", "clear local in-memory state")
         cancelActiveRefreshes()
+        pushJobsByProfile.values.forEach(Job::cancel)
+        pushJobsByProfile.clear()
         currentProfileId = 1
         initialized = false
         pulledFromServer = false
@@ -296,14 +303,14 @@ object AddonRepository {
             return
         }
         log.i { "removeAddon() — $manifestUrl" }
-        val beforeCount = _uiState.value.addons.size
+        var changed = false
         _uiState.update { current ->
-            current.copy(
-                addons = current.addons.filterNot { it.manifestUrl == manifestUrl },
-            )
+            val updatedAddons = current.addons.filterNot { it.manifestUrl == manifestUrl }
+            changed = updatedAddons.size != current.addons.size
+            if (changed) current.copy(addons = updatedAddons) else current
         }
-        val removed = _uiState.value.addons.size != beforeCount
-        InAppLogger.info("Addons/Repository", "removeAddon removed=$removed url=${InAppLogger.redactUrl(manifestUrl)}")
+        InAppLogger.info("Addons/Repository", "removeAddon removed=$changed url=${InAppLogger.redactUrl(manifestUrl)}")
+        if (!changed) return
         persist()
         pushToServer()
     }
@@ -314,6 +321,7 @@ object AddonRepository {
             return
         }
         var movedUrl: String? = null
+        var changed = false
         _uiState.update { current ->
             val addons = current.addons
             if (
@@ -332,11 +340,13 @@ object AddonRepository {
             val movingAddon = reordered.removeAt(fromIndex)
             movedUrl = movingAddon.manifestUrl
             reordered.add(toIndex, movingAddon)
+            changed = true
             current.copy(addons = reordered)
         }
         movedUrl?.let { url ->
             InAppLogger.info("Addons/Repository", "moveAddon from=$fromIndex to=$toIndex url=${InAppLogger.redactUrl(url)}")
         }
+        if (!changed) return
         persist()
         pushToServer()
     }
@@ -365,6 +375,7 @@ object AddonRepository {
             "Addons/Repository",
             "setAddonEnabled enabled=$enabled changed=$changed shouldRefresh=$shouldRefresh url=${InAppLogger.redactUrl(manifestUrl)}",
         )
+        if (!changed) return
         persist()
         pushToServer()
         if (shouldRefresh) {
@@ -447,22 +458,23 @@ object AddonRepository {
     }
 
     private fun pushToServer() {
-        scope.launch {
-            runCatching {
-                if (isUsingPrimaryAddonsFromSecondaryProfile()) {
-                    return@runCatching
-                }
-                val profileId = currentProfileId
-                val addons = _uiState.value.addons
-                    .distinctBy { it.manifestUrl }
-                    .mapIndexed { index, addon ->
-                        AddonPushItem(
-                            url = addon.manifestUrl,
-                            name = addon.userSetName?.takeIf { it.isNotBlank() } ?: addon.manifest?.name ?: "",
-                            enabled = addon.enabled,
-                            sortOrder = index,
-                        )
-                    }
+        if (isUsingPrimaryAddonsFromSecondaryProfile()) return
+        val profileId = currentProfileId
+        val addons = _uiState.value.addons
+            .distinctBy { it.manifestUrl }
+            .mapIndexed { index, addon ->
+                AddonPushItem(
+                    url = addon.manifestUrl,
+                    name = addon.userSetName?.takeIf { it.isNotBlank() } ?: addon.manifest?.name ?: "",
+                    enabled = addon.enabled,
+                    sortOrder = index,
+                )
+            }
+        pushJobsByProfile[profileId]?.cancel()
+        var pushJob: Job? = null
+        pushJob = scope.launch {
+            try {
+                delay(ADDON_PUSH_DEBOUNCE_MS)
                 log.d { "pushToServer() — profileId=$profileId, pushing ${addons.size} addons" }
                 InAppLogger.debug("Addons/Repository", "pushToServer profile=$profileId count=${addons.size}")
                 val params = buildJsonObject {
@@ -473,11 +485,18 @@ object AddonRepository {
                 SupabaseProvider.client.postgrest.rpc("sync_push_addons", params)
                 log.d { "pushToServer() — success" }
                 InAppLogger.info("Addons/Repository", "pushToServer success count=${addons.size}")
-            }.onFailure { e ->
-                log.e(e) { "pushToServer() — FAILED" }
-                InAppLogger.error("Addons/Repository", "pushToServer failed: ${InAppLogger.throwableSummary(e)}")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                log.e(error) { "pushToServer() — FAILED" }
+                InAppLogger.error("Addons/Repository", "pushToServer failed: ${InAppLogger.throwableSummary(error)}")
+            } finally {
+                if (pushJobsByProfile[profileId] === pushJob) {
+                    pushJobsByProfile.remove(profileId)
+                }
             }
         }
+        pushJobsByProfile[profileId] = pushJob
     }
 
     private fun markRefreshing(manifestUrl: String) {

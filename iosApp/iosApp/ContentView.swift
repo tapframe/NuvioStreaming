@@ -630,6 +630,8 @@ final class AppNavigationCoordinator: ObservableObject {
             }
         }
     }
+    @Published private(set) var isMainContentMounted = false
+    @Published private(set) var isMainContentVisible = false
     @Published private(set) var isAppReady = false
     @Published private(set) var isTabBarVisible = true
     @Published private(set) var tabBarBehavior: NuvioTabBarBehavior = NuvioTabBarBehavior.current()
@@ -645,6 +647,7 @@ final class AppNavigationCoordinator: ObservableObject {
     let libraryCoordinator = TabNavigationCoordinator()
     let liveTvCoordinator = TabNavigationCoordinator()
     let settingsCoordinator = TabNavigationCoordinator()
+    let appGateController = AppGateController()
     let profileSwitcherController = NativeProfileSwitcherController()
     let profileTabInteraction = NativeProfileTabInteractionCoordinator()
 
@@ -780,9 +783,20 @@ final class AppNavigationCoordinator: ObservableObject {
         }
     }
 
+    func setMainContentMounted(_ mounted: Bool) {
+        isMainContentMounted = mounted
+        if !mounted {
+            isMainContentVisible = false
+            selectedTab = .home
+        }
+    }
+
+    func setMainContentVisible(_ visible: Bool) {
+        isMainContentVisible = visible
+    }
+
     func openProfileManagement() {
         isProfileSwitcherPresented = false
-        updateAppReady(false)
         profileSwitcherController.requestManageProfiles()
     }
 
@@ -849,9 +863,6 @@ struct NativeNavComposeView: UIViewControllerRepresentable {
             onActivate: { tabName in
                 appCoordinator.activateTab(named: tabName)
             },
-            onAppReady: { ready in
-                appCoordinator.updateAppReady(ready.boolValue)
-            },
             onTabTitles: { home, search, library, profile, switchProfile, addProfile in
                 appCoordinator.updateTabTitles(
                     home: home,
@@ -862,7 +873,7 @@ struct NativeNavComposeView: UIViewControllerRepresentable {
                     addProfile: addProfile
                 )
             },
-            nativeProfileSwitcherController: appCoordinator.profileSwitcherController
+            appGateController: appCoordinator.appGateController
         )
         return NuvioComposeHost.wrap(
             controller,
@@ -878,6 +889,35 @@ struct NativeNavComposeView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         (uiViewController as? RootComposeViewController)?.refreshContainingTabBarVisibility()
     }
+}
+
+@available(iOS 16.0, *)
+struct AppGateComposeView: UIViewControllerRepresentable {
+    let appCoordinator: AppNavigationCoordinator
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = MainViewControllerKt.AppGateViewController(
+            appGateController: appCoordinator.appGateController,
+            nativeProfileSwitcherController: appCoordinator.profileSwitcherController,
+            onActivate: { tabName in
+                appCoordinator.activateTab(named: tabName)
+            },
+            onAppReady: { ready in
+                appCoordinator.updateAppReady(ready.boolValue)
+            },
+            onMainContentMountChanged: { mounted in
+                appCoordinator.setMainContentMounted(mounted.boolValue)
+            },
+            onMainContentVisibleChanged: { visible in
+                appCoordinator.setMainContentVisible(visible.boolValue)
+            }
+        )
+        controller.view.backgroundColor = .clear
+        controller.view.isOpaque = false
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
 @available(iOS 16.0, *)
@@ -904,7 +944,8 @@ struct DetailComposeView: UIViewControllerRepresentable {
             },
             onActivate: { tabName in
                 appCoordinator.activateTab(named: tabName)
-            }
+            },
+            appGateController: appCoordinator.appGateController
         )
         return NuvioComposeHost.wrap(
             controller,
@@ -963,7 +1004,7 @@ struct TabContentView: View {
         .toolbar(
             usesNativeTabBar &&
                 !appCoordinator.tabBarBehavior.usesCustomBar &&
-                appCoordinator.isAppReady &&
+                appCoordinator.isMainContentVisible &&
                 coordinator.path.isEmpty &&
                 appCoordinator.isTabBarVisible
                 ? Visibility.visible
@@ -1484,12 +1525,26 @@ struct NativeNavContentView: View {
 
     @ViewBuilder
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *), usesNativeTabBar {
-                nativeTabs
-            } else {
-                legacyTabs
+        ZStack {
+            Group {
+                if appCoordinator.isMainContentMounted {
+                    if #available(iOS 26.0, *), usesNativeTabBar {
+                        nativeTabs
+                    } else {
+                        legacyTabs
+                    }
+                } else {
+                    Color(uiColor: nuvioBackgroundColor)
+                        .ignoresSafeArea(.all)
+                }
             }
+            .zIndex(0)
+
+            AppGateComposeView(appCoordinator: appCoordinator)
+                .ignoresSafeArea(.all)
+                .allowsHitTesting(!appCoordinator.isAppReady)
+                .accessibilityHidden(appCoordinator.isAppReady)
+                .zIndex(1)
         }
         .onReceive(
             NotificationCenter.default.publisher(

@@ -20,6 +20,7 @@ import platform.posix.rewind
 @OptIn(ExperimentalForeignApi::class)
 internal actual object MemberAssetStorage {
     private const val accessPayloadKey = "member_access_payload"
+    private const val backgroundCatalogPayloadKey = "member_background_catalog_payload"
     private val backgroundDirectory = "${NSHomeDirectory()}/Library/Caches/NuvioMemberBackgrounds"
     private val avatarDirectory = "${NSHomeDirectory()}/Library/Caches/NuvioMemberAvatars"
     private val legacyBrandingPath = "${NSHomeDirectory()}/Library/Application Support/NuvioMembership/branding.png"
@@ -30,6 +31,13 @@ internal actual object MemberAssetStorage {
     actual fun saveAccessPayload(payload: String) {
         NSUserDefaults.standardUserDefaults.setObject(payload, forKey = accessPayloadKey)
         NSFileManager.defaultManager.removeItemAtPath(legacyBrandingPath, null)
+    }
+
+    actual fun loadProfileBackgroundCatalogPayload(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(backgroundCatalogPayloadKey)
+
+    actual fun saveProfileBackgroundCatalogPayload(payload: String) {
+        NSUserDefaults.standardUserDefaults.setObject(payload, forKey = backgroundCatalogPayloadKey)
     }
 
     actual fun loadProfileBackground(cacheKey: String): ByteArray? =

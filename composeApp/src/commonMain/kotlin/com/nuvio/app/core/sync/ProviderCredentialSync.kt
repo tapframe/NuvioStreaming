@@ -94,8 +94,10 @@ object ProviderCredentialSync {
                 }
             }
 
-            seedSnapshot(localSnapshot)
             val rows = pullRows(profileId)
+            if (shouldSeedProviderCredentials(localSnapshot, rows)) {
+                seedSnapshot(localSnapshot)
+            }
             requireCurrentScope(credentialScope)
             val remoteSnapshot = localSnapshot.mergeRemote(rows)
             val applied = remoteSnapshot != localSnapshot
