@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
@@ -86,6 +87,7 @@ internal fun rememberGuardedPopBackStack(
 }
 
 internal data class AppTabState(
+    val searchListState: LazyListState,
     val homeContentGeneration: Int = 0,
     val searchFocusRequestCount: Int = 0,
     val rootActionsEnabled: Boolean = true,
@@ -166,6 +168,7 @@ internal fun AppTabHost(
                 AppScreenTab.Search -> {
                     SearchScreen(
                         modifier = Modifier.fillMaxSize(),
+                        listState = state.searchListState,
                         onPosterClick = actions.onPosterClick,
                         onPosterLongClick = actions.onPosterLongClick,
                         searchFocusRequestCount = state.searchFocusRequestCount,
