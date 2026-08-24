@@ -312,6 +312,80 @@ class SubtitleSelectionModelTest {
     }
 
     @Test
+    fun lazyListKeysAreBundleSafeAndDoNotExposeAddonTransportIdentity() {
+        val addon = addonSubtitle(
+            id = "provider-id",
+            url = "https://signed.example/subtitle.srt?token=secret",
+            providerOrigin = "https://provider.example/manifest.json",
+        )
+        val addonEntry = AddonSubtitleSessionRegistry().reconcile(listOf(addon)).single()
+        val keys = SubtitleOptionLazyKeyRegistry()
+
+        val addonKey = keys.keyFor(SubtitleSelectionKey.Addon(addonEntry.identity))
+        val builtInKey = keys.keyFor(SubtitleSelectionKey.BuiltIn(trackIndex = 7, trackId = "embedded:english"))
+
+        assertEquals(String::class, addonKey::class)
+        assertEquals(String::class, builtInKey::class)
+        assertFalse(addonKey.contains(addon.url))
+        assertFalse(addonKey.contains(addon.providerOrigin))
+        assertEquals("subtitle-language-off", subtitleLanguageLazyListKey(SubtitleOffLanguageKey))
+        assertEquals("subtitle-language-unknown", subtitleLanguageLazyListKey(SubtitleUnknownLanguageKey))
+    }
+
+    @Test
+    fun addonLazyKeysStayStableAcrossDeepReorderAndSignedUrlRefresh() {
+        val identityRegistry = AddonSubtitleSessionRegistry()
+        val lazyKeyRegistry = SubtitleOptionLazyKeyRegistry()
+        val initial = (0 until 35).map { index ->
+            addonSubtitle(
+                id = "subtitle-$index",
+                url = "https://cdn.example/$index.srt?token=old",
+                fileName = "subtitle-$index.srt",
+            )
+        }
+        val target = initial[27]
+        identityRegistry.reconcile(initial.take(10))
+        val targetEntry = identityRegistry.reconcile(initial).single { it.subtitle == target }
+        val targetSelectionKey = SubtitleSelectionKey.Addon(targetEntry.identity)
+        val targetLazyKey = lazyKeyRegistry.keyFor(targetSelectionKey)
+
+        val refreshedTarget = target.copy(url = "https://cdn.example/27.srt?token=new")
+        val refreshedEntries = identityRegistry.reconcile(
+            initial.map { if (it.id == target.id) refreshedTarget else it }.reversed(),
+            pinnedSubtitle = target,
+        )
+        val refreshedOption = buildSubtitleSelectionOptions("en", emptyList(), refreshedEntries)
+            .single { it.key == targetSelectionKey }
+
+        assertEquals(targetLazyKey, lazyKeyRegistry.keyFor(refreshedOption.key))
+        assertEquals(refreshedTarget, assertIs<SubtitleSelectionOption.Addon>(refreshedOption).subtitle)
+    }
+
+    @Test
+    fun duplicateProviderIdsReceiveDistinctStableAddonLazyKeys() {
+        val identityRegistry = AddonSubtitleSessionRegistry()
+        val lazyKeyRegistry = SubtitleOptionLazyKeyRegistry()
+        val providerA = addonSubtitle(id = "shared", providerOrigin = "https://a.example/manifest.json")
+        val providerB = addonSubtitle(id = "shared", providerOrigin = "https://b.example/manifest.json")
+        val sameProviderCollision = providerA.copy(
+            url = "https://cdn.example/commentary.srt",
+            providerFileName = "commentary.srt",
+        )
+        val initial = identityRegistry.reconcile(listOf(providerA, providerB, sameProviderCollision))
+        val initialKeys = initial.associate { entry ->
+            entry.identity to lazyKeyRegistry.keyFor(SubtitleSelectionKey.Addon(entry.identity))
+        }
+
+        val reordered = identityRegistry.reconcile(listOf(sameProviderCollision, providerB, providerA))
+        val reorderedKeys = reordered.associate { entry ->
+            entry.identity to lazyKeyRegistry.keyFor(SubtitleSelectionKey.Addon(entry.identity))
+        }
+
+        assertEquals(3, initialKeys.values.toSet().size)
+        assertEquals(initialKeys, reorderedKeys)
+    }
+
+    @Test
     fun emptySubtitleRailShowsFetchActionWhenNoLanguagesAreAvailable() {
         assertEquals(
             SubtitleOptionsRailEmptyContent.FETCH,

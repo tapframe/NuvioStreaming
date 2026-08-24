@@ -95,6 +95,7 @@ fun SubtitleModal(
     modifier: Modifier = Modifier,
 ) {
     val addonIdentityRegistry = remember(subtitleSessionKey) { AddonSubtitleSessionRegistry() }
+    val optionLazyKeyRegistry = remember(subtitleSessionKey) { SubtitleOptionLazyKeyRegistry() }
     val sessionAddonSubtitles = remember(addonIdentityRegistry, addonSubtitles, selectedAddonSubtitle) {
         addonIdentityRegistry.reconcile(
             subtitles = addonSubtitles,
@@ -219,7 +220,7 @@ fun SubtitleModal(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                             contentPadding = PaddingValues(vertical = 8.dp),
                         ) {
-                            items(languageItems, key = { it.key }) { item ->
+                            items(languageItems, key = { subtitleLanguageLazyListKey(it.key) }) { item ->
                                 SubtitleLanguageRow(
                                     item = item,
                                     selected = item.key == activeLanguageKey,
@@ -284,9 +285,10 @@ fun SubtitleModal(
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                     contentPadding = PaddingValues(vertical = 8.dp),
                                 ) {
-                                    items(options, key = { it.key }) { option ->
+                                    items(options, key = { optionLazyKeyRegistry.keyFor(it.key) }) { option ->
                                         SubtitleOptionRow(
                                             option = option,
+                                            pointerInputKey = optionLazyKeyRegistry.keyFor(option.key),
                                             selected = option.key == selectedOptionKey,
                                             onClick = {
                                                 selectionState = selectionState.selectOption(
@@ -345,6 +347,27 @@ fun SubtitleModal(
             }
         }
     }
+}
+
+internal class SubtitleOptionLazyKeyRegistry {
+    private val addonKeys = mutableMapOf<AddonSubtitleSessionIdentity, String>()
+    private var nextAddonToken = 1L
+
+    fun keyFor(key: SubtitleSelectionKey): String = when (key) {
+        is SubtitleSelectionKey.BuiltIn -> {
+            "subtitle-option-builtin:${key.trackIndex}:${key.trackId.length}:${key.trackId}"
+        }
+
+        is SubtitleSelectionKey.Addon -> addonKeys.getOrPut(key.identity) {
+            "subtitle-option-addon-${nextAddonToken++}"
+        }
+    }
+}
+
+internal fun subtitleLanguageLazyListKey(languageKey: String): String = when (languageKey) {
+    SubtitleOffLanguageKey -> "subtitle-language-off"
+    SubtitleUnknownLanguageKey -> "subtitle-language-unknown"
+    else -> "subtitle-language:${languageKey.length}:$languageKey"
 }
 
 internal fun isUnhandledTap(
@@ -517,6 +540,7 @@ private fun SubtitleLanguageRow(
 @Composable
 private fun SubtitleOptionRow(
     option: SubtitleSelectionOption,
+    pointerInputKey: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -552,7 +576,7 @@ private fun SubtitleOptionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
-            .clickableIncludingFlingStop(option.key, onClick)
+            .clickableIncludingFlingStop(pointerInputKey, onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
