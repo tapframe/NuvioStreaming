@@ -144,7 +144,10 @@ object StreamAutoPlaySelector {
                     .toList()
 
                 val excludeRegex = if (exclusionWords.isNotEmpty()) {
-                    Regex("\\b(${exclusionWords.joinToString("|")})\\b", RegexOption.IGNORE_CASE)
+                    Regex(
+                        "\\b(${exclusionWords.joinToString("|") { Regex.escape(it) }})\\b",
+                        RegexOption.IGNORE_CASE,
+                    )
                 } else null
 
                 candidateStreams.filter { stream ->

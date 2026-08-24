@@ -116,7 +116,7 @@ object SearchRepository {
                     runCatching { request.toSection(forceRefresh = forceRefresh) }
                         .fold(
                             onSuccess = { section ->
-                                resultChannel.send(
+                                resultChannel.trySend(
                                     IndexedSearchResult(
                                         index = index,
                                         section = section,
@@ -125,7 +125,7 @@ object SearchRepository {
                             },
                             onFailure = { error ->
                                 if (error is CancellationException) throw error
-                                resultChannel.send(
+                                resultChannel.trySend(
                                     IndexedSearchResult(
                                         index = index,
                                         error = error,

@@ -76,6 +76,7 @@
     <string name="addons_version_format">Version %1$s</string>
     <string name="cd_selected">Selected</string>
     <string name="collections_copy_json">Copy JSON</string>
+    <string name="collections_copy_json_error">The collection data is too large for the clipboard on this device.</string>
     <string name="collections_count_summary">%1$d collection(s), %2$d folder(s)</string>
     <string name="collections_delete_message">Delete "%1$s"? This cannot be undone.</string>
     <string name="collections_delete_title">Delete Collection</string>

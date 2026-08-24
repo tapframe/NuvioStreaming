@@ -71,67 +71,65 @@ private fun buildHomeCatalogDescriptorSignature(
     addon: ManagedAddon,
     manifest: AddonManifest,
     catalog: AddonCatalog,
-): String =
-    buildString {
-        append(addon.displayTitle)
-        append('|')
-        append(addon.enabled)
-        append('|')
-        append(addon.isRefreshing)
-        append('|')
-        append(addon.errorMessage.orEmpty())
-        append('|')
-        append(addon.manifestUrl)
-        append('|')
-        append(manifest.id)
-        append('|')
-        append(manifest.name)
-        append('|')
-        append(manifest.version)
-        append('|')
-        append(manifest.description)
-        append('|')
-        append(manifest.logoUrl.orEmpty())
-        append('|')
-        append(manifest.transportUrl)
-        append('|')
-        append(manifest.types.joinToString(","))
-        append('|')
-        append(manifest.idPrefixes.joinToString(","))
-        append('|')
-        append(manifest.resources.joinToString(",") { resource ->
-            listOf(
-                resource.name,
-                resource.types.joinToString("/"),
-                resource.idPrefixes.joinToString("/"),
-            ).joinToString(":")
-        })
-        append('|')
-        append(
-            listOf(
-                manifest.behaviorHints.configurable,
-                manifest.behaviorHints.configurationRequired,
-                manifest.behaviorHints.adult,
-                manifest.behaviorHints.p2p,
-            ).joinToString(":"),
-        )
-        append('|')
-        append(catalog.type)
-        append('|')
-        append(catalog.id)
-        append('|')
-        append(catalog.name)
-        append('|')
-        append(catalog.supportsPagination())
-        append('|')
-        append(catalog.extra.joinToString(",") { extra ->
-            listOf(
-                extra.name,
-                extra.isRequired.toString(),
-                extra.options.joinToString("/"),
-                extra.optionsLimit?.toString().orEmpty(),
-            ).joinToString(":")
-        })
+): String {
+    val signature = CatalogDescriptorSignature()
+    signature.add(addon.displayTitle)
+    signature.add(addon.enabled)
+    signature.add(addon.isRefreshing)
+    signature.add(addon.errorMessage)
+    signature.add(addon.manifestUrl)
+    signature.add(manifest.id)
+    signature.add(manifest.name)
+    signature.add(manifest.version)
+    signature.add(manifest.description)
+    signature.add(manifest.logoUrl)
+    signature.add(manifest.transportUrl)
+    manifest.types.forEach(signature::add)
+    manifest.idPrefixes.forEach(signature::add)
+    manifest.resources.forEach { resource ->
+        signature.add(resource.name)
+        resource.types.forEach(signature::add)
+        resource.idPrefixes.forEach(signature::add)
     }
+    signature.add(manifest.behaviorHints.configurable)
+    signature.add(manifest.behaviorHints.configurationRequired)
+    signature.add(manifest.behaviorHints.adult)
+    signature.add(manifest.behaviorHints.p2p)
+    signature.add(catalog.type)
+    signature.add(catalog.id)
+    signature.add(catalog.name)
+    signature.add(catalog.supportsPagination())
+    catalog.extra.forEach { extra ->
+        signature.add(extra.name)
+        signature.add(extra.isRequired)
+        extra.options.forEach(signature::add)
+        signature.add(extra.optionsLimit)
+    }
+    return signature.value()
+}
+
+private class CatalogDescriptorSignature {
+    private var hash = -3750763034362895579L
+
+    fun add(value: String?) {
+        val text = value.orEmpty()
+        mix(text.length)
+        text.forEach { character -> mix(character.code) }
+    }
+
+    fun add(value: Boolean) {
+        mix(if (value) 1 else 0)
+    }
+
+    fun add(value: Int?) {
+        mix(value ?: Int.MIN_VALUE)
+    }
+
+    fun value(): String = hash.toULong().toString(16)
+
+    private fun mix(value: Int) {
+        hash = (hash xor value.toLong()) * 1099511628211L
+    }
+}
 
 internal fun String.displayLabel(): String = localizedMediaTypeLabel(this)

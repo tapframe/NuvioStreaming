@@ -27,13 +27,30 @@ class PlayerNowPlayingService : Service() {
             return START_NOT_STICKY
         }
 
-        val notification = PlayerNowPlayingServiceState.notification
-        if (notification == null) {
+        val startNotification = PlayerNowPlayingServiceState.consumeStartNotification()
+            ?: PlayerNowPlayingServiceState.notification
+        if (startNotification == null) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
-        startForeground(NOW_PLAYING_NOTIFICATION_ID, notification)
+        val started = runCatching {
+            startForeground(NOW_PLAYING_NOTIFICATION_ID, startNotification)
+        }.onFailure { error ->
+            Log.w(NOW_PLAYING_TAG, "Unable to promote playback service", error)
+        }.isSuccess
+        if (!started) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        val currentNotification = PlayerNowPlayingServiceState.notification
+        if (currentNotification == null) {
+            stopSelf(startId)
+        } else if (currentNotification !== startNotification) {
+            getSystemService(NotificationManager::class.java)
+                ?.notify(NOW_PLAYING_NOTIFICATION_ID, currentNotification)
+        }
         return START_NOT_STICKY
     }
 
@@ -106,6 +123,7 @@ private object PlayerNowPlayingServiceController {
     private fun publishNow(command: PlayerNowPlayingServiceCommand.Publish) {
         if (PlayerNowPlayingServiceState.notification !== command.notification) return
         if (startRequested.compareAndSet(false, true)) {
+            PlayerNowPlayingServiceState.pendingStartNotification = command.notification
             val intent = Intent(command.context, PlayerNowPlayingService::class.java)
                 .setAction(ACTION_START_FOREGROUND)
             val started = runCatching {
@@ -118,6 +136,7 @@ private object PlayerNowPlayingServiceController {
                 Log.w(NOW_PLAYING_TAG, "Unable to start playback service", error)
             }.isSuccess
             if (!started) {
+                PlayerNowPlayingServiceState.clearPendingStartNotification(command.notification)
                 startRequested.set(false)
                 return
             }
@@ -151,4 +170,17 @@ private object PlayerNowPlayingServiceController {
 private object PlayerNowPlayingServiceState {
     @Volatile
     var notification: Notification? = null
+
+    @Volatile
+    var pendingStartNotification: Notification? = null
+
+    fun consumeStartNotification(): Notification? = synchronized(this) {
+        pendingStartNotification.also { pendingStartNotification = null }
+    }
+
+    fun clearPendingStartNotification(notification: Notification) = synchronized(this) {
+        if (pendingStartNotification === notification) {
+            pendingStartNotification = null
+        }
+    }
 }

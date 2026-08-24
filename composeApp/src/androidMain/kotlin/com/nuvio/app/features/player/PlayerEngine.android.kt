@@ -72,7 +72,10 @@ import `is`.xyz.mpv.MPVNode
 import `is`.xyz.mpv.Utils
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -82,6 +85,8 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "NuvioPlayer"
 private const val PLAYER_DIAGNOSTIC_TAG = "NuvioPlayerDiag"
@@ -584,7 +589,7 @@ private fun ExoPlayerSurface(
                         "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
                         "bufferedMs=${exoPlayer.bufferedPosition.coerceAtLeast(0L)} " +
                         "durationMs=${exoPlayer.duration.coerceAtLeast(0L)} " +
-                        "bufferedPercent=${exoPlayer.bufferedPercentage} playWhenReady=${exoPlayer.playWhenReady} " +
+                        "playWhenReady=${exoPlayer.playWhenReady} " +
                         "terminalError=${exoPlayer.playerError?.errorCodeName ?: "none"}",
                 )
                 if (playbackState == Player.STATE_READY) {
@@ -682,6 +687,7 @@ private fun ExoPlayerSurface(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            playerViewRef?.releaseLibassOverlay()
             exoPlayer.release()
         }
     }
@@ -975,7 +981,7 @@ private fun LibmpvPlayerSurface(
                 latestOnSnapshot.value(snapshot)
                 nowPlayingController?.syncPlayback(snapshot)
                 if (updateKeepScreenOn) {
-                    view.keepScreenOn = view.shouldKeepScreenOn()
+                    view.keepScreenOn = snapshot.isPlaying || snapshot.isLoading
                 }
             }
         }
@@ -1005,7 +1011,10 @@ private fun LibmpvPlayerSurface(
                 }
             }
             override fun eventProperty(property: String, value: MPVNode) {
-                if (property == "track-list") dispatchSnapshot()
+                if (property == "track-list") {
+                    view.refreshTracks(context)
+                    dispatchSnapshot()
+                }
             }
             override fun event(eventId: Int, data: MPVNode) {
                 when (eventId) {
@@ -1052,7 +1061,7 @@ private fun LibmpvPlayerSurface(
                             )
                             latestOnSnapshot.value(snapshot)
                             nowPlayingController?.syncPlayback(snapshot)
-                            view.keepScreenOn = view.shouldKeepScreenOn()
+                            view.keepScreenOn = snapshot.isPlaying || snapshot.isLoading
                         }
                     }
                 }
@@ -1081,14 +1090,16 @@ private fun LibmpvPlayerSurface(
             view.setPaused(true)
         }
         PlayerPictureInPictureManager.registerTogglePlaybackCallback {
-            val snapshot = view.snapshot()
-            if (snapshot.isPlaying) {
-                view.setPaused(true)
-            } else {
-                if (snapshot.isEnded) {
-                    view.seekToMs(0L)
+            coroutineScope.launch {
+                val snapshot = view.snapshot()
+                if (snapshot.isPlaying) {
+                    view.setPaused(true)
+                } else {
+                    if (snapshot.isEnded) {
+                        view.seekToMs(0L)
+                    }
+                    view.setPaused(false)
                 }
-                view.setPaused(false)
             }
         }
         onDispose {
@@ -1122,8 +1133,8 @@ private fun LibmpvPlayerSurface(
     LaunchedEffect(playerViewRef, playWhenReady) {
         val view = playerViewRef ?: return@LaunchedEffect
         view.setPaused(!latestPlayWhenReady.value)
-        view.keepScreenOn = view.shouldKeepScreenOn()
         val snapshot = view.snapshot()
+        view.keepScreenOn = snapshot.isPlaying || snapshot.isLoading
         latestOnSnapshot.value(snapshot)
         nowPlayingController?.syncPlayback(snapshot)
     }
@@ -1143,7 +1154,7 @@ private fun LibmpvPlayerSurface(
             val snapshot = view.snapshot()
             latestOnSnapshot.value(snapshot)
             nowPlayingController?.syncPlayback(snapshot)
-            view.keepScreenOn = view.shouldKeepScreenOn()
+            view.keepScreenOn = snapshot.isPlaying || snapshot.isLoading
             delay(250L)
         }
     }
@@ -1175,7 +1186,7 @@ private fun LibmpvPlayerSurface(
         },
         onRelease = { view ->
             if (playerViewRef === view) playerViewRef = null
-            runCatching { view.destroy() }
+            view.releaseMpv()
         },
     )
 }
@@ -1194,10 +1205,21 @@ private class NuvioLibmpvView(
     private val yuv420pEnabled: Boolean,
     attrs: AttributeSet? = null,
 ) : BaseMPVView(context, attrs) {
+    private val mpvDispatcher = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "NuvioLibmpv").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+    private val mpvScope = CoroutineScope(SupervisorJob() + mpvDispatcher)
+    private val released = AtomicBoolean(false)
     private var currentSourceUrl: String? = null
     private var currentSourceAudioUrl: String? = null
     private var currentRequestHeaders: Map<String, String> = emptyMap()
     private var currentExternalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle> = emptyList()
+    @Volatile
+    private var latestSnapshot = PlayerPlaybackSnapshot()
+    @Volatile
+    private var latestAudioTracks: List<LibmpvTrack> = emptyList()
+    @Volatile
+    private var latestSubtitleTracks: List<LibmpvTrack> = emptyList()
 
     override fun initOptions() {
         setVo(videoOutput.mpvValue)
@@ -1236,34 +1258,36 @@ private class NuvioLibmpvView(
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
 
-    fun loadSource(
+    suspend fun loadSource(
         sourceUrl: String,
         sourceAudioUrl: String?,
         requestHeaders: Map<String, String>,
         externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle>,
         playWhenReady: Boolean,
-    ) {
-        val sameSource =
-            currentSourceUrl == sourceUrl &&
-                currentSourceAudioUrl == sourceAudioUrl &&
-                currentRequestHeaders == requestHeaders &&
-                currentExternalSubtitles == externalSubtitles
-        currentSourceUrl = sourceUrl
-        currentSourceAudioUrl = sourceAudioUrl
-        currentRequestHeaders = requestHeaders
-        currentExternalSubtitles = externalSubtitles
-        if (!sameSource) {
-            loadCurrentSource(playWhenReady = playWhenReady)
-        } else {
-            applyRequestHeaders(requestHeaders)
-            setPaused(!playWhenReady)
+    ) = withContext(mpvDispatcher) {
+        if (!released.get()) {
+            val sameSource =
+                currentSourceUrl == sourceUrl &&
+                    currentSourceAudioUrl == sourceAudioUrl &&
+                    currentRequestHeaders == requestHeaders &&
+                    currentExternalSubtitles == externalSubtitles
+            currentSourceUrl = sourceUrl
+            currentSourceAudioUrl = sourceAudioUrl
+            currentRequestHeaders = requestHeaders
+            currentExternalSubtitles = externalSubtitles
+            if (!sameSource) {
+                loadCurrentSourceNow(playWhenReady = playWhenReady)
+            } else {
+                applyRequestHeadersNow(requestHeaders)
+                setPausedNow(!playWhenReady)
+            }
         }
     }
 
-    private fun loadCurrentSource(playWhenReady: Boolean) {
+    private fun loadCurrentSourceNow(playWhenReady: Boolean) {
         val sourceUrl = currentSourceUrl ?: return
-        applyRequestHeaders(currentRequestHeaders)
-        setPaused(!playWhenReady)
+        applyRequestHeadersNow(currentRequestHeaders)
+        setPausedNow(!playWhenReady)
         mpv.command("loadfile", sourceUrl.toMpvSource(), "replace")
         currentSourceAudioUrl?.takeIf { it.isNotBlank() }?.let { sourceAudioUrl ->
             mpv.command("audio-add", sourceAudioUrl.toMpvSource(), "auto")
@@ -1272,7 +1296,7 @@ private class NuvioLibmpvView(
             val flag = if (index == 0) "auto" else "cached"
             mpv.command("sub-add", subtitle.url, flag)
         }
-        setPaused(!playWhenReady)
+        setPausedNow(!playWhenReady)
     }
 
     private fun String.toMpvSource(): String =
@@ -1283,16 +1307,29 @@ private class NuvioLibmpvView(
         }
 
     fun setPaused(paused: Boolean) {
-        runCatching { mpv.setPropertyBoolean("pause", paused) }
+        executeMpv { setPausedNow(paused) }
     }
 
     fun seekToMs(positionMs: Long) {
-        runCatching {
+        executeMpv {
             mpv.command("seek", (positionMs.coerceAtLeast(0L) / 1000.0).toString(), "absolute")
         }
     }
 
-    fun snapshot(): PlayerPlaybackSnapshot {
+    suspend fun snapshot(): PlayerPlaybackSnapshot {
+        if (released.get()) return latestSnapshot
+        return withContext(mpvDispatcher) {
+            if (released.get()) {
+                latestSnapshot
+            } else {
+                runCatching { readSnapshotNow() }
+                    .onSuccess { latestSnapshot = it }
+                    .getOrDefault(latestSnapshot)
+            }
+        }
+    }
+
+    private fun readSnapshotNow(): PlayerPlaybackSnapshot {
         val paused = mpv.getPropertyBoolean("pause") ?: true
         val pausedForCache = mpv.getPropertyBoolean("paused-for-cache") ?: false
         val idle = mpv.getPropertyBoolean("core-idle") ?: false
@@ -1324,30 +1361,29 @@ private class NuvioLibmpvView(
         )
     }
 
-    fun shouldKeepScreenOn(): Boolean {
-        val snapshot = snapshot()
-        return snapshot.isPlaying || snapshot.isLoading
-    }
-
     fun applyResizeMode(resizeMode: PlayerResizeMode) {
-        when (resizeMode) {
-            PlayerResizeMode.Fit -> {
-                mpv.setPropertyDouble("panscan", 0.0)
-                mpv.setPropertyString("video-aspect-override", "no")
-            }
-            PlayerResizeMode.Fill -> {
-                mpv.setPropertyDouble("panscan", 1.0)
-                mpv.setPropertyString("video-aspect-override", "no")
-            }
-            PlayerResizeMode.Zoom -> {
-                mpv.setPropertyDouble("panscan", 0.5)
-                mpv.setPropertyString("video-aspect-override", "no")
+        executeMpv {
+            when (resizeMode) {
+                PlayerResizeMode.Fit -> {
+                    mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.Fill -> {
+                    mpv.setPropertyDouble("panscan", 1.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.Zoom -> {
+                    mpv.setPropertyDouble("panscan", 0.5)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
             }
         }
     }
 
     fun seekByMs(offsetMs: Long) {
-        mpv.command("seek", (offsetMs / 1000.0).toString(), "relative")
+        executeMpv {
+            mpv.command("seek", (offsetMs / 1000.0).toString(), "relative")
+        }
     }
 
     fun controller(
@@ -1364,11 +1400,13 @@ private class NuvioLibmpvView(
             override fun seekBy(offsetMs: Long) = this@NuvioLibmpvView.seekByMs(offsetMs)
 
             override fun retry() {
-                loadCurrentSource(playWhenReady = true)
+                executeMpv { loadCurrentSourceNow(playWhenReady = true) }
             }
 
             override fun setPlaybackSpeed(speed: Float) {
-                mpv.setPropertyDouble("speed", speed.coerceIn(0.25f, 4f).toDouble())
+                executeMpv {
+                    mpv.setPropertyDouble("speed", speed.coerceIn(0.25f, 4f).toDouble())
+                }
             }
 
             override fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {
@@ -1380,11 +1418,11 @@ private class NuvioLibmpvView(
             }
 
             override fun setMuted(muted: Boolean) {
-                mpv.setPropertyBoolean("mute", muted)
+                executeMpv { mpv.setPropertyBoolean("mute", muted) }
             }
 
             override fun getAudioTracks(): List<AudioTrack> =
-                extractLibmpvTracks(context, type = "audio").mapIndexed { index, track ->
+                latestAudioTracks.mapIndexed { index, track ->
                     AudioTrack(
                         index = index,
                         id = track.id.toString(),
@@ -1395,7 +1433,7 @@ private class NuvioLibmpvView(
                 }
 
             override fun getSubtitleTracks(): List<SubtitleTrack> =
-                extractLibmpvTracks(context, type = "sub").mapIndexed { index, track ->
+                latestSubtitleTracks.mapIndexed { index, track ->
                     SubtitleTrack(
                         index = index,
                         id = track.id.toString(),
@@ -1408,30 +1446,30 @@ private class NuvioLibmpvView(
 
             override fun selectAudioTrack(index: Int) {
                 if (index < 0) {
-                    mpv.setPropertyString("aid", "no")
+                    executeMpv { mpv.setPropertyString("aid", "no") }
                 } else {
-                    extractLibmpvTracks(context, type = "audio").getOrNull(index)?.let { track ->
-                        mpv.setPropertyInt("aid", track.id)
+                    latestAudioTracks.getOrNull(index)?.let { track ->
+                        executeMpv { mpv.setPropertyInt("aid", track.id) }
                     }
                 }
             }
 
             override fun selectSubtitleTrack(index: Int) {
                 if (index < 0) {
-                    mpv.setPropertyString("sid", "no")
+                    executeMpv { mpv.setPropertyString("sid", "no") }
                 } else {
-                    extractLibmpvTracks(context, type = "sub").getOrNull(index)?.let { track ->
-                        mpv.setPropertyInt("sid", track.id)
+                    latestSubtitleTracks.getOrNull(index)?.let { track ->
+                        executeMpv { mpv.setPropertyInt("sid", track.id) }
                     }
                 }
             }
 
             override fun setSubtitleUri(url: String) {
-                mpv.command("sub-add", url, "select")
+                executeMpv { mpv.command("sub-add", url, "select") }
             }
 
             override fun clearExternalSubtitle() {
-                mpv.setPropertyString("sid", "no")
+                executeMpv { mpv.setPropertyString("sid", "no") }
             }
 
             override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
@@ -1439,30 +1477,64 @@ private class NuvioLibmpvView(
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
-                mpv.setPropertyString("sub-ass-override", "no")
-                mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
-                mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
-                mpv.setPropertyString("sub-outline-color", style.outlineColor.toMpvColor())
-                mpv.setPropertyString("sub-border-color", style.outlineColor.toMpvColor())
-                mpv.setPropertyString("sub-border-style", style.toMpvSubtitleBorderStyle())
-                mpv.setPropertyString("sub-bold", if (style.bold) "yes" else "no")
-                mpv.setPropertyInt("sub-font-size", style.toMpvSubtitleFontSize())
-                mpv.setPropertyInt("sub-outline-size", style.toMpvSubtitleOutlineSize())
-                mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
-                mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
-                mpv.setPropertyBoolean("sub-filter-sdh", style.stripSdh)
-                mpv.setPropertyBoolean("sub-filter-sdh-harder", style.stripSdh)
+                executeMpv {
+                    mpv.setPropertyString("sub-ass-override", "no")
+                    mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
+                    mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
+                    mpv.setPropertyString("sub-outline-color", style.outlineColor.toMpvColor())
+                    mpv.setPropertyString("sub-border-color", style.outlineColor.toMpvColor())
+                    mpv.setPropertyString("sub-border-style", style.toMpvSubtitleBorderStyle())
+                    mpv.setPropertyString("sub-bold", if (style.bold) "yes" else "no")
+                    mpv.setPropertyInt("sub-font-size", style.toMpvSubtitleFontSize())
+                    mpv.setPropertyInt("sub-outline-size", style.toMpvSubtitleOutlineSize())
+                    mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
+                    mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
+                    mpv.setPropertyBoolean("sub-filter-sdh", style.stripSdh)
+                    mpv.setPropertyBoolean("sub-filter-sdh-harder", style.stripSdh)
+                }
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
-                mpv.setPropertyDouble(
-                    "sub-delay",
-                    delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS) / 1000.0,
-                )
+                executeMpv {
+                    mpv.setPropertyDouble(
+                        "sub-delay",
+                        delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS) / 1000.0,
+                    )
+                }
             }
         }
 
-    private fun applyRequestHeaders(headers: Map<String, String>) {
+    fun refreshTracks(context: Context) {
+        executeMpv {
+            latestAudioTracks = extractLibmpvTracks(context, type = "audio")
+            latestSubtitleTracks = extractLibmpvTracks(context, type = "sub")
+        }
+    }
+
+    fun releaseMpv() {
+        if (!released.compareAndSet(false, true)) return
+        holder.removeCallback(this)
+        mpvScope.launch {
+            runCatching { mpv.destroy() }
+            mpvDispatcher.close()
+        }
+    }
+
+    private fun setPausedNow(paused: Boolean) {
+        runCatching { mpv.setPropertyBoolean("pause", paused) }
+    }
+
+    private fun executeMpv(block: () -> Unit) {
+        if (released.get()) return
+        mpvScope.launch {
+            if (released.get()) return@launch
+            runCatching(block).onFailure { error ->
+                Log.w(TAG, "libmpv operation failed", error)
+            }
+        }
+    }
+
+    private fun applyRequestHeadersNow(headers: Map<String, String>) {
         val userAgent = headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
         if (!userAgent.isNullOrBlank()) {
             mpv.setPropertyString("user-agent", userAgent)
@@ -1749,6 +1821,14 @@ private fun android.widget.FrameLayout.removeAssOverlayChildren() {
             removeViewAt(index)
         }
     }
+}
+
+private fun PlayerView.releaseLibassOverlay() {
+    findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container)
+        ?.removeAssOverlayChildren()
+    findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
+        ?.removeAssOverlayChildren()
+    setTag(R.id.libass_overlay_bound_player, null)
 }
 
 private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState, pipScale: Float = 1.0f) {
