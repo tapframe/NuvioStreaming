@@ -1431,11 +1431,25 @@ private class NuvioLibmpvView(
             }
 
             override fun clearExternalSubtitle() {
+                extractLibmpvTracks(context, type = "sub")
+                    .filter { it.isExternal }
+                    .forEach { track -> mpv.command("sub-remove", track.id.toString()) }
                 mpv.setPropertyString("sid", "no")
             }
 
             override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
-                selectSubtitleTrack(trackIndex)
+                val tracks = extractLibmpvTracks(context, type = "sub")
+                val targetTrackId = tracks.getOrNull(trackIndex)
+                    ?.takeUnless { it.isExternal }
+                    ?.id
+                tracks
+                    .filter { it.isExternal }
+                    .forEach { track -> mpv.command("sub-remove", track.id.toString()) }
+                if (targetTrackId == null) {
+                    mpv.setPropertyString("sid", "no")
+                } else {
+                    mpv.setPropertyInt("sid", targetTrackId)
+                }
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
@@ -1491,6 +1505,8 @@ private class NuvioLibmpvView(
                     label = label,
                     language = language,
                     isSelected = node.nodeBoolean("selected") ?: false,
+                    isExternal = node.nodeBoolean("external") == true ||
+                        node.nodeString("external-filename") != null,
                     isForced = inferForcedSubtitleTrack(
                         label = label,
                         language = language,
@@ -1507,6 +1523,7 @@ private data class LibmpvTrack(
     val label: String,
     val language: String?,
     val isSelected: Boolean,
+    val isExternal: Boolean,
     val isForced: Boolean,
 )
 

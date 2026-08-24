@@ -219,3 +219,17 @@ internal fun findPersistedSubtitleTrackIndex(
     }
     return -1
 }
+
+internal fun persistedAddonSubtitleUrlForVideo(
+    preference: PersistedPlayerTrackPreference,
+    videoId: String,
+): String? {
+    val persistedVideoId = preference.addonSubtitleVideoId?.takeIf { it.isNotBlank() } ?: return null
+    if (persistedVideoId != videoId.takeIf { it.isNotBlank() }) return null
+    return preference.addonSubtitleUrl?.takeIf { it.isNotBlank() }
+}
+
+internal fun isSubtitleModalSelectionCurrent(
+    modalVideoId: String?,
+    currentVideoId: String,
+): Boolean = !modalVideoId.isNullOrBlank() && modalVideoId == currentVideoId

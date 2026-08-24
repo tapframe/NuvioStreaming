@@ -11,6 +11,7 @@ internal actual object PlayerTrackPreferenceStorage {
     private const val addonSubtitleIdKey = "addon_subtitle_id"
     private const val addonSubtitleUrlKey = "addon_subtitle_url"
     private const val addonSubtitleAddonNameKey = "addon_subtitle_addon_name"
+    private const val addonSubtitleVideoIdKey = "addon_subtitle_video_id"
     private const val audioLanguageKey = "audio_language"
     private const val audioNameKey = "audio_name"
     private const val audioTrackIdKey = "audio_track_id"
@@ -26,6 +27,7 @@ internal actual object PlayerTrackPreferenceStorage {
             addonSubtitleId = loadString(addonSubtitleIdKey, id),
             addonSubtitleUrl = loadString(addonSubtitleUrlKey, id),
             addonSubtitleAddonName = loadString(addonSubtitleAddonNameKey, id),
+            addonSubtitleVideoId = loadString(addonSubtitleVideoIdKey, id),
             audioLanguage = loadString(audioLanguageKey, id),
             audioName = loadString(audioNameKey, id),
             audioTrackId = loadString(audioTrackIdKey, id),
@@ -39,6 +41,7 @@ internal actual object PlayerTrackPreferenceStorage {
                 it.addonSubtitleId,
                 it.addonSubtitleUrl,
                 it.addonSubtitleAddonName,
+                it.addonSubtitleVideoId,
                 it.audioLanguage,
                 it.audioName,
                 it.audioTrackId,
@@ -55,6 +58,7 @@ internal actual object PlayerTrackPreferenceStorage {
         saveOptionalString(addonSubtitleIdKey, id, preference.addonSubtitleId)
         saveOptionalString(addonSubtitleUrlKey, id, preference.addonSubtitleUrl)
         saveOptionalString(addonSubtitleAddonNameKey, id, preference.addonSubtitleAddonName)
+        saveOptionalString(addonSubtitleVideoIdKey, id, preference.addonSubtitleVideoId)
         saveOptionalString(audioLanguageKey, id, preference.audioLanguage)
         saveOptionalString(audioNameKey, id, preference.audioName)
         saveOptionalString(audioTrackIdKey, id, preference.audioTrackId)

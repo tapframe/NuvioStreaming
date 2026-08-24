@@ -68,6 +68,20 @@ internal actual object PlatformLocalAccountDataCleaner {
         "collection_mobile_settings_payload",
         "collections_payload",
     )
+    private val playerTrackPreferencePrefixes = listOf(
+        "subtitle_type|",
+        "subtitle_language|",
+        "subtitle_name|",
+        "subtitle_track_id|",
+        "addon_subtitle_id|",
+        "addon_subtitle_url|",
+        "addon_subtitle_addon_name|",
+        "addon_subtitle_video_id|",
+        "audio_language|",
+        "audio_name|",
+        "audio_track_id|",
+        "subtitle_delay_ms|",
+    )
 
     actual fun wipe() {
         val defaults = NSUserDefaults.standardUserDefaults
@@ -90,7 +104,8 @@ internal actual object PlatformLocalAccountDataCleaner {
             val keyString = key as? String ?: continue
             if (
                 keyString.startsWith("stream_link_") ||
-                keyString.startsWith("cw_enrichment_cache_")
+                keyString.startsWith("cw_enrichment_cache_") ||
+                playerTrackPreferencePrefixes.any(keyString::startsWith)
             ) {
                 defaults.removeObjectForKey(keyString)
             }
