@@ -365,13 +365,31 @@ private fun ExoPlayerSurface(
             .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
 
         val trackSelector = DefaultTrackSelector(context).apply {
-            setParameters(
-                buildUponParameters()
-                    .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
-            )
+            var parameters = buildUponParameters()
+                .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
             if (playerSettings.tunnelingEnabled) {
-                setParameters(buildUponParameters().setTunnelingEnabled(true))
+                parameters = parameters.setTunnelingEnabled(true)
             }
+            val captioningManager = context.getSystemService(Context.CAPTIONING_SERVICE)
+                as? android.view.accessibility.CaptioningManager
+            if (captioningManager != null) {
+                if (!captioningManager.isEnabled) {
+                    parameters = parameters.setIgnoredTextSelectionFlags(
+                        parameters.build().ignoredTextSelectionFlags or C.SELECTION_FLAG_DEFAULT
+                    )
+                }
+                captioningManager.locale?.let { locale ->
+                    parameters = parameters.setPreferredTextLanguage(locale.isO3Language)
+                }
+            }
+            if (playerSettings.subtitleStyle.useForcedSubtitles) {
+                parameters = parameters.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            } else {
+                parameters = parameters.setIgnoredTextSelectionFlags(
+                    parameters.build().ignoredTextSelectionFlags or C.SELECTION_FLAG_FORCED
+                )
+            }
+            setParameters(parameters)
         }
 
         val loadControl = DefaultLoadControl.Builder()
@@ -409,6 +427,13 @@ private fun ExoPlayerSurface(
                 .build()
         }
 
+        player.applySubtitleTrackPreferences(
+            preferredLanguage = playerSettings.preferredSubtitleLanguage,
+            useForcedSubtitles = playerSettings.subtitleStyle.useForcedSubtitles,
+            autoSelectionApplied = false,
+            hasActiveSubtitle = false,
+            useCustomSubtitles = false,
+        )
         player
     }
 
@@ -469,6 +494,14 @@ private fun ExoPlayerSurface(
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
     val isInPip = rememberIsInPictureInPicture()
     val pipSubtitleScale by rememberUpdatedState(if (isInPip) 0.4f else 1.0f)
+
+    val sidecarController = remember(exoPlayer, coroutineScope) {
+        SidecarSubtitleController(
+            scope = coroutineScope,
+            getPlayer = { exoPlayer },
+            getSubtitleDelayMs = { latestSubtitleDelayMs.value },
+        )
+    }
 
     fun syncPlayerViewKeepScreenOn() {
         playerViewRef?.keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
@@ -664,6 +697,7 @@ private fun ExoPlayerSurface(
             exoPlayer.removeListener(listener)
             playerViewRef?.keepScreenOn = false
             subtitleSelectionJob?.cancel()
+            sidecarController.stopSidecarAddonSubtitle(clearView = true)
         }
     }
 
@@ -753,6 +787,7 @@ private fun ExoPlayerSurface(
 
                 override fun selectSubtitleTrack(index: Int) {
                     Log.d(TAG, "selectSubtitleTrack: index=$index")
+                    sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     if (index < 0) {
                         Log.d(TAG, "selectSubtitleTrack: disabling text tracks")
                         exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
@@ -773,6 +808,22 @@ private fun ExoPlayerSurface(
                 override fun setSubtitleUri(url: String) {
                     Log.d(TAG, "setSubtitleUri: url=$url")
                     subtitleSelectionJob?.cancel()
+                    if (sidecarController.canAttachAddonSubtitleViaSidecar(url, useLibass)) {
+                        Log.d(TAG, "setSubtitleUri: using buffer-preserving sidecar for url=$url")
+                        val headers = externalSubtitles.firstOrNull { it.url == url }?.headers.orEmpty()
+                        val attached = sidecarController.startSidecarAddonSubtitle(
+                            url = url,
+                            headers = headers,
+                            useLibass = useLibass,
+                        )
+                        if (attached) {
+                            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                                .buildUpon()
+                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                                .build()
+                            return
+                        }
+                    }
                     subtitleSelectionJob = coroutineScope.launch {
                         val currentPosition = exoPlayer.currentPosition
                         val wasPlaying = exoPlayer.isPlaying
@@ -816,42 +867,70 @@ private fun ExoPlayerSurface(
                 override fun clearExternalSubtitle() {
                     Log.d(TAG, "clearExternalSubtitle called")
                     subtitleSelectionJob?.cancel()
+                    sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     selectedExternalSubtitleMimeType = null
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
                     val currentMediaItem = exoPlayer.currentMediaItem ?: return
-                    preserveAudioSelectionForReload("clearExternalSubtitle")
-                    val newMediaItem = currentMediaItem.buildUpon()
-                        .setSubtitleConfigurations(emptyList())
-                        .build()
-                    exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = wasPlaying
+                    if (currentMediaItem.localConfiguration?.subtitleConfigurations?.isNotEmpty() == true) {
+                        preserveAudioSelectionForReload("clearExternalSubtitle")
+                        val newMediaItem = currentMediaItem.buildUpon()
+                            .setSubtitleConfigurations(emptyList())
+                            .build()
+                        exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
+                        exoPlayer.prepare()
+                        exoPlayer.playWhenReady = wasPlaying
+                    } else {
+                        selectSubtitleTrack(-1)
+                    }
                     Log.d(TAG, "clearExternalSubtitle: done, position=$currentPosition")
                 }
 
                 override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
                     Log.d(TAG, "clearExternalSubtitleAndSelect: trackIndex=$trackIndex")
                     subtitleSelectionJob?.cancel()
+                    sidecarController.stopSidecarAddonSubtitle(clearView = true)
                     selectedExternalSubtitleMimeType = null
-                    pendingSubtitleTrackIndex.clear()
-                    pendingSubtitleTrackIndex.add(trackIndex)
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
                     val currentMediaItem = exoPlayer.currentMediaItem ?: return
-                    preserveAudioSelectionForReload("clearExternalSubtitleAndSelect")
-                    val newMediaItem = currentMediaItem.buildUpon()
-                        .setSubtitleConfigurations(emptyList())
-                        .build()
-                    exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = wasPlaying
+                    if (currentMediaItem.localConfiguration?.subtitleConfigurations?.isNotEmpty() == true) {
+                        pendingSubtitleTrackIndex.clear()
+                        pendingSubtitleTrackIndex.add(trackIndex)
+                        preserveAudioSelectionForReload("clearExternalSubtitleAndSelect")
+                        val newMediaItem = currentMediaItem.buildUpon()
+                            .setSubtitleConfigurations(emptyList())
+                            .build()
+                        exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
+                        exoPlayer.prepare()
+                        exoPlayer.playWhenReady = wasPlaying
+                    } else {
+                        pendingSubtitleTrackIndex.clear()
+                        selectSubtitleTrack(trackIndex)
+                    }
                     Log.d(TAG, "clearExternalSubtitleAndSelect: done, pending=$trackIndex position=$currentPosition")
                 }
 
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
                     currentSubtitleStyle = style
                     playerViewRef?.applySubtitleStyle(style, pipSubtitleScale)
+                }
+
+                override fun applySubtitlePreferences(
+                    preferredLanguage: String,
+                    secondaryPreferredLanguage: String?,
+                    useForcedSubtitles: Boolean,
+                    autoSelectionApplied: Boolean,
+                    hasActiveSubtitle: Boolean,
+                    useCustomSubtitles: Boolean,
+                ) {
+                    exoPlayer.applySubtitleTrackPreferences(
+                        preferredLanguage = preferredLanguage,
+                        useForcedSubtitles = useForcedSubtitles,
+                        autoSelectionApplied = autoSelectionApplied,
+                        hasActiveSubtitle = hasActiveSubtitle,
+                        useCustomSubtitles = useCustomSubtitles,
+                    )
                 }
 
                 override fun setSubtitleDelayMs(delayMs: Int) {
@@ -879,6 +958,7 @@ private fun ExoPlayerSurface(
                 this.resizeMode = resizeMode.toExoResizeMode()
                 setShutterBackgroundColor(android.graphics.Color.BLACK)
                 playerViewRef = this
+                sidecarController.bindSubtitleView(this.subtitleView)
                 syncLibassOverlay(
                     player = exoPlayer,
                     enabled = useLibass,
@@ -892,6 +972,7 @@ private fun ExoPlayerSurface(
             playerView.useController = useNativeController
             playerView.resizeMode = resizeMode.toExoResizeMode()
             playerViewRef = playerView
+            sidecarController.bindSubtitleView(playerView.subtitleView)
             syncPlayerViewKeepScreenOn()
             playerView.syncLibassOverlay(
                 player = exoPlayer,
@@ -1476,6 +1557,38 @@ private class NuvioLibmpvView(
                 selectSubtitleTrack(trackIndex)
             }
 
+            override fun applySubtitlePreferences(
+                preferredLanguage: String,
+                secondaryPreferredLanguage: String?,
+                useForcedSubtitles: Boolean,
+                autoSelectionApplied: Boolean,
+                hasActiveSubtitle: Boolean,
+                useCustomSubtitles: Boolean,
+            ) {
+                if (hasActiveSubtitle || useCustomSubtitles) {
+                    return
+                }
+                val languages = listOfNotNull(
+                    preferredLanguage.takeIf { language ->
+                        language.isNotBlank() &&
+                            !language.equals(SubtitleLanguageOption.NONE, ignoreCase = true) &&
+                            !language.equals(SubtitleLanguageOption.FORCED, ignoreCase = true)
+                    },
+                    secondaryPreferredLanguage?.takeIf { language ->
+                        language.isNotBlank() &&
+                            !language.equals(SubtitleLanguageOption.NONE, ignoreCase = true) &&
+                            !language.equals(SubtitleLanguageOption.FORCED, ignoreCase = true)
+                    },
+                )
+                if (languages.isEmpty()) {
+                    mpv.setPropertyString("sid", "no")
+                    return
+                }
+                runCatching {
+                    mpv.setPropertyString("slang", languages.joinToString(","))
+                }
+            }
+
             override fun applySubtitleStyle(style: SubtitleStyleState) {
                 executeMpv {
                     mpv.setPropertyString("sub-ass-override", "no")
@@ -1875,6 +1988,56 @@ private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
         idx++
     }
     return tracks
+}
+
+private fun ExoPlayer.applySubtitleTrackPreferences(
+    preferredLanguage: String,
+    useForcedSubtitles: Boolean,
+    autoSelectionApplied: Boolean,
+    hasActiveSubtitle: Boolean,
+    useCustomSubtitles: Boolean,
+) {
+    if (hasActiveSubtitle || useCustomSubtitles) {
+        return
+    }
+
+    val builder = trackSelectionParameters.buildUpon()
+    val resolvedPreferred = exoPreferredTextLanguage(preferredLanguage)
+
+    if (resolvedPreferred == null) {
+        builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        builder.setPreferredTextLanguage(null)
+    } else {
+        val userDisabledSubtitles = autoSelectionApplied && !hasActiveSubtitle
+        val shouldSuppressExoAutoSelect = useForcedSubtitles && !autoSelectionApplied
+        if (!userDisabledSubtitles && !shouldSuppressExoAutoSelect) {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        }
+        if (!shouldSuppressExoAutoSelect) {
+            builder.setPreferredTextLanguage(resolvedPreferred)
+        }
+    }
+
+    val currentFlags = trackSelectionParameters.ignoredTextSelectionFlags
+    val newFlags = if (!useForcedSubtitles) {
+        currentFlags or C.SELECTION_FLAG_FORCED
+    } else {
+        currentFlags and C.SELECTION_FLAG_FORCED.inv()
+    }
+    builder.setIgnoredTextSelectionFlags(newFlags)
+    trackSelectionParameters = builder.build()
+}
+
+private fun exoPreferredTextLanguage(preferredLanguage: String): String? {
+    val normalized = normalizeLanguageCode(preferredLanguage) ?: return null
+    return when (normalized) {
+        SubtitleLanguageOption.NONE,
+        SubtitleLanguageOption.FORCED,
+        -> null
+        SubtitleLanguageOption.DEVICE ->
+            DeviceLanguagePreferences.preferredLanguageCodes().firstOrNull()
+        else -> normalized
+    }
 }
 
 private fun ExoPlayer.extractSubtitleTracks(context: Context): List<SubtitleTrack> {
