@@ -14,6 +14,8 @@
     <string name="action_cancel">Отказ</string>
     <string name="action_close">Затвори</string>
     <string name="action_delete">Изтрий</string>
+    <string name="action_delete_confirm_message">Наистина ли искате да изтриете?</string>
+    <string name="action_delete_confirm_title">Изтрий?</string>
     <string name="action_done">Готово</string>
     <string name="action_edit">Редактирай</string>
     <string name="action_import">Импортирай</string>
@@ -42,6 +44,7 @@
     <string name="addons_badge_unavailable">Недостъпна</string>
     <string name="addons_configure">Настрой добавката</string>
     <string name="addons_delete">Изтрий добавката</string>
+    <string name="addons_delete_confirm_title">Изтриване на добавката?</string>
     <string name="addons_appstore_add_description">Пренесете библиотеката си в Nuvio с добавките, които използвате.</string>
     <string name="addons_appstore_empty_subtitle">Добавете добавка, за да започнете да изграждате библиотеката си.</string>
     <string name="addons_appstore_empty_title">Настройте Nuvio по свой начин.</string>
@@ -754,7 +757,7 @@
     <string name="settings_show_secret">Покажи стойността</string>
     <string name="settings_continue_watching_resume_prompt_description">Показвай изскачащ прозорец за продължаване от там, където сте спрели, при отваряне на приложението след излизане от плейъра.</string>
     <string name="settings_continue_watching_resume_prompt_title">Подкана за продължаване при стартиране</string>
-    <string name="settings_continue_watching_blur_next_up_description">Замъгли миниатюрите на следващите епизоди в „Продължи гледането", за да избегнете спойлери.</string>
+    <string name="settings_continue_watching_blur_next_up_description">Замъгли миниатюрите на негледаните епизоди в „Продължи гледането", за да избегнете спойлери.</string>
     <string name="settings_continue_watching_blur_next_up_title">Замъгли негледаното в „Продължи гледането"</string>
     <string name="settings_continue_watching_show_unaired_next_up_description">Включи предстоящи епизоди в „Продължи гледането" преди да са излъчени.</string>
     <string name="settings_continue_watching_show_unaired_next_up_title">Покажи неизлъчени следващи епизоди</string>
@@ -945,6 +948,20 @@
     <string name="community_donation_progress_title">Сървър и поддръжка за този месец</string>
     <string name="community_donation_progress_complete">Покрито. Допълнителната подкрепа вече отива за разработка.</string>
     <string name="community_donation_progress_remaining">След 100% допълнителната подкрепа отива за разработка.</string>
+    <string name="community_membership_title">Членство „Поддръжник“ в Nuvio</string>
+    <string name="community_membership_description">Подкрепата за Nuvio помага за покриване на разходите за инфраструктура и развитие, като в същото време основните функции остават безплатни за всички.</string>
+    <string name="community_view_supporter_membership">Преглед на членството „Поддръжник“</string>
+    <string name="community_membership_you_are">Вие сте</string>
+    <string name="community_membership_thank_you">Благодарим Ви.</string>
+    <string name="community_membership_supporter_since">Поддръжник от %1$s.</string>
+    <string name="community_membership_connected_title">Patreon е свързан</string>
+    <string name="community_membership_connected_description">Не беше открит активен план на Nuvio в този акаунт в Patreon. Прегледайте наличните опции или обновете страницата, след като промените членството си в Patreon.</string>
+    <string name="community_membership_manage">Управление на членството</string>
+    <string name="community_membership_refresh">Опресняване</string>
+    <string name="community_membership_refreshing">Опреснява се</string>
+    <string name="community_membership_unable_load">Не може да се зареди статуса на членството. Моля, опитайте отново.</string>
+    <string name="community_membership_tier_supporter">Поддръжник</string>
+    <string name="community_membership_tier_supporter_plus">Поддръжник Плюс</string>
     <string name="community_loading_donation_progress">Зареждане на напредъка на финансирането...</string>
     <string name="community_supporters_not_configured">API за поддръжници не е конфигуриран. Добавете DONATIONS_BASE_URL към local.properties.</string>
     <string name="community_tab_contributors">Сътрудници</string>
@@ -1110,6 +1127,8 @@
     <string name="settings_playback_subtitle_show_preferred_only">Покажи само предпочитани езици</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Показвай само субтитри, съответстващи на предпочитаните от вас езици за субтитри.</string>
     <string name="settings_playback_subtitle_size">Размер на субтитрите</string>
+    <string name="settings_playback_subtitle_strip_sdh">Премахване на SDH субтитри</string>
+    <string name="settings_playback_subtitle_strip_sdh_description">Скриване на описанията на звуците и имената на говорещите от текстовите субтитри.</string>
     <string name="settings_playback_subtitle_text_color">Цвят на текста</string>
     <string name="settings_playback_subtitle_use_forced">Използвай принудителни субтитри</string>
     <string name="settings_playback_subtitle_use_forced_description">Предпочитай принудителни субтитри при съответствие с настройките ви за субтитри.</string>
@@ -2139,8 +2158,8 @@
     <string name="cw_airs_today">Ще се излъчи днес</string>
     <string name="cw_airs_tomorrow">Ще се излъчи утре</string>
     <plurals name="cw_airs_in_days">
-        <item quantity="one">Ще се излъчи се след %1$d ден</item>
-        <item quantity="other">Ще се излъчи се след %1$d дни</item>
+        <item quantity="one">Ще се излъчи след %1$d ден</item>
+        <item quantity="other">Ще се излъчи след %1$d дни</item>
     </plurals>
     <string name="cw_airs_date_short">%1$s</string>
     <string name="cw_airs_today_short">Днес</string>
