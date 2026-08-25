@@ -54,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
-import com.nuvio.app.features.player.AddonSubtitleStartupMode
 import com.nuvio.app.features.player.AndroidLibmpvVideoOutput
 import com.nuvio.app.features.player.AndroidPlaybackEngine
 import com.nuvio.app.features.player.AudioLanguageOption
@@ -174,17 +173,6 @@ private fun formatP2pCacheBytes(bytes: Long): String {
         "${kotlin.math.round(bytes / mebibyte * 10.0) / 10.0} MB"
     }
 }
-
-@Composable
-private fun addonSubtitleStartupModeLabel(mode: AddonSubtitleStartupMode): String =
-    when (mode) {
-        AddonSubtitleStartupMode.FAST_STARTUP ->
-            stringResource(Res.string.settings_playback_addon_subtitle_startup_fast)
-        AddonSubtitleStartupMode.PREFERRED_ONLY ->
-            stringResource(Res.string.settings_playback_addon_subtitle_startup_preferred)
-        AddonSubtitleStartupMode.ALL_SUBTITLES ->
-            stringResource(Res.string.settings_playback_addon_subtitle_startup_all)
-    }
 
 fun snapToStep(value: Float, step: Float): Float {
     return (value / step).roundToInt() * step
@@ -307,7 +295,6 @@ private fun PlaybackSettingsSection(
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
     var showPreferredSubtitleDialog by remember { mutableStateOf(false) }
     var showSecondarySubtitleDialog by remember { mutableStateOf(false) }
-    var showAddonSubtitleStartupModeDialog by remember { mutableStateOf(false) }
     var showSubtitleTextColorDialog by remember { mutableStateOf(false) }
     var showSubtitleBackgroundColorDialog by remember { mutableStateOf(false) }
     var showSubtitleOutlineColorDialog by remember { mutableStateOf(false) }
@@ -548,14 +535,6 @@ private fun PlaybackSettingsSection(
                             autoPlayPlayerSettings.subtitleStyle.copy(showOnlyPreferredLanguages = enabled),
                         )
                     },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_addon_subtitle_startup_mode),
-                    description = addonSubtitleStartupModeLabel(autoPlayPlayerSettings.addonSubtitleStartupMode),
-                    enabled = otherSubtitleOptionsEnabled,
-                    isTablet = isTablet,
-                    onClick = { showAddonSubtitleStartupModeDialog = true },
                 )
             }
         }
@@ -1386,17 +1365,6 @@ private fun PlaybackSettingsSection(
                 showSecondarySubtitleDialog = false
             },
             onDismiss = { showSecondarySubtitleDialog = false },
-        )
-    }
-
-    if (showAddonSubtitleStartupModeDialog) {
-        AddonSubtitleStartupModeDialog(
-            selectedMode = autoPlayPlayerSettings.addonSubtitleStartupMode,
-            onModeSelected = {
-                PlayerSettingsRepository.setAddonSubtitleStartupMode(it)
-                showAddonSubtitleStartupModeDialog = false
-            },
-            onDismiss = { showAddonSubtitleStartupModeDialog = false },
         )
     }
 
@@ -2569,108 +2537,7 @@ private fun LibassRenderTypeDialog(
     }
 }
 
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun AddonSubtitleStartupModeDialog(
-    selectedMode: AddonSubtitleStartupMode,
-    onModeSelected: (AddonSubtitleStartupMode) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val options = listOf(
-        Triple(
-            AddonSubtitleStartupMode.FAST_STARTUP,
-            Res.string.settings_playback_addon_subtitle_startup_fast,
-            Res.string.settings_playback_addon_subtitle_startup_fast_description,
-        ),
-        Triple(
-            AddonSubtitleStartupMode.PREFERRED_ONLY,
-            Res.string.settings_playback_addon_subtitle_startup_preferred,
-            Res.string.settings_playback_addon_subtitle_startup_preferred_description,
-        ),
-        Triple(
-            AddonSubtitleStartupMode.ALL_SUBTITLES,
-            Res.string.settings_playback_addon_subtitle_startup_all,
-            Res.string.settings_playback_addon_subtitle_startup_all_description,
-        ),
-    )
 
-    BasicAlertDialog(
-        onDismissRequest = onDismiss,
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = stringResource(Res.string.settings_playback_addon_subtitle_startup_mode),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                )
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    options.forEach { (mode, titleRes, descriptionRes) ->
-                        val isSelected = mode == selectedMode
-                        val containerColor = if (isSelected) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        }
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onModeSelected(mode) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = containerColor,
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(titleRes),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = stringResource(descriptionRes),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier.size(24.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Check,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
