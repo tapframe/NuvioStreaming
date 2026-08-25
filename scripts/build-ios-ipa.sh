@@ -5,7 +5,20 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 version_file="${repository_root}/iosApp/Configuration/Version.xcconfig"
 version="${1:-$(sed -nE 's/^[[:space:]]*MARKETING_VERSION[[:space:]]*=[[:space:]]*([^[:space:]#]+).*$/\1/p' "${version_file}" | head -n 1)}"
-derived_data="${IOS_DERIVED_DATA_PATH:-${repository_root}/build/ios-derived-full}"
+configuration="${IOS_CONFIGURATION:-Release}"
+case "${configuration}" in
+    Debug)
+        configuration_slug="debug"
+        ;;
+    Release)
+        configuration_slug="release"
+        ;;
+    *)
+        echo "Unsupported iOS configuration: ${configuration}" >&2
+        exit 1
+        ;;
+esac
+derived_data="${IOS_DERIVED_DATA_PATH:-${repository_root}/build/ios-derived-full-${configuration_slug}}"
 output_directory="${IOS_IPA_OUTPUT_DIR:-${repository_root}/build/ios-ipa}"
 clang_module_cache="${CLANG_MODULE_CACHE_PATH:-${derived_data}/ModuleCache.noindex}"
 swiftpm_module_cache="${SWIFTPM_MODULECACHE_OVERRIDE:-${derived_data}/SwiftPMModuleCache.noindex}"
@@ -16,14 +29,23 @@ if [[ ! "${version}" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
 fi
 
 cd "${repository_root}"
-env \
-    NUVIO_IOS_DISTRIBUTION=full \
-    CLANG_MODULE_CACHE_PATH="${clang_module_cache}" \
-    SWIFTPM_MODULECACHE_OVERRIDE="${swiftpm_module_cache}" \
+build_environment=(
+    env
+    NUVIO_IOS_DISTRIBUTION=full
+    CLANG_MODULE_CACHE_PATH="${clang_module_cache}"
+    SWIFTPM_MODULECACHE_OVERRIDE="${swiftpm_module_cache}"
+)
+if [[ -n "${NUVIO_GRADLE_JVMARGS:-}" ]]; then
+    build_environment+=("ORG_GRADLE_PROJECT_org.gradle.jvmargs=${NUVIO_GRADLE_JVMARGS}")
+fi
+if [[ -n "${NUVIO_KOTLIN_NATIVE_JVMARGS:-}" ]]; then
+    build_environment+=("ORG_GRADLE_PROJECT_kotlin.native.jvmArgs=${NUVIO_KOTLIN_NATIVE_JVMARGS}")
+fi
+"${build_environment[@]}" \
     xcodebuild \
     -project iosApp/iosApp.xcodeproj \
     -scheme iosApp \
-    -configuration Release \
+    -configuration "${configuration}" \
     -sdk iphoneos \
     -destination 'generic/platform=iOS' \
     -derivedDataPath "${derived_data}" \
@@ -32,7 +54,7 @@ env \
     CODE_SIGN_IDENTITY= \
     build
 
-app_path="${derived_data}/Build/Products/Release-iphoneos/Nuvio.app"
+app_path="${derived_data}/Build/Products/${configuration}-iphoneos/Nuvio.app"
 if [[ ! -d "${app_path}" ]]; then
     echo "iOS build did not produce ${app_path}." >&2
     exit 1
@@ -48,6 +70,14 @@ executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "${app_path
 architectures="$(xcrun lipo -archs "${app_path}/${executable}")"
 if [[ " ${architectures} " != *" arm64 "* ]]; then
     echo "Built iOS application does not contain arm64." >&2
+    exit 1
+fi
+if ! launch_screen_plist="$(plutil -extract UILaunchScreen xml1 -o - "${app_path}/Info.plist" 2>/dev/null)"; then
+    echo "Built iOS application does not contain UILaunchScreen." >&2
+    exit 1
+fi
+if [[ "${launch_screen_plist}" == *"<key>UILaunchScreen</key>"* ]]; then
+    echo "Built iOS application contains a nested UILaunchScreen." >&2
     exit 1
 fi
 if [[ -d "${app_path}/_CodeSignature" ]]; then
@@ -74,8 +104,8 @@ trap 'rm -rf "${package_root}"' EXIT
 mkdir -p "${package_root}/Payload"
 ditto "${app_path}" "${package_root}/Payload/Nuvio.app"
 
-ipa_path="${output_directory}/nuvio-${version}-full-release.ipa"
-temporary_ipa="${package_root}/nuvio-${version}-full-release.ipa"
+ipa_path="${output_directory}/nuvio-${version}-full-${configuration_slug}.ipa"
+temporary_ipa="${package_root}/nuvio-${version}-full-${configuration_slug}.ipa"
 (
     cd "${package_root}"
     /usr/bin/zip -qry "${temporary_ipa}" Payload

@@ -188,8 +188,14 @@ jobs:
     name: Build iOS IPA
     if: inputs.mode != 'dry-run'
     needs: prepare
-    runs-on: macos-15
+    runs-on: macos-26-intel
+    timeout-minutes: 75
     env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      GRADLE_OPTS: -Dfile.encoding=UTF-8
+      KOTLIN_DAEMON_JVMARGS: -Xmx2048M
+      NUVIO_GRADLE_JVMARGS: -Xmx9216M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=1024M
+      NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx9216M
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
 
     steps:
@@ -204,6 +210,11 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      - name: Verify Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
 
       - name: Configure runtime properties
         run: |
@@ -220,7 +231,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nuvio-${{ needs.prepare.outputs.version }}-ios-full-release
-          path: build/ios-ipa/*.ipa
+          path: build/ios-ipa/*-full-release.ipa
           if-no-files-found: error
 
   release:
