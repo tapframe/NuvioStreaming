@@ -364,6 +364,7 @@ internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: Downloa
     activeEpisodeNumber = episode.episode
     activeEpisodeTitle = episode.title
     activeEpisodeThumbnail = episode.thumbnail
+    activePauseDescription = episode.overview
     activeVideoId = resolvedVideoId
     activeInitialPositionMs = epResumePositionMs
     activeInitialProgressFraction = epResumeFraction
@@ -471,6 +472,7 @@ private fun PlayerScreenRuntime.applyEpisodeStreamMetadata(
     activeEpisodeNumber = episode.episode
     activeEpisodeTitle = episode.title
     activeEpisodeThumbnail = episode.thumbnail
+    activePauseDescription = episode.overview
     activeVideoId = episode.id
     activeInitialPositionMs = resume.positionMs
     activeInitialProgressFraction = resume.fraction

@@ -45,6 +45,10 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.labelRes
 import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.features.membership.MemberAccessRepository
+import com.nuvio.app.features.membership.availableAppThemes
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.cd_selected
@@ -108,7 +112,11 @@ internal fun LazyListScope.appearanceSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                val themes = listOf(AppTheme.WHITE) + AppTheme.entries.filterNot { it == AppTheme.WHITE }
+                val memberAccess by remember {
+                    MemberAccessRepository.ensureStarted()
+                    MemberAccessRepository.access
+                }.collectAsStateWithLifecycle()
+                val themes = availableAppThemes(memberAccess.entitlements)
                 val horizontalPadding = if (isTablet) 20.dp else 16.dp
                 val verticalPadding = if (isTablet) 18.dp else 14.dp
                 val themeSpacing = if (isTablet) 16.dp else 12.dp
@@ -428,7 +436,7 @@ private fun ThemeChip(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(palette.secondary),
+                    .background(palette.accentBrush()),
                 contentAlignment = Alignment.Center,
             ) {
                 if (isSelected) {

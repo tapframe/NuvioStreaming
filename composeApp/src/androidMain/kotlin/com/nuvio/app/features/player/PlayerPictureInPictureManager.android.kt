@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import kotlin.math.roundToInt
@@ -109,18 +110,18 @@ internal object PlayerPictureInPictureManager {
     }
 
     private fun applyPictureInPictureParams(activity: Activity) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (!activity.canUsePictureInPicture()) return
         if (sessionState == lastAppliedSessionState) return
-        lastAppliedSessionState = sessionState
-        activity.setPictureInPictureParams(buildParams(activity))
+        if (runCatching { activity.setPictureInPictureParams(buildParams(activity)) }.isSuccess) {
+            lastAppliedSessionState = sessionState
+        }
     }
 
     private fun enterIfEligible(activity: Activity): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        if (!activity.canUsePictureInPicture()) return false
         if (!sessionState.isActive || !sessionState.isPlaying) return false
-        if (activity.isFinishing) return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) return false
-        return activity.enterPictureInPictureMode(buildParams(activity))
+        return runCatching { activity.enterPictureInPictureMode(buildParams(activity)) }.getOrDefault(false)
     }
 
     private fun buildParams(activity: Activity): PictureInPictureParams {
@@ -168,6 +169,14 @@ internal object PlayerPictureInPictureManager {
     private fun clearPendingPictureInPictureExitCheck() {
         pendingPictureInPictureExitCheck?.let(mainHandler::removeCallbacks)
         pendingPictureInPictureExitCheck = null
+    }
+
+    private fun Activity.canUsePictureInPicture(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        if (isFinishing || isDestroyed) return false
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return false
+        if (this is ComponentActivity && !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return false
+        return true
     }
 
     private const val REQUEST_CODE_TOGGLE = 1
