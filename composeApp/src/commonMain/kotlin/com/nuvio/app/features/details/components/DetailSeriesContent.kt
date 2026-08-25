@@ -78,6 +78,7 @@ import com.nuvio.app.features.details.SeasonViewModeStorage
 import com.nuvio.app.features.details.formatRuntimeFromMinutes
 import com.nuvio.app.features.details.metaVideoSeasonEpisodeComparator
 import com.nuvio.app.features.details.normalizeSeasonNumber
+import com.nuvio.app.features.details.preferredEpisodeNumberForSeason
 import com.nuvio.app.features.details.seasonSortKey
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
@@ -301,7 +302,11 @@ fun DetailSeriesContent(
                             progressByVideoId = progressByVideoId,
                             episodeRatings = episodeRatings,
                             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
-                            preferredEpisodeNumber = preferredEpisodeNumber,
+                            preferredEpisodeNumber = preferredEpisodeNumberForSeason(
+                                displayedSeasonNumber = seasonForContent,
+                                preferredSeasonNumber = preferredSeasonNumber,
+                                preferredEpisodeNumber = preferredEpisodeNumber,
+                            ),
                             onEpisodeClick = onEpisodeClick,
                             onEpisodeLongPress = onEpisodeLongPress,
                         )

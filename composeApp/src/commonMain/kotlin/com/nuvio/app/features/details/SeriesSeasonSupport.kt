@@ -23,3 +23,9 @@ internal fun seasonSortKey(seasonNumber: Int?): Int =
     } else {
         seasonNumber
     }
+
+internal fun preferredEpisodeNumberForSeason(
+    displayedSeasonNumber: Int,
+    preferredSeasonNumber: Int?,
+    preferredEpisodeNumber: Int?,
+): Int? = preferredEpisodeNumber.takeIf { displayedSeasonNumber == preferredSeasonNumber }
