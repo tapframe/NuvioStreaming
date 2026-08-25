@@ -235,6 +235,7 @@ internal object MetaDetailsParser {
                 episode = video.int("episode"),
                 overview = video.string("overview") ?: video.string("description"),
                 runtime = video.int("runtime"),
+                rating = video.string("rating")?.trim()?.toDoubleOrNull()?.takeIf { it > 0.0 },
                 streams = video.embeddedStreams(),
             )
         }
