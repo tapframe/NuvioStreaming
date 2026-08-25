@@ -16,7 +16,7 @@
 
 - [Android on Google Play](https://play.google.com/store/apps/details?id=com.nuvio.app)
 - [Android APK](https://github.com/NuvioMedia/NuvioMobile/releases/latest)
-- iOS must be built from source.
+- [iOS IPA](https://github.com/NuvioMedia/NuvioMobile/releases/latest) for sideloading
 
 ## Build from source
 
@@ -38,15 +38,17 @@ Android development requires Android Studio and the Android SDK.
 iOS development requires macOS and Xcode.
 
 ```bash
-env NUVIO_IOS_DISTRIBUTION=full xcodebuild \
-  -project iosApp/iosApp.xcodeproj \
-  -scheme iosApp \
-  -configuration Debug \
-  -sdk iphonesimulator \
-  -derivedDataPath build/ios-derived-full-simulator \
-  CODE_SIGNING_ALLOWED=NO \
-  build
+./scripts/prepare-ios-dependencies.sh
+./scripts/build-ios-ipa.sh
 ```
+
+The resulting IPA in `build/ios-ipa` is unsigned so AltStore, SideStore, or another sideloader can sign it with the installing user's Apple account.
+
+### Releases
+
+Run the `Build Mobile Release` workflow from GitHub Actions. `dry-run` validates the version and release notes without building, while `draft` and `publish` build the full Android APKs and unsigned iOS IPA in parallel and attach them to one GitHub release. The workflow uses the existing Android release-property and keystore secrets; the IPA does not require Apple signing secrets.
+
+Run the `Build Test IPA` workflow to compile the current branch on a macOS runner and download the unsigned IPA from the workflow artifacts. Test artifacts are retained for seven days and do not create a tag or GitHub release.
 
 The shared app is built with Kotlin Multiplatform and Compose Multiplatform.
 
