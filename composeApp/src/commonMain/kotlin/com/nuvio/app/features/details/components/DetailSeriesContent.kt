@@ -36,6 +36,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -684,7 +687,7 @@ private fun EpisodeHorizontalCard(
     val cardShape = RoundedCornerShape(metrics.cornerRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
-    val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
+    val runtimeLabel = remember(video.runtime) { episodeRuntimeLabel(video.runtime) }
     val imageUrl = video.thumbnail ?: fallbackImage
     val visibleProgressEntry = progressEntry?.takeIf { it.durationMs > 0L && !it.isCompleted }
     val progressBarHeight = 4.dp
@@ -800,11 +803,11 @@ private fun EpisodeHorizontalCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     runtimeLabel?.let { runtime ->
-                        Text(
-                            text = runtime,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
+                        EpisodeRuntimeMetadata(
+                            label = runtime,
+                            iconSize = metrics.imdbLogoHeight + 1.dp,
+                            textSize = metrics.metaTextSize,
                             color = Color.White.copy(alpha = 0.78f),
-                            maxLines = 1,
                         )
                     }
                     ratingLabel?.let { rating ->
@@ -975,6 +978,40 @@ private fun formatEpisodeRuntime(runtimeMinutes: Int): String {
     return formatRuntimeFromMinutes(runtimeMinutes)
 }
 
+internal fun episodeRuntimeLabel(runtimeMinutes: Int?): String? =
+    runtimeMinutes
+        ?.takeIf(::shouldShowEpisodeRuntime)
+        ?.let(::formatEpisodeRuntime)
+
+internal fun shouldShowEpisodeRuntime(runtimeMinutes: Int?): Boolean =
+    runtimeMinutes != null && runtimeMinutes > 0
+
+@Composable
+private fun EpisodeRuntimeMetadata(
+    label: String,
+    iconSize: Dp,
+    textSize: androidx.compose.ui.unit.TextUnit,
+    color: Color,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Schedule,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(iconSize),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = textSize),
+            color = color,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 private fun EpisodeCodeBadge(
     text: String,
@@ -1065,6 +1102,7 @@ private fun EpisodeListCard(
     val cardShape = RoundedCornerShape(sizing.cardRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
+    val runtimeLabel = remember(video.runtime) { episodeRuntimeLabel(video.runtime) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1156,11 +1194,19 @@ private fun EpisodeListCard(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                if (formattedDate != null || ratingLabel != null) {
+                if (runtimeLabel != null || formattedDate != null || ratingLabel != null) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        runtimeLabel?.let { runtime ->
+                            EpisodeRuntimeMetadata(
+                                label = runtime,
+                                iconSize = 13.dp,
+                                textSize = sizing.metaTextSize,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            )
+                        }
                         formattedDate?.let { date ->
                             Text(
                                 text = date,

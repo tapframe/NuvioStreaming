@@ -32,22 +32,25 @@ internal fun formatRuntimeFromMinutes(totalMinutes: Int): String {
     }
 }
 
-private fun parseRuntimeMinutes(value: String): Int? {
-    hourMinuteColonRegex.matchEntire(value)?.let { match ->
+internal fun parseRuntimeMinutes(value: String?): Int? {
+    val normalized = value?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    if (normalized.startsWith("-")) return null
+
+    hourMinuteColonRegex.matchEntire(normalized)?.let { match ->
         val hours = match.groupValues[1].toIntOrNull() ?: return null
         val minutes = match.groupValues[2].toIntOrNull() ?: return null
         return (hours * 60) + minutes
     }
 
-    val hoursToken = hourTokenRegex.find(value)?.groupValues?.getOrNull(1)?.toIntOrNull()
-    val minutesToken = minuteTokenRegex.find(value)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    val hoursToken = hourTokenRegex.find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    val minutesToken = minuteTokenRegex.find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()
     if (hoursToken != null || minutesToken != null) {
         val hours = (hoursToken ?: 0).coerceAtLeast(0)
         val minutes = (minutesToken ?: 0).coerceAtLeast(0)
         return (hours * 60) + minutes
     }
 
-    digitsOnlyRegex.matchEntire(value)?.let { match ->
+    digitsOnlyRegex.matchEntire(normalized)?.let { match ->
         return match.groupValues[1].toIntOrNull()?.coerceAtLeast(0)
     }
 
