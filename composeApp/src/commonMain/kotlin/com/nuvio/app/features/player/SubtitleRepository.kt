@@ -67,8 +67,6 @@ object SubtitleRepository {
                 return@launch
             }
 
-            val accumulatedSubs = java.util.Collections.synchronizedList(mutableListOf<AddonSubtitle>())
-
             supervisorScope {
                 subtitleAddons.map { addon ->
                     async {
@@ -115,9 +113,8 @@ object SubtitleRepository {
                             }
 
                             if (addonSubs.isNotEmpty()) {
-                                synchronized(accumulatedSubs) {
-                                    accumulatedSubs.addAll(addonSubs)
-                                    _addonSubtitles.value = accumulatedSubs.toList()
+                                _addonSubtitles.update { currentSubtitles ->
+                                    currentSubtitles + addonSubs
                                 }
                             }
                         } catch (error: Throwable) {
@@ -127,7 +124,7 @@ object SubtitleRepository {
                 }.awaitAll()
             }
 
-            if (accumulatedSubs.isEmpty()) {
+            if (_addonSubtitles.value.isEmpty()) {
                 _error.value = getString(Res.string.compose_player_no_subtitles_found)
             }
             _isLoading.value = false
