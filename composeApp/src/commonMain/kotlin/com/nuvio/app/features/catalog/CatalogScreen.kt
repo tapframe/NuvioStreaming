@@ -415,7 +415,7 @@ private fun PosterShape.catalogAspectRatio(): Float =
     when (this) {
         PosterShape.Poster -> 0.68f
         PosterShape.Square -> 1f
-        PosterShape.Landscape -> 1.2f
+        PosterShape.Landscape -> 1.78f
     }
 
 private fun catalogGridColumnsForWidth(screenWidth: Dp): Int =
