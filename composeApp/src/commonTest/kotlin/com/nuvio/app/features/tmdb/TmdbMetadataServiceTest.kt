@@ -6,6 +6,9 @@ import com.nuvio.app.features.details.MetaPerson
 import com.nuvio.app.features.details.MetaVideo
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TmdbMetadataServiceTest {
     @Test
@@ -268,5 +271,97 @@ class TmdbMetadataServiceTest {
         assertEquals(base.director, result.director)
         assertEquals(base.cast, result.cast)
         assertEquals(base.productionCompanies, result.productionCompanies)
+    }
+
+    @Test
+    fun `containsCjkOrHangul detects Japanese Chinese and Korean scripts`() {
+        assertTrue(containsCjkOrHangul("田中敦子"))
+        assertTrue(containsCjkOrHangul("成龙"))
+        assertTrue(containsCjkOrHangul("김수현"))
+        assertFalse(containsCjkOrHangul("Atsuko Tanaka"))
+        assertFalse(containsCjkOrHangul("Scarlett Johansson"))
+    }
+
+    @Test
+    fun `resolvePersonName falls back Japanese names to Romaji for non-Japanese locales`() {
+        assertEquals(
+            "Atsuko Tanaka",
+            resolvePersonName("田中敦子", "Atsuko Tanaka", null, "tr-TR"),
+        )
+        assertEquals(
+            "Atsuko Tanaka",
+            resolvePersonName("田中敦子", "田中敦子", "Atsuko Tanaka", "de-DE"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName keeps Japanese names when user language is Japanese`() {
+        assertEquals(
+            "田中敦子",
+            resolvePersonName("田中敦子", "Atsuko Tanaka", "Atsuko Tanaka", "ja-JP"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName falls back Hangul names to Latin for non-Korean locales`() {
+        assertEquals(
+            "Kim Soo-hyun",
+            resolvePersonName("김수현", "Kim Soo-hyun", null, "de-DE"),
+        )
+        assertEquals(
+            "Kim Soo-hyun",
+            resolvePersonName("김수현", "김수현", "Kim Soo-hyun", "fr-FR"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName keeps Hangul when user language is Korean`() {
+        assertEquals(
+            "김수현",
+            resolvePersonName("김수현", "Kim Soo-hyun", "Kim Soo-hyun", "ko-KR"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName falls back Chinese hanzi to stage name for non-Chinese locales`() {
+        assertEquals(
+            "Jackie Chan",
+            resolvePersonName("成龙", "Jackie Chan", null, "es-ES"),
+        )
+        assertEquals(
+            "Jackie Chan",
+            resolvePersonName("成龙", "成龙", "Jackie Chan", "en-US"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName keeps hanzi when user language is Chinese`() {
+        assertEquals(
+            "成龙",
+            resolvePersonName("成龙", "Jackie Chan", "Jackie Chan", "zh-CN"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName leaves already-Latin names unchanged`() {
+        assertEquals(
+            "Scarlett Johansson",
+            resolvePersonName("Scarlett Johansson", "Scarlett Johansson", null, "tr-TR"),
+        )
+        assertEquals(
+            "Tom Hanks",
+            resolvePersonName("Tom Hanks", "Tom Hanks", null, "ja-JP"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName handles null and blank inputs`() {
+        assertEquals("Takuya Kimura", resolvePersonName(null, "Takuya Kimura", null, "tr-TR"))
+        assertEquals("Scarlett Johansson", resolvePersonName("Scarlett Johansson", null, null, "tr-TR"))
+        assertNull(resolvePersonName(null, null, null, "tr-TR"))
+        assertEquals(
+            "Takuya Kimura",
+            resolvePersonName("  木村拓哉  ", "Takuya Kimura", null, "fr-FR"),
+        )
     }
 }
