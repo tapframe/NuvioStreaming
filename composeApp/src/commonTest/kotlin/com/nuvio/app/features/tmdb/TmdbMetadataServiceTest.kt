@@ -364,4 +364,34 @@ class TmdbMetadataServiceTest {
             resolvePersonName("  木村拓哉  ", "Takuya Kimura", null, "fr-FR"),
         )
     }
+
+    @Test
+    fun `resolvePersonName falls back CJK filmography titles to English`() {
+        assertEquals(
+            "Ghost in the Shell: Stand Alone Complex",
+            resolvePersonName(
+                "攻殻機動隊 STAND ALONE COMPLEX",
+                "攻殻機動隊 STAND ALONE COMPLEX",
+                "Ghost in the Shell: Stand Alone Complex",
+                "pl-PL",
+            ),
+        )
+        assertEquals(
+            "Make My Day",
+            resolvePersonName("Make My Day", "Make My Day", null, "pl-PL"),
+        )
+    }
+
+    @Test
+    fun `resolvePersonName keeps CJK filmography titles for Japanese locale`() {
+        assertEquals(
+            "攻殻機動隊 STAND ALONE COMPLEX",
+            resolvePersonName(
+                "攻殻機動隊 STAND ALONE COMPLEX",
+                "攻殻機動隊 STAND ALONE COMPLEX",
+                "Ghost in the Shell: Stand Alone Complex",
+                "ja-JP",
+            ),
+        )
+    }
 }

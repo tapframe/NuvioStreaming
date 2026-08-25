@@ -79,16 +79,42 @@ object TmdbMetadataService {
                                 (person.originalName == null || containsCjkOrHangul(person.originalName))
                             )
                     )
-            val englishPerson = if (shouldFetchEnglishPerson) {
-                runCatching {
-                    fetch<TmdbPersonResponse>(
-                        endpoint = "person/$personId",
-                        query = mapOf("language" to "en"),
-                    )
-                }.getOrNull()
+            val shouldFetchEnglishCredits = language != "en" &&
+                !isCjkLanguage &&
+                personCreditsContainCjkTitles(credits)
+
+            val (englishPerson, englishCredits) = if (shouldFetchEnglishPerson || shouldFetchEnglishCredits) {
+                coroutineScope {
+                    val englishPersonDeferred = async {
+                        if (shouldFetchEnglishPerson) {
+                            runCatching {
+                                fetch<TmdbPersonResponse>(
+                                    endpoint = "person/$personId",
+                                    query = mapOf("language" to "en"),
+                                )
+                            }.getOrNull()
+                        } else {
+                            null
+                        }
+                    }
+                    val englishCreditsDeferred = async {
+                        if (shouldFetchEnglishCredits) {
+                            runCatching {
+                                fetch<TmdbPersonCombinedCreditsResponse>(
+                                    endpoint = "person/$personId/combined_credits",
+                                    query = mapOf("language" to "en"),
+                                )
+                            }.getOrNull()
+                        } else {
+                            null
+                        }
+                    }
+                    englishPersonDeferred.await() to englishCreditsDeferred.await()
+                }
             } else {
-                null
+                null to null
             }
+            val englishTitlesById = englishCreditTitlesById(englishCredits)
 
             val biography = if (person.biography.isNullOrBlank() && language != "en") {
                 englishPerson?.biography
@@ -99,10 +125,34 @@ object TmdbMetadataService {
             val preferCrew = preferCrewCredits ?: shouldPreferCrewCredits(person.knownForDepartment)
 
             val (castMovieCredits, crewMovieCredits, castTvCredits, crewTvCredits) = coroutineScope {
-                val castMovieDeferred = async { mapPersonMovieCreditsFromCast(credits?.cast.orEmpty()) }
-                val crewMovieDeferred = async { mapPersonMovieCreditsFromCrew(credits?.crew.orEmpty()) }
-                val castTvDeferred = async { mapPersonTvCreditsFromCast(credits?.cast.orEmpty()) }
-                val crewTvDeferred = async { mapPersonTvCreditsFromCrew(credits?.crew.orEmpty()) }
+                val castMovieDeferred = async {
+                    mapPersonMovieCreditsFromCast(
+                        cast = credits?.cast.orEmpty(),
+                        preferredLanguage = language,
+                        englishTitlesById = englishTitlesById,
+                    )
+                }
+                val crewMovieDeferred = async {
+                    mapPersonMovieCreditsFromCrew(
+                        crew = credits?.crew.orEmpty(),
+                        preferredLanguage = language,
+                        englishTitlesById = englishTitlesById,
+                    )
+                }
+                val castTvDeferred = async {
+                    mapPersonTvCreditsFromCast(
+                        cast = credits?.cast.orEmpty(),
+                        preferredLanguage = language,
+                        englishTitlesById = englishTitlesById,
+                    )
+                }
+                val crewTvDeferred = async {
+                    mapPersonTvCreditsFromCrew(
+                        crew = credits?.crew.orEmpty(),
+                        preferredLanguage = language,
+                        englishTitlesById = englishTitlesById,
+                    )
+                }
                 PersonCreditBuckets(
                     castMovieCredits = castMovieDeferred.await(),
                     crewMovieCredits = crewMovieDeferred.await(),
@@ -168,6 +218,8 @@ object TmdbMetadataService {
 
     private fun mapPersonMovieCreditsFromCast(
         cast: List<TmdbPersonCreditCast>,
+        preferredLanguage: String,
+        englishTitlesById: Map<Int, String>,
     ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
         return cast
@@ -175,7 +227,12 @@ object TmdbMetadataService {
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
-                val title = credit.title ?: credit.name ?: return@mapNotNull null
+                val title = resolvePersonName(
+                    localizedName = credit.title ?: credit.name,
+                    originalName = credit.originalTitle ?: credit.originalName,
+                    fallbackEnglishName = englishTitlesById[credit.id],
+                    preferredLanguage = preferredLanguage,
+                ) ?: return@mapNotNull null
                 val poster = buildImageUrl(credit.posterPath, "w500")
                     ?: buildImageUrl(credit.backdropPath, "w780")
                     ?: return@mapNotNull null
@@ -196,6 +253,8 @@ object TmdbMetadataService {
 
     private fun mapPersonMovieCreditsFromCrew(
         crew: List<TmdbPersonCreditCrew>,
+        preferredLanguage: String,
+        englishTitlesById: Map<Int, String>,
     ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
         return crew
@@ -203,7 +262,12 @@ object TmdbMetadataService {
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
-                val title = credit.title ?: credit.name ?: return@mapNotNull null
+                val title = resolvePersonName(
+                    localizedName = credit.title ?: credit.name,
+                    originalName = credit.originalTitle ?: credit.originalName,
+                    fallbackEnglishName = englishTitlesById[credit.id],
+                    preferredLanguage = preferredLanguage,
+                ) ?: return@mapNotNull null
                 val poster = buildImageUrl(credit.posterPath, "w500")
                     ?: buildImageUrl(credit.backdropPath, "w780")
                     ?: return@mapNotNull null
@@ -224,6 +288,8 @@ object TmdbMetadataService {
 
     private fun mapPersonTvCreditsFromCast(
         cast: List<TmdbPersonCreditCast>,
+        preferredLanguage: String,
+        englishTitlesById: Map<Int, String>,
     ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
         return cast
@@ -231,7 +297,12 @@ object TmdbMetadataService {
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
-                val title = credit.name ?: credit.title ?: return@mapNotNull null
+                val title = resolvePersonName(
+                    localizedName = credit.name ?: credit.title,
+                    originalName = credit.originalName ?: credit.originalTitle,
+                    fallbackEnglishName = englishTitlesById[credit.id],
+                    preferredLanguage = preferredLanguage,
+                ) ?: return@mapNotNull null
                 val poster = buildImageUrl(credit.posterPath, "w500")
                     ?: buildImageUrl(credit.backdropPath, "w780")
                     ?: return@mapNotNull null
@@ -252,6 +323,8 @@ object TmdbMetadataService {
 
     private fun mapPersonTvCreditsFromCrew(
         crew: List<TmdbPersonCreditCrew>,
+        preferredLanguage: String,
+        englishTitlesById: Map<Int, String>,
     ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
         return crew
@@ -259,7 +332,12 @@ object TmdbMetadataService {
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
-                val title = credit.name ?: credit.title ?: return@mapNotNull null
+                val title = resolvePersonName(
+                    localizedName = credit.name ?: credit.title,
+                    originalName = credit.originalName ?: credit.originalTitle,
+                    fallbackEnglishName = englishTitlesById[credit.id],
+                    preferredLanguage = preferredLanguage,
+                ) ?: return@mapNotNull null
                 val poster = buildImageUrl(credit.posterPath, "w500")
                     ?: buildImageUrl(credit.backdropPath, "w780")
                     ?: return@mapNotNull null
@@ -1342,6 +1420,28 @@ internal fun normalizeTmdbLanguage(language: String?): String {
         "es-419" -> "es-MX"
         else -> normalized
     }
+}
+
+private fun personCreditsContainCjkTitles(credits: TmdbPersonCombinedCreditsResponse?): Boolean {
+    if (credits == null) return false
+    return credits.cast.any { containsCjkOrHangul(it.title ?: it.name ?: return@any false) } ||
+        credits.crew.any { containsCjkOrHangul(it.title ?: it.name ?: return@any false) }
+}
+
+private fun englishCreditTitlesById(credits: TmdbPersonCombinedCreditsResponse?): Map<Int, String> {
+    if (credits == null) return emptyMap()
+    val titles = linkedMapOf<Int, String>()
+    fun putTitle(id: Int, title: String?, name: String?) {
+        val text = title?.trim()?.takeIf { it.isNotBlank() }
+            ?: name?.trim()?.takeIf { it.isNotBlank() }
+            ?: return
+        if (!containsCjkOrHangul(text)) {
+            titles.putIfAbsent(id, text)
+        }
+    }
+    credits.cast.forEach { putTitle(it.id, it.title, it.name) }
+    credits.crew.forEach { putTitle(it.id, it.title, it.name) }
+    return titles
 }
 
 internal fun containsCjkOrHangul(text: String): Boolean {
