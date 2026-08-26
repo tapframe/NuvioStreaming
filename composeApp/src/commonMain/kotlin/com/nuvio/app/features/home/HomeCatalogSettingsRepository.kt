@@ -3,6 +3,7 @@ package com.nuvio.app.features.home
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionRepository
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -136,7 +137,12 @@ object HomeCatalogSettingsRepository {
     private var hasLoaded = false
     private var definitions: List<HomeCatalogDefinition> = emptyList()
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
-    private var preferences: MutableMap<String, StoredHomeCatalogPreference> = mutableMapOf()
+    private val preferencesRef = atomic<Map<String, StoredHomeCatalogPreference>>(emptyMap())
+    private var preferences: Map<String, StoredHomeCatalogPreference>
+        get() = preferencesRef.value
+        set(value) {
+            preferencesRef.value = value
+        }
     private var heroEnabled = true
     private var heroStyle = HomeHeroStyle.FULL_BLEED
     private var showCatalogType = true
@@ -144,7 +150,7 @@ object HomeCatalogSettingsRepository {
 
     fun onProfileChanged() {
         hasLoaded = false
-        preferences.clear()
+        preferences = emptyMap()
         heroEnabled = true
         heroStyle = HomeHeroStyle.FULL_BLEED
         showCatalogType = true
@@ -158,7 +164,7 @@ object HomeCatalogSettingsRepository {
         hasLoaded = false
         definitions = emptyList()
         collectionDefinitions = emptyList()
-        preferences.clear()
+        preferences = emptyMap()
         heroEnabled = true
         heroStyle = HomeHeroStyle.FULL_BLEED
         showCatalogType = true
@@ -276,7 +282,7 @@ object HomeCatalogSettingsRepository {
         heroStyle = HomeHeroStyle.FULL_BLEED
         showCatalogType = true
         hideUnreleasedContent = false
-        preferences.clear()
+        preferences = emptyMap()
         normalizePreferences()
         publish()
         persist()
@@ -300,10 +306,12 @@ object HomeCatalogSettingsRepository {
         if (fromIndex == toIndex) return
         val orderedKeys = allKeys.toMutableList()
         orderedKeys.add(toIndex, orderedKeys.removeAt(fromIndex))
+        val updatedPreferences = preferences.toMutableMap()
         orderedKeys.forEachIndexed { index, itemKey ->
-            val current = preferences[itemKey] ?: return@forEachIndexed
-            preferences[itemKey] = current.copy(order = index)
+            val current = updatedPreferences[itemKey] ?: return@forEachIndexed
+            updatedPreferences[itemKey] = current.copy(order = index)
         }
+        preferences = updatedPreferences
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
@@ -326,7 +334,7 @@ object HomeCatalogSettingsRepository {
             heroStyle = HomeHeroStyle.fromStorageValue(parsedPayload.heroStyle)
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
-            preferences = parsedPayload.items.associateBy { it.key }.toMutableMap()
+            preferences = parsedPayload.items.associateBy { it.key }
             publish()
             return
         }
@@ -335,7 +343,7 @@ object HomeCatalogSettingsRepository {
             json.decodeFromString<List<StoredHomeCatalogPreference>>(payload)
         }.getOrDefault(emptyList())
 
-        preferences = legacyItems.associateBy { it.key }.toMutableMap()
+        preferences = legacyItems.associateBy { it.key }
         publish()
     }
 
@@ -384,7 +392,7 @@ object HomeCatalogSettingsRepository {
                 order = stored?.order ?: nextOrder++,
             )
         }
-        preferences = normalized
+        preferences = normalized.toMap()
     }
 
     private fun publish() {
@@ -454,7 +462,7 @@ object HomeCatalogSettingsRepository {
         val current = preferences[key] ?: defaultPreferenceForMissingKey(key) ?: return
         val updated = transform(current)
         if (updated == current) return
-        preferences[key] = updated
+        preferences = preferences + (key to updated)
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
@@ -487,10 +495,12 @@ object HomeCatalogSettingsRepository {
         val movingKey = orderedKeys.removeAt(currentIndex)
         orderedKeys.add(targetIndex, movingKey)
 
+        val updatedPreferences = preferences.toMutableMap()
         orderedKeys.forEachIndexed { index, itemKey ->
-            val current = preferences[itemKey] ?: return@forEachIndexed
-            preferences[itemKey] = current.copy(order = index)
+            val current = updatedPreferences[itemKey] ?: return@forEachIndexed
+            updatedPreferences[itemKey] = current.copy(order = index)
         }
+        preferences = updatedPreferences
 
         publish()
         persist()
@@ -560,7 +570,7 @@ object HomeCatalogSettingsRepository {
             val preservedPreferences = preferences.filterKeys { key ->
                 key !in remoteKeys && (key in knownKeys || key.requiresExplicitSyncKey())
             }
-            preferences = (preservedPreferences + remotePreferences).toMutableMap()
+            preferences = preservedPreferences + remotePreferences
             normalizePreferences()
         }
         hasLoaded = true
@@ -594,10 +604,12 @@ object HomeCatalogSettingsRepository {
         val reorderedKeys = pinnedKeys + nonPinnedKeys
         if (reorderedKeys == orderedKeys) return
 
+        val updatedPreferences = preferences.toMutableMap()
         reorderedKeys.forEachIndexed { index, itemKey ->
-            val current = preferences[itemKey] ?: return@forEachIndexed
-            preferences[itemKey] = current.copy(order = index)
+            val current = updatedPreferences[itemKey] ?: return@forEachIndexed
+            updatedPreferences[itemKey] = current.copy(order = index)
         }
+        preferences = updatedPreferences
     }
 
     private fun defaultPreferenceForMissingKey(key: String): StoredHomeCatalogPreference? {

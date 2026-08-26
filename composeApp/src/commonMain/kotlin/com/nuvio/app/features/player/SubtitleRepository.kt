@@ -10,12 +10,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -52,56 +56,75 @@ object SubtitleRepository {
             _addonSubtitles.value = emptyList()
 
             val addons = AddonRepository.uiState.value.addons.enabledAddons()
-            val allSubs = mutableListOf<AddonSubtitle>()
-
-            for (addon in addons) {
-                val manifest = addon.manifest ?: continue
-                val subtitleResource = manifest.resources.find { it.name.isSubtitleResourceName() } ?: continue
-                if (!subtitleResource.supportsSubtitleType(requestType, videoId)) continue
-
-                val subtitleUrl = buildAddonResourceUrl(
-                    manifestUrl = manifest.transportUrl,
-                    resource = "subtitles",
-                    type = requestType,
-                    id = videoId,
-                )
-
-                try {
-                    val response = withContext(Dispatchers.Default) {
-                        fetchAddonResponseText(subtitleUrl)
-                    }
-                    val parsed = json.parseToJsonElement(response).jsonObject
-                    val subtitlesArray = parsed["subtitles"]?.jsonArray ?: continue
-
-                    for (element in subtitlesArray) {
-                        val obj = element.jsonObject
-                        val id = obj.stringValue("id")
-                            ?: "${manifest.id}_${allSubs.size}"
-                        val url = obj.stringValue("url") ?: continue
-                        val rawLang = obj.subtitleLanguage() ?: "unknown"
-                        val normalizedLang = normalizeLanguageCode(rawLang) ?: rawLang
-
-                        allSubs.add(
-                            AddonSubtitle(
-                                id = id,
-                                url = url,
-                                language = normalizedLang,
-                                display = getString(
-                                    Res.string.player_addon_subtitle_display_format,
-                                    getLanguageLabelForCode(rawLang),
-                                    addon.displayTitle,
-                                ),
-                                addonName = addon.displayTitle,
-                            )
-                        )
-                    }
-                } catch (error: Throwable) {
-                    if (error is CancellationException) throw error
-                }
+            val subtitleAddons = addons.filter { addon ->
+                val manifest = addon.manifest ?: return@filter false
+                val subtitleResource = manifest.resources.find { it.name.isSubtitleResourceName() } ?: return@filter false
+                subtitleResource.supportsSubtitleType(requestType, videoId)
             }
 
-            _addonSubtitles.value = allSubs
-            if (allSubs.isEmpty() && addons.any { it.manifest?.resources?.any { r -> r.name.isSubtitleResourceName() } == true }) {
+            if (subtitleAddons.isEmpty()) {
+                _isLoading.value = false
+                return@launch
+            }
+
+            supervisorScope {
+                subtitleAddons.map { addon ->
+                    async {
+                        val manifest = addon.manifest ?: return@async
+                        val subtitleUrl = buildAddonResourceUrl(
+                            manifestUrl = manifest.transportUrl,
+                            resource = "subtitles",
+                            type = requestType,
+                            id = videoId,
+                        )
+
+                        try {
+                            val response = withTimeoutOrNull(10_000L) {
+                                withContext(Dispatchers.Default) {
+                                    fetchAddonResponseText(subtitleUrl)
+                                }
+                            } ?: return@async
+
+                            val parsed = json.parseToJsonElement(response).jsonObject
+                            val subtitlesArray = parsed["subtitles"]?.jsonArray ?: return@async
+
+                            val addonSubs = mutableListOf<AddonSubtitle>()
+                            for (element in subtitlesArray) {
+                                val obj = element.jsonObject
+                                val id = obj.stringValue("id")
+                                    ?: "${manifest.id}_${addonSubs.size}"
+                                val url = obj.stringValue("url") ?: continue
+                                val rawLang = obj.subtitleLanguage() ?: "unknown"
+                                val normalizedLang = normalizeLanguageCode(rawLang) ?: rawLang
+
+                                addonSubs.add(
+                                    AddonSubtitle(
+                                        id = id,
+                                        url = url,
+                                        language = normalizedLang,
+                                        display = getString(
+                                            Res.string.player_addon_subtitle_display_format,
+                                            getLanguageLabelForCode(rawLang),
+                                            addon.displayTitle,
+                                        ),
+                                        addonName = addon.displayTitle,
+                                    )
+                                )
+                            }
+
+                            if (addonSubs.isNotEmpty()) {
+                                _addonSubtitles.update { currentSubtitles ->
+                                    currentSubtitles + addonSubs
+                                }
+                            }
+                        } catch (error: Throwable) {
+                            if (error is CancellationException) throw error
+                        }
+                    }
+                }.awaitAll()
+            }
+
+            if (_addonSubtitles.value.isEmpty()) {
                 _error.value = getString(Res.string.compose_player_no_subtitles_found)
             }
             _isLoading.value = false

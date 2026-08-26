@@ -31,4 +31,24 @@ class SeriesSeasonSupportTest {
             meta.sortedPlayableEpisodes().map(MetaVideo::id),
         )
     }
+
+    @Test
+    fun `preferred episode only applies to its season`() {
+        assertEquals(
+            5,
+            preferredEpisodeNumberForSeason(
+                displayedSeasonNumber = 1,
+                preferredSeasonNumber = 1,
+                preferredEpisodeNumber = 5,
+            ),
+        )
+        assertEquals(
+            null,
+            preferredEpisodeNumberForSeason(
+                displayedSeasonNumber = 2,
+                preferredSeasonNumber = 1,
+                preferredEpisodeNumber = 5,
+            ),
+        )
+    }
 }

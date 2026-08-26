@@ -97,6 +97,7 @@ data class MetaVideo(
     val overview: String? = null,
     val runtime: Int? = null,
     val tmdbRating: Double? = null,
+    val rating: Double? = null,
     val streams: List<StreamItem> = emptyList(),
 )
 

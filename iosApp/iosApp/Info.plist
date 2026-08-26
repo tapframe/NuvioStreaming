@@ -30,6 +30,8 @@
 		<string>outplayer</string>
 		<string>open-vidhub</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

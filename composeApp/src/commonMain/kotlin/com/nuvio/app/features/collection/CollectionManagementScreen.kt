@@ -74,6 +74,7 @@ fun CollectionManagementScreen(
     var importText by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
+    var showCopyError by remember { mutableStateOf(false) }
 
     NuvioScreen {
         stickyHeader {
@@ -83,7 +84,9 @@ fun CollectionManagementScreen(
             ) {
                 IconButton(onClick = {
                     val json = CollectionRepository.exportToJson()
-                    clipboardManager.setText(AnnotatedString(json))
+                    showCopyError = runCatching {
+                        clipboardManager.setText(AnnotatedString(json))
+                    }.isFailure
                 }) {
                     Icon(
                         imageVector = Icons.Rounded.ContentCopy,
@@ -189,6 +192,14 @@ fun CollectionManagementScreen(
             },
         )
     }
+
+    NuvioStatusModal(
+        title = stringResource(Res.string.collections_copy_json),
+        message = stringResource(Res.string.collections_copy_json_error),
+        isVisible = showCopyError,
+        onConfirm = { showCopyError = false },
+        onDismiss = { showCopyError = false },
+    )
 
     val deleteId = showDeleteConfirm
     val deleteCollection = deleteId?.let { id -> collections.find { it.id == id } }
