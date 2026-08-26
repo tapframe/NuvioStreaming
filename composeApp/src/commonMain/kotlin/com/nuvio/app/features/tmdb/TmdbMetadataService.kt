@@ -458,34 +458,57 @@ object TmdbMetadataService {
                 }
             }
 
-            val queryParams = buildMap {
-                put("language", language)
-                put("page", page.toString())
-                put("sort_by", sortBy)
-                when (mediaType) {
-                    TmdbEntityMediaType.MOVIE -> {
-                        put("with_companies", entityId.toString())
-                    }
-                    TmdbEntityMediaType.TV -> {
-                        if (entityKind == TmdbEntityKind.COMPANY) put("with_companies", entityId.toString())
-                        if (entityKind == TmdbEntityKind.NETWORK) put("with_networks", entityId.toString())
-                    }
-                }
-                if (voteCountFloor != null) put("vote_count.gte", voteCountFloor.toString())
-            }
-
             val endpoint = when (mediaType) {
                 TmdbEntityMediaType.MOVIE -> "discover/movie"
                 TmdbEntityMediaType.TV -> "discover/tv"
             }
 
-            val response = fetch<TmdbDiscoverResponse>(endpoint = endpoint, query = queryParams)
+            suspend fun loadDiscover(requestLanguage: String): TmdbDiscoverResponse? {
+                val queryParams = buildMap {
+                    put("language", requestLanguage)
+                    put("page", page.toString())
+                    put("sort_by", sortBy)
+                    when (mediaType) {
+                        TmdbEntityMediaType.MOVIE -> {
+                            put("with_companies", entityId.toString())
+                        }
+                        TmdbEntityMediaType.TV -> {
+                            if (entityKind == TmdbEntityKind.COMPANY) put("with_companies", entityId.toString())
+                            if (entityKind == TmdbEntityKind.NETWORK) put("with_networks", entityId.toString())
+                        }
+                    }
+                    if (voteCountFloor != null) put("vote_count.gte", voteCountFloor.toString())
+                }
+                return fetch<TmdbDiscoverResponse>(endpoint = endpoint, query = queryParams)
+            }
+
+            val response = loadDiscover(language)
             val results = response?.results.orEmpty()
             val totalPages = response?.totalPages ?: page
 
+            val isCjkLanguage = language.startsWith("ja") ||
+                language.startsWith("ko") ||
+                language.startsWith("zh")
+            val englishTitlesById = if (
+                language != "en" &&
+                !isCjkLanguage &&
+                discoverResultsContainCjkTitles(results)
+            ) {
+                englishDiscoverTitlesById(loadDiscover("en")?.results.orEmpty())
+            } else {
+                emptyMap()
+            }
+
             val mappedItems = results
                 .filter { it.id > 0 }
-                .mapNotNull { item -> mapEntityDiscoverResult(item, mediaType) }
+                .mapNotNull { item ->
+                    mapEntityDiscoverResult(
+                        result = item,
+                        mediaType = mediaType,
+                        preferredLanguage = language,
+                        englishTitlesById = englishTitlesById,
+                    )
+                }
                 .take(ENTITY_RAIL_MAX_ITEMS)
 
             TmdbEntityRailPageResult(
@@ -571,12 +594,15 @@ object TmdbMetadataService {
     private fun mapEntityDiscoverResult(
         result: TmdbDiscoverResult,
         mediaType: TmdbEntityMediaType,
+        preferredLanguage: String,
+        englishTitlesById: Map<Int, String>,
     ): MetaPreview? {
-        val title = result.title?.takeIf { it.isNotBlank() }
-            ?: result.name?.takeIf { it.isNotBlank() }
-            ?: result.originalTitle?.takeIf { it.isNotBlank() }
-            ?: result.originalName?.takeIf { it.isNotBlank() }
-            ?: return null
+        val title = resolvePersonName(
+            localizedName = result.title ?: result.name,
+            originalName = result.originalTitle ?: result.originalName,
+            fallbackEnglishName = englishTitlesById[result.id],
+            preferredLanguage = preferredLanguage,
+        ) ?: return null
 
         val poster = buildImageUrl(result.posterPath, "w500")
             ?: buildImageUrl(result.backdropPath, "w780")
@@ -1422,6 +1448,25 @@ internal fun normalizeTmdbLanguage(language: String?): String {
     }
 }
 
+internal fun discoverResultsContainCjkTitles(results: List<TmdbDiscoverResult>): Boolean {
+    return results.any { result ->
+        containsCjkOrHangul(result.title ?: result.name ?: return@any false)
+    }
+}
+
+internal fun englishDiscoverTitlesById(results: List<TmdbDiscoverResult>): Map<Int, String> {
+    val titles = linkedMapOf<Int, String>()
+    results.forEach { result ->
+        val text = result.title?.trim()?.takeIf { it.isNotBlank() }
+            ?: result.name?.trim()?.takeIf { it.isNotBlank() }
+            ?: return@forEach
+        if (!containsCjkOrHangul(text)) {
+            titles.putIfAbsent(result.id, text)
+        }
+    }
+    return titles
+}
+
 private fun personCreditsContainCjkTitles(credits: TmdbPersonCombinedCreditsResponse?): Boolean {
     if (credits == null) return false
     return credits.cast.any { containsCjkOrHangul(it.title ?: it.name ?: return@any false) } ||
@@ -2116,7 +2161,7 @@ private data class TmdbDiscoverResponse(
 )
 
 @Serializable
-private data class TmdbDiscoverResult(
+internal data class TmdbDiscoverResult(
     val id: Int,
     val title: String? = null,
     val name: String? = null,

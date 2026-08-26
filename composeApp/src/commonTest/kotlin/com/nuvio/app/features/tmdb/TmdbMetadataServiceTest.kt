@@ -394,4 +394,47 @@ class TmdbMetadataServiceTest {
             ),
         )
     }
+
+    @Test
+    fun `network browse falls back CJK titles to English`() {
+        val localizedResults = listOf(
+            TmdbDiscoverResult(
+                id = 57775,
+                name = "ちびまる子ちゃん",
+                originalName = "ちびまる子ちゃん",
+                posterPath = "/maruko.jpg",
+                firstAirDate = "1990-01-07",
+            ),
+            TmdbDiscoverResult(
+                id = 37854,
+                name = "One Piece",
+                originalName = "ワンピース",
+                posterPath = "/op.jpg",
+                firstAirDate = "1999-10-20",
+            ),
+        )
+        val englishResults = listOf(
+            TmdbDiscoverResult(
+                id = 57775,
+                name = "Chibi Maruko-chan",
+                originalName = "ちびまる子ちゃん",
+                posterPath = "/maruko.jpg",
+            ),
+        )
+
+        assertTrue(discoverResultsContainCjkTitles(localizedResults))
+        val englishTitlesById = englishDiscoverTitlesById(englishResults)
+
+        val titles = localizedResults.associate { result ->
+            result.id to resolvePersonName(
+                localizedName = result.title ?: result.name,
+                originalName = result.originalTitle ?: result.originalName,
+                fallbackEnglishName = englishTitlesById[result.id],
+                preferredLanguage = "tr-TR",
+            )
+        }
+
+        assertEquals("Chibi Maruko-chan", titles[57775])
+        assertEquals("One Piece", titles[37854])
+    }
 }
