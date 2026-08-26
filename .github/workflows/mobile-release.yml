@@ -9,9 +9,23 @@ on:
         type: choice
         options:
           - dry-run
+          - test-build
           - draft
           - publish
         default: dry-run
+      target:
+        description: Choose which platform to build
+        required: true
+        type: choice
+        options:
+          - all
+          - android-only
+          - ios-only
+        default: all
+      description:
+        description: Run description
+        required: false
+        type: string
       exclude_commits:
         description: Optional comma-separated commit hashes to omit from the notes
         required: false
@@ -59,25 +73,27 @@ jobs:
             exit 1
           fi
 
-          if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-            echo "Tag ${RELEASE_TAG} already exists." >&2
-            exit 1
-          fi
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
-            exit 1
-          fi
+          if [[ "${RELEASE_MODE}" != "test-build" ]]; then
+            if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+              echo "Tag ${RELEASE_TAG} already exists." >&2
+              exit 1
+            fi
+            if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
+              exit 1
+            fi
 
-          unexpected_changes="$(
-            git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
-              | grep -Ev '^(\.github/workflows/android-release\.yml|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh)$' \
-              || true
-          )"
-          if [[ -n "${unexpected_changes}" ]]; then
-            echo "The version bump must be the final application change before release." >&2
-            echo "Unexpected files changed after the bump:" >&2
-            echo "${unexpected_changes}" >&2
-            exit 1
+            unexpected_changes="$(
+              git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
+                | grep -Ev '^(\.github/workflows/mobile-release\.yml|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh)$' \
+                || true
+            )"
+            if [[ -n "${unexpected_changes}" ]]; then
+              echo "The version bump must be the final application change before release." >&2
+              echo "Unexpected files changed after the bump:" >&2
+              echo "${unexpected_changes}" >&2
+              exit 1
+            fi
           fi
 
           if [[ "${RELEASE_MODE}" != "dry-run" ]]; then
@@ -131,7 +147,7 @@ jobs:
 
   android:
     name: Build Android APKs
-    if: inputs.mode != 'dry-run'
+    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'android-only')
     needs: prepare
     runs-on: ubuntu-latest
     env:
@@ -187,7 +203,7 @@ jobs:
 
   ios:
     name: Build iOS IPA
-    if: inputs.mode != 'dry-run'
+    if: inputs.mode != 'dry-run' && (inputs.target == 'all' || inputs.target == 'ios-only')
     needs: prepare
     runs-on: macos-26
     timeout-minutes: 75
@@ -257,7 +273,7 @@ jobs:
 
   release:
     name: Create ${{ inputs.mode }} release
-    if: inputs.mode != 'dry-run'
+    if: inputs.mode == 'draft' || inputs.mode == 'publish'
     needs:
       - prepare
       - android

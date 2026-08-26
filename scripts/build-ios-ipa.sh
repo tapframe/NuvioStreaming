@@ -54,11 +54,17 @@ fi
     CODE_SIGN_IDENTITY= \
     build
 
-app_path="${derived_data}/Build/Products/${configuration}-iphoneos/Nuvio.app"
-if [[ ! -d "${app_path}" ]]; then
-    echo "iOS build did not produce ${app_path}." >&2
+products_directory="${derived_data}/Build/Products/${configuration}-iphoneos"
+app_paths=()
+while IFS= read -r candidate; do
+    app_paths+=("${candidate}")
+done < <(/usr/bin/find "${products_directory}" -maxdepth 1 -type d -name '*.app' -print 2>/dev/null | sort)
+if (( ${#app_paths[@]} != 1 )); then
+    echo "Expected exactly one .app in ${products_directory}, found ${#app_paths[@]}." >&2
     exit 1
 fi
+app_path="${app_paths[0]}"
+app_bundle_name="$(basename "${app_path}")"
 
 built_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${app_path}/Info.plist")"
 if [[ "${built_version}" != "${version}" ]]; then
@@ -102,7 +108,7 @@ output_directory="$(cd "${output_directory}" && pwd -P)"
 package_root="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-ios-ipa.XXXXXX")"
 trap 'rm -rf "${package_root}"' EXIT
 mkdir -p "${package_root}/Payload"
-ditto "${app_path}" "${package_root}/Payload/Nuvio.app"
+ditto "${app_path}" "${package_root}/Payload/${app_bundle_name}"
 
 ipa_path="${output_directory}/nuvio-${version}-full-${configuration_slug}.ipa"
 temporary_ipa="${package_root}/nuvio-${version}-full-${configuration_slug}.ipa"
