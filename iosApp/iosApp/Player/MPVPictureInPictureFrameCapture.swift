@@ -34,6 +34,7 @@ final class MPVPictureInPictureFrameCapture {
     private var loggedUnsupportedFormat = false
 
     private static let primingCaptureInterval: CFTimeInterval = 1.0
+    private var primingRefreshTimer: DispatchSourceTimer?
 
     init?(
         displayLayer: AVSampleBufferDisplayLayer,
@@ -119,6 +120,7 @@ final class MPVPictureInPictureFrameCapture {
         isActive = active
         if active { isPriming = false }
         stateLock.unlock()
+        if active { stopPrimingRefreshTimer() }
         updateArmedState()
     }
 
@@ -131,6 +133,7 @@ final class MPVPictureInPictureFrameCapture {
     }
 
     func stopPictureInPictureRendering(removingDisplayedImage: Bool) {
+        stopPrimingRefreshTimer()
         stateLock.lock()
         isPriming = false
         isActive = false
@@ -168,12 +171,42 @@ final class MPVPictureInPictureFrameCapture {
         burstFramesRemaining = max(burstFramesRemaining, 3)
         stateLock.unlock()
         updateArmedState()
+        if !stopAfterFirstFrame { startPrimingRefreshTimer() }
         InAppLogBridge.shared.info(tag: "PiP/iOS", message: "PiP frame capture priming started reason=\(reason)")
+    }
+
+    private func startPrimingRefreshTimer() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.primingRefreshTimer?.cancel()
+            let timer = DispatchSource.makeTimerSource(queue: .main)
+            timer.schedule(
+                deadline: .now() + Self.primingCaptureInterval,
+                repeating: Self.primingCaptureInterval
+            )
+            timer.setEventHandler { [weak self] in
+                guard let self else { return }
+                self.stateLock.lock()
+                let shouldRefresh = self.isPriming && !self.isActive
+                self.stateLock.unlock()
+                guard shouldRefresh else { return }
+                self.requestRenderBurst(reason: "priming-refresh", count: 1)
+            }
+            timer.resume()
+            self.primingRefreshTimer = timer
+        }
+    }
+
+    private func stopPrimingRefreshTimer() {
+        DispatchQueue.main.async { [weak self] in
+            self?.primingRefreshTimer?.cancel()
+            self?.primingRefreshTimer = nil
+        }
     }
 
     private func updateArmedState() {
         stateLock.lock()
-        let armed = isPriming || isActive || burstFramesRemaining > 0
+        let armed = isActive || burstFramesRemaining > 0
         stateLock.unlock()
         metalLayer.isDrawableCaptureArmed = armed
     }
@@ -182,24 +215,19 @@ final class MPVPictureInPictureFrameCapture {
         guard !metalLayer.isSuspended else { return }
 
         stateLock.lock()
-        let priming = isPriming
         let active = isActive
         let burst = burstFramesRemaining
         let frameRate = max(12.0, videoFrameRateProvider())
-        let shouldCapture = priming || active || burst > 0
+        let shouldCapture = active || burst > 0
         if !shouldCapture {
             stateLock.unlock()
             return
         }
         let now = CACurrentMediaTime()
-        if burst == 0 {
-            let minimumInterval = active
-                ? 1.0 / (frameRate * max(0.5, playbackRateProvider())) * 0.5
-                : Self.primingCaptureInterval
-            if (now - lastCaptureTime) < minimumInterval {
-                stateLock.unlock()
-                return
-            }
+        let minimumInterval = 1.0 / (frameRate * max(0.5, playbackRateProvider()))
+        if burst == 0 && (now - lastCaptureTime) < minimumInterval * 0.5 {
+            stateLock.unlock()
+            return
         }
         lastCaptureTime = now
         if burstFramesRemaining > 0 { burstFramesRemaining -= 1 }
