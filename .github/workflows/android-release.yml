@@ -288,6 +288,7 @@ jobs:
 
           release_args=(
             "${RELEASE_TAG}"
+            --repo "${GITHUB_REPOSITORY}"
             --target "${RELEASE_BRANCH}"
             --title "${RELEASE_VERSION}"
             --notes-file release-assets/release-notes.md
