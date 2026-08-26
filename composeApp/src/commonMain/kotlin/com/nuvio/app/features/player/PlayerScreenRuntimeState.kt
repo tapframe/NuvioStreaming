@@ -92,7 +92,7 @@ internal class PlayerScreenRuntime(
 
     var gestureController: PlayerGestureController? = null
 
-    var controlsVisible by mutableStateOf(true)
+    var controlsVisible by mutableStateOf(false)
     var playerControlsLocked by mutableStateOf(false)
     var activeSourceUrl by mutableStateOf(sourceUrl)
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)

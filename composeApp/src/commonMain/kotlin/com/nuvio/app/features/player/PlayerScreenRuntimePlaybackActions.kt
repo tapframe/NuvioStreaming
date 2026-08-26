@@ -234,7 +234,6 @@ internal fun PlayerScreenRuntime.tryShowParentalGuide() {
     if (!playerSettingsUiState.showParentalGuide) return
     if (!parentalGuideHasShown && parentalWarnings.isNotEmpty() && !playbackStartedForParentalGuide) {
         playbackStartedForParentalGuide = true
-        controlsVisible = true
         showParentalGuide = true
         parentalGuideHasShown = true
     }
