@@ -1089,12 +1089,15 @@ object TmdbMetadataService {
             }
         }
 
+        val preferredLang = language.substringBefore('-').lowercase()
+
         val byCategory = linkedMapOf<String, MutableList<MetaTrailer>>()
         allVideos
             .asSequence()
             .filter { trailer ->
                 trailer.site.equals("YouTube", ignoreCase = true) && trailer.key.isNotBlank()
             }
+            .distinctBy { it.key }
             .forEach { trailer ->
                 byCategory.getOrPut(
                     trailer.type.ifBlank { runBlocking { getString(Res.string.generic_trailer) } },
@@ -1111,6 +1114,14 @@ object TmdbMetadataService {
                     }
                 }
                     .thenByDescending { it.seasonNumber ?: Int.MIN_VALUE }
+                    .thenBy {
+                        val lang = it.iso6391?.trim()?.lowercase()
+                        when {
+                            lang == preferredLang -> 0
+                            lang == "en" -> 1
+                            else -> 2
+                        }
+                    }
                     .thenByDescending { it.official }
                     .thenByDescending { it.publishedAt.orEmpty() }
             )
@@ -1476,6 +1487,7 @@ private data class TmdbVideoResult(
     val type: String? = null,
     val official: Boolean? = null,
     @SerialName("published_at") val publishedAt: String? = null,
+    @SerialName("iso_639_1") val iso6391: String? = null,
 )
 
 private fun TmdbVideoResult.toMetaTrailer(
@@ -1496,6 +1508,7 @@ private fun TmdbVideoResult.toMetaTrailer(
         publishedAt = publishedAt,
         seasonNumber = seasonNumber,
         displayName = displayName,
+        iso6391 = iso6391?.trim()?.takeIf { it.isNotBlank() },
     )
 }
 
