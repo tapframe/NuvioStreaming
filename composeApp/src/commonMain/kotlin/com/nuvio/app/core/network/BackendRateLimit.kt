@@ -99,7 +99,8 @@ internal fun retryAfterDelayMillis(
     } else {
         null
     }
-    return secondsDelay ?: dateDelay ?: fallbackDelayMs.coerceAtLeast(0L)
+    return (secondsDelay ?: dateDelay ?: fallbackDelayMs.coerceAtLeast(0L))
+        .coerceAtMost(MaximumFallbackDelayMs)
 }
 
 internal fun backendRetryDelayMillis(

@@ -309,29 +309,32 @@ fun ProfileEditScreen(
                 onClick = {
                     isSaving = true
                     scope.launch {
-                        val avatarColorHex = visibleAvatarItem?.bgColor ?: fallbackColorHex
-                        if (isNew) {
-                            ProfileRepository.createProfile(
-                                name = name,
-                                avatarColorHex = avatarColorHex,
-                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
-                                avatarUrl = customAvatarUrl,
-                                usesPrimaryAddons = usesPrimaryAddons,
-                            )
-                        } else {
-                            ProfileRepository.updateProfile(
-                                profileIndex = currentProfile!!.profileIndex,
-                                name = name,
-                                avatarColorHex = avatarColorHex,
-                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
-                                avatarUrl = customAvatarUrl,
-                                profileBackgroundId = selectedBackgroundId,
-                                profileBackgroundUrl = selectedBackgroundUrl,
-                                usesPrimaryAddons = usesPrimaryAddons,
-                            )
+                        try {
+                            val avatarColorHex = visibleAvatarItem?.bgColor ?: fallbackColorHex
+                            if (isNew) {
+                                ProfileRepository.createProfile(
+                                    name = name,
+                                    avatarColorHex = avatarColorHex,
+                                    avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                    avatarUrl = customAvatarUrl,
+                                    usesPrimaryAddons = usesPrimaryAddons,
+                                )
+                            } else {
+                                ProfileRepository.updateProfile(
+                                    profileIndex = currentProfile!!.profileIndex,
+                                    name = name,
+                                    avatarColorHex = avatarColorHex,
+                                    avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                    avatarUrl = customAvatarUrl,
+                                    profileBackgroundId = selectedBackgroundId,
+                                    profileBackgroundUrl = selectedBackgroundUrl,
+                                    usesPrimaryAddons = usesPrimaryAddons,
+                                )
+                            }
+                            onSaved()
+                        } finally {
+                            isSaving = false
                         }
-                        isSaving = false
-                        onSaved()
                     }
                 },
             )

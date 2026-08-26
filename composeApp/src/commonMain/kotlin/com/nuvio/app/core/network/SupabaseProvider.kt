@@ -9,6 +9,7 @@ import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 import io.ktor.http.takeFrom
@@ -93,6 +94,10 @@ object SupabaseProvider {
                 }
                 defaultRequest {
                     headers.append(HttpHeaders.UserAgent, userAgent)
+                }
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 30_000L
+                    connectTimeoutMillis = 15_000L
                 }
             }
             install(Auth)

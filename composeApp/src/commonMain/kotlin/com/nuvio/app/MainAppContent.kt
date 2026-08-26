@@ -352,6 +352,14 @@ internal fun MainAppContent(
         }
     }
 
+    val isSettingsPageRequestOwner = !useNativeNavigation || initialTab == AppScreenTab.Settings
+    LaunchedEffect(appGateController, isSettingsPageRequestOwner) {
+        if (!isSettingsPageRequestOwner) return@LaunchedEffect
+        appGateController?.settingsPageRequests?.collect { pageName ->
+            requestedSettingsPageName = pageName
+        }
+    }
+
     fun handleRootTabClick(tab: AppScreenTab) {
         if (selectedTab != tab) {
             activateTab(tab)
