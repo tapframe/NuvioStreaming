@@ -362,7 +362,7 @@ private fun SubtitleLanguageRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
-            .clickable(onClick = onClick)
+            .clickableIncludingFlingStop(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -431,7 +431,7 @@ private fun SubtitleOptionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) tokens.colors.accent else Color.Transparent)
-            .clickable(onClick = onClick)
+            .clickableIncludingFlingStop(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
