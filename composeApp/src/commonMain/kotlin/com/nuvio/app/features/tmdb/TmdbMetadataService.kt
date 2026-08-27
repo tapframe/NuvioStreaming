@@ -782,10 +782,17 @@ object TmdbMetadataService {
                 )
             }
             val credits = async {
-                fetch<TmdbCreditsResponse>(
-                    endpoint = "$mediaType/$numericId/credits",
-                    query = mapOf("language" to normalizedLanguage),
-                )
+                if (mediaType == "tv") {
+                    fetch<TmdbAggregateCreditsResponse>(
+                        endpoint = "tv/$numericId/aggregate_credits",
+                        query = mapOf("language" to normalizedLanguage),
+                    )?.toStandard()
+                } else {
+                    fetch<TmdbCreditsResponse>(
+                        endpoint = "movie/$numericId/credits",
+                        query = mapOf("language" to normalizedLanguage),
+                    )
+                }
             }
             val images = async {
                 fetch<TmdbImagesResponse>(
@@ -1089,12 +1096,15 @@ object TmdbMetadataService {
             }
         }
 
+        val preferredLang = language.substringBefore('-').lowercase()
+
         val byCategory = linkedMapOf<String, MutableList<MetaTrailer>>()
         allVideos
             .asSequence()
             .filter { trailer ->
                 trailer.site.equals("YouTube", ignoreCase = true) && trailer.key.isNotBlank()
             }
+            .distinctBy { it.key }
             .forEach { trailer ->
                 byCategory.getOrPut(
                     trailer.type.ifBlank { runBlocking { getString(Res.string.generic_trailer) } },
@@ -1111,6 +1121,14 @@ object TmdbMetadataService {
                     }
                 }
                     .thenByDescending { it.seasonNumber ?: Int.MIN_VALUE }
+                    .thenBy {
+                        val lang = it.iso6391?.trim()?.lowercase()
+                        when {
+                            lang == preferredLang -> 0
+                            lang == "en" -> 1
+                            else -> 2
+                        }
+                    }
                     .thenByDescending { it.official }
                     .thenByDescending { it.publishedAt.orEmpty() }
             )
@@ -1476,6 +1494,7 @@ private data class TmdbVideoResult(
     val type: String? = null,
     val official: Boolean? = null,
     @SerialName("published_at") val publishedAt: String? = null,
+    @SerialName("iso_639_1") val iso6391: String? = null,
 )
 
 private fun TmdbVideoResult.toMetaTrailer(
@@ -1496,6 +1515,7 @@ private fun TmdbVideoResult.toMetaTrailer(
         publishedAt = publishedAt,
         seasonNumber = seasonNumber,
         displayName = displayName,
+        iso6391 = iso6391?.trim()?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -1520,6 +1540,62 @@ private data class TmdbCreator(
 private data class TmdbCreditsResponse(
     val cast: List<TmdbCastMember> = emptyList(),
     val crew: List<TmdbCrewMember> = emptyList(),
+)
+
+@Serializable
+private data class TmdbAggregateCreditsResponse(
+    val cast: List<TmdbAggregateCastMember> = emptyList(),
+    val crew: List<TmdbAggregateCrewMember> = emptyList(),
+) {
+    fun toStandard(): TmdbCreditsResponse = TmdbCreditsResponse(
+        cast = cast.map { member ->
+            TmdbCastMember(
+                id = member.id,
+                name = member.name,
+                character = member.roles.firstOrNull()?.character,
+                profilePath = member.profilePath,
+            )
+        },
+        crew = crew.flatMap { member ->
+            member.jobs.map { job ->
+                TmdbCrewMember(
+                    id = member.id,
+                    name = member.name,
+                    job = job.job,
+                    profilePath = member.profilePath,
+                )
+            }
+        },
+    )
+}
+
+@Serializable
+private data class TmdbAggregateCastMember(
+    val id: Int? = null,
+    val name: String? = null,
+    val roles: List<TmdbAggregateRole> = emptyList(),
+    @SerialName("profile_path") val profilePath: String? = null,
+)
+
+@Serializable
+private data class TmdbAggregateRole(
+    val character: String? = null,
+    @SerialName("episode_count") val episodeCount: Int? = null,
+)
+
+@Serializable
+private data class TmdbAggregateCrewMember(
+    val id: Int? = null,
+    val name: String? = null,
+    val department: String? = null,
+    val jobs: List<TmdbAggregateJob> = emptyList(),
+    @SerialName("profile_path") val profilePath: String? = null,
+)
+
+@Serializable
+private data class TmdbAggregateJob(
+    val job: String? = null,
+    @SerialName("episode_count") val episodeCount: Int? = null,
 )
 
 @Serializable
