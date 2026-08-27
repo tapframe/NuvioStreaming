@@ -3,6 +3,8 @@ package com.nuvio.app.features.settings
 import com.nuvio.app.core.build.AppFeaturePolicy
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -1011,7 +1013,8 @@ private fun TabletSettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = topOffset),
+                    .padding(top = topOffset)
+                    .verticalScroll(rememberScrollState()),
             ) {
                 Text(
                     text = stringResource(Res.string.compose_settings_page_root),
