@@ -1,9 +1,11 @@
 <div align="center">
-
-  <img src="assets/brand/app_logo_wordmark.png" alt="Nuvio" width="300" />
+           &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp;
+            &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp;
+   &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp;
+            &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp;
+  <img src="https://nuvio.tv/assets/nuvio-app-logo-wordmark.webp" alt="Nuvio" width="320" />
 
   <br />
-
 
   <p>A free, open-source media app for your phone, your desktop, and the TV you already own.</p>
 
@@ -21,10 +23,10 @@
 
   <br />
 
-  <img src="https://img.shields.io/github/v/release/NuvioMedia/NuvioMobile?style=for-the-badge&color=#2596be&labelColor=1e1e2e&logo=github" alt="Latest Version" />
-  <img src="https://img.shields.io/github/downloads/NuvioMedia/NuvioMobile/total?style=for-the-badge&color=#2596be&labelColor=1e1e2e&logo=github" alt="Downloads" />
-  <img src="https://img.shields.io/github/stars/NuvioMedia/NuvioMobile?style=for-the-badge&color=#2596be&labelColor=1e1e2e&logo=github" alt="Stars" />
-  <img src="https://img.shields.io/github/license/NuvioMedia/NuvioMobile?style=for-the-badge&color=#2596be&labelColor=1e1e2e" alt="License" />
+  <img src="https://img.shields.io/github/v/release/NuvioMedia/NuvioMobile?style=for-the-badge&color=2596be&labelColor=1e1e2e&logo=github" alt="Latest Version" />
+  <img src="https://img.shields.io/github/downloads/NuvioMedia/NuvioMobile/total?style=for-the-badge&color=2596be&labelColor=1e1e2e&logo=github" alt="Downloads" />
+  <img src="https://img.shields.io/github/stars/NuvioMedia/NuvioMobile?style=for-the-badge&color=2596be&labelColor=1e1e2e&logo=github" alt="Stars" />
+  <img src="https://img.shields.io/github/license/NuvioMedia/NuvioMobile?style=for-the-badge&color=2596be&labelColor=1e1e2e" alt="License" />
 
   <br />
 
