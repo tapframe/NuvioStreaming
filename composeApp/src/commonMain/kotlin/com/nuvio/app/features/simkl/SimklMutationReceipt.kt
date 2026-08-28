@@ -263,8 +263,10 @@ private fun JsonObject.objectValue(key: String): JsonObject? =
     runCatching { get(key)?.jsonObject }.getOrNull()
 
 private fun JsonObject.stringValue(key: String): String? =
-    runCatching { get(key)?.jsonPrimitive?.content }
+    runCatching { get(key)?.jsonPrimitive }
         .getOrNull()
+        ?.takeIf { primitive -> primitive !is kotlinx.serialization.json.JsonNull }
+        ?.content
         ?.trim()
         ?.takeIf(String::isNotEmpty)
 

@@ -149,6 +149,7 @@ import com.nuvio.app.features.updater.rememberAppUpdaterController
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
+import com.nuvio.app.features.watching.domain.isShortPlaceholderDuration
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
@@ -610,6 +611,9 @@ internal fun MainAppContent(
         if (result != null && result.positionMs > 0L) {
             coroutineScope.launch {
                 val durationMs = result.durationMs
+                // Guard: debrid cache-sync placeholders and error clips report a short
+                // duration reaching completion. Skip scrobble + progress for those.
+                if (durationMs != null && isShortPlaceholderDuration(durationMs)) return@launch
                 val progressPercent = if (durationMs != null && durationMs > 0L) {
                     (result.positionMs.toFloat() / durationMs.toFloat() * 100f).coerceIn(0f, 100f)
                 } else {
