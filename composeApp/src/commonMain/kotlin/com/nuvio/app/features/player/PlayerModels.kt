@@ -45,6 +45,7 @@ data class PlayerLaunch(
     val torrentTrackers: List<String> = emptyList(),
     val initialPositionMs: Long = 0L,
     val initialProgressFraction: Float? = null,
+    val streamLaunchId: Long? = null,
     val contentLanguage: String? = null,
 )
 

@@ -1,5 +1,7 @@
 package com.nuvio.app.features.streams
 
+import androidx.compose.runtime.mutableStateMapOf
+
 data class StreamLaunch(
     val profileId: Int,
     val type: String,
@@ -19,11 +21,12 @@ data class StreamLaunch(
     val resumeProgressFraction: Float? = null,
     val manualSelection: Boolean = false,
     val startFromBeginning: Boolean = false,
+    val streamsSnapshot: StreamsUiState? = null,
 )
 
 object StreamLaunchStore {
     private var nextLaunchId = 1L
-    private val launches = mutableMapOf<Long, StreamLaunch>()
+    private val launches = mutableStateMapOf<Long, StreamLaunch>()
 
     fun put(launch: StreamLaunch): Long {
         val launchId = nextLaunchId++
@@ -32,6 +35,33 @@ object StreamLaunchStore {
     }
 
     fun get(launchId: Long): StreamLaunch? = launches[launchId]
+
+    fun updateEpisode(
+        launchId: Long?,
+        videoId: String,
+        seasonNumber: Int?,
+        episodeNumber: Int?,
+        episodeTitle: String?,
+        episodeThumbnail: String?,
+        pauseDescription: String?,
+        streamsSnapshot: StreamsUiState? = null,
+    ) {
+        if (launchId == null) return
+        val current = launches[launchId] ?: return
+        launches[launchId] = current.copy(
+            videoId = videoId,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            episodeTitle = episodeTitle,
+            episodeThumbnail = episodeThumbnail,
+            pauseDescription = pauseDescription,
+            resumePositionMs = null,
+            resumeProgressFraction = null,
+            manualSelection = true,
+            startFromBeginning = false,
+            streamsSnapshot = streamsSnapshot,
+        )
+    }
 
     fun remove(launchId: Long) {
         launches.remove(launchId)

@@ -121,6 +121,7 @@ fun StreamsScreen(
     resumeProgressFraction: Float? = null,
     manualSelection: Boolean = false,
     startFromBeginning: Boolean = false,
+    initialStreamsSnapshot: StreamsUiState? = null,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit = { _, _, _ -> },
     onStreamActionOpen: (
         stream: StreamItem,
@@ -199,7 +200,16 @@ fun StreamsScreen(
         }
     }
 
-    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection) {
+    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection, initialStreamsSnapshot) {
+        initialStreamsSnapshot?.let { snapshot ->
+            StreamsRepository.restorePlayerEpisodeSnapshot(
+                type = type,
+                videoId = videoId,
+                season = seasonNumber,
+                episode = episodeNumber,
+                snapshot = snapshot,
+            )
+        }
         StreamsRepository.load(
             type = type,
             videoId = videoId,

@@ -71,13 +71,48 @@ object StreamsRepository {
         )
     }
 
-    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean) {
-        val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
-            PluginRepository.initialize()
-            PluginRepository.uiState.value
-        } else {
-            PluginsUiState(pluginsEnabled = false)
+    fun restorePlayerEpisodeSnapshot(
+        type: String,
+        videoId: String,
+        season: Int?,
+        episode: Int?,
+        snapshot: StreamsUiState,
+    ) {
+        val completedGroups = snapshot.groups.map { group ->
+            if (group.isLoading) group.copy(isLoading = false) else group
         }
+        val emptyStateReason = if (completedGroups.isEmpty()) {
+            snapshot.emptyStateReason
+        } else {
+            completedGroups.toEmptyStateReason(anyLoading = false)
+        }
+        if (completedGroups.isEmpty() && emptyStateReason == null) return
+
+        val pluginUiState = currentPluginUiState()
+        val requestToken = requestToken(
+            type = type,
+            videoId = videoId,
+            season = season,
+            episode = episode,
+            manualSelection = true,
+        )
+        activeJob?.cancel()
+        activeJob = null
+        activeRequestKey = requestKey(requestToken, pluginUiState)
+        _uiState.value = StreamsUiState(
+            requestToken = requestToken,
+            groups = completedGroups,
+            activeAddonIds = completedGroups.map { it.addonId }.toSet(),
+            selectedFilter = snapshot.selectedFilter?.takeIf { selected ->
+                completedGroups.any { it.addonId == selected }
+            },
+            isAnyLoading = false,
+            emptyStateReason = emptyStateReason,
+        )
+    }
+
+    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean) {
+        val pluginUiState = currentPluginUiState()
         val requestToken = requestToken(
             type = type,
             videoId = videoId,
@@ -85,7 +120,7 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
         )
-        val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
+        val requestKey = requestKey(requestToken, pluginUiState)
         val currentState = _uiState.value
         if (
             !forceRefresh &&
@@ -801,4 +836,15 @@ object StreamsRepository {
     fun setOverlayVisible(visible: Boolean, message: String? = null) {
         _uiState.update { it.copy(showDirectAutoPlayOverlay = visible, overlayMessage = message) }
     }
+
+    private fun currentPluginUiState(): PluginsUiState =
+        if (AppFeaturePolicy.pluginsEnabled) {
+            PluginRepository.initialize()
+            PluginRepository.uiState.value
+        } else {
+            PluginsUiState(pluginsEnabled = false)
+        }
+
+    private fun requestKey(requestToken: String, pluginUiState: PluginsUiState): String =
+        "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
 }
