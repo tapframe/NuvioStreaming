@@ -21,6 +21,7 @@
     <a href="https://nuvio.tv">Support Nuvio</a>
   </p>
 
+
   <br />
 
   <img src="https://img.shields.io/github/v/release/NuvioMedia/NuvioMobile?style=for-the-badge&color=2596be&labelColor=1e1e2e&logo=github" alt="Latest Version" />
