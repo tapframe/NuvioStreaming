@@ -5,8 +5,10 @@ import android.net.wifi.WifiManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.DatagramPacket
 import java.net.InetAddress
 import java.net.MulticastSocket
@@ -254,7 +256,7 @@ internal actual object DlnaCastPlatform {
         // SetAVTransportURI
         val setReq = Request.Builder()
             .url(device.controlUrl)
-            .post(okhttp3.RequestBody.create(okhttp3.MediaType.parse("text/xml; charset=\"utf-8\""), setUriBody))
+            .post(setUriBody.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
             .header("Content-Type", "text/xml; charset=\"utf-8\"")
             .header("SOAPACTION", "\"${device.avTransportServiceType}#SetAVTransportURI\"")
             .build()
@@ -273,7 +275,7 @@ internal actual object DlnaCastPlatform {
 
         val playReq = Request.Builder()
             .url(device.controlUrl)
-            .post(okhttp3.RequestBody.create(okhttp3.MediaType.parse("text/xml; charset=\"utf-8\""), playBody))
+            .post(playBody.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
             .header("Content-Type", "text/xml; charset=\"utf-8\"")
             .header("SOAPACTION", "\"${device.avTransportServiceType}#Play\"")
             .build()
@@ -291,7 +293,7 @@ internal actual object DlnaCastPlatform {
             val body = DlnaSoap.buildStopBody()
             val req = Request.Builder()
                 .url(device.controlUrl)
-                .post(okhttp3.RequestBody.create(okhttp3.MediaType.parse("text/xml; charset=\"utf-8\""), body))
+                .post(body.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
                 .header("Content-Type", "text/xml; charset=\"utf-8\"")
                 .header("SOAPACTION", "\"${device.avTransportServiceType}#Stop\"")
                 .build()
@@ -311,7 +313,7 @@ internal actual object DlnaCastPlatform {
             val body = DlnaSoap.buildSeekBody(target = target)
             val req = Request.Builder()
                 .url(device.controlUrl)
-                .post(okhttp3.RequestBody.create(okhttp3.MediaType.parse("text/xml; charset=\"utf-8\""), body))
+                .post(body.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
                 .header("Content-Type", "text/xml; charset=\"utf-8\"")
                 .header("SOAPACTION", "\"${device.avTransportServiceType}#Seek\"")
                 .build()
