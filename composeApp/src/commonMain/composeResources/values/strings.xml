@@ -345,6 +345,16 @@
     <string name="compose_auth_create_account">Create Account</string>
     <string name="compose_auth_dont_have_account">Don't have an account? </string>
     <string name="compose_auth_email">Email</string>
+    <string name="compose_auth_link_cancel">Cancel</string>
+    <string name="compose_auth_link_code_expired">This code expired.</string>
+    <string name="compose_auth_link_creating_code">Creating code…</string>
+    <string name="compose_auth_link_failed">Link sign-in failed.</string>
+    <string name="compose_auth_link_open">Open nuvio.tv/link</string>
+    <string name="compose_auth_link_open_failed">Couldn't open the link.</string>
+    <string name="compose_auth_link_sign_in">Sign In with Link</string>
+    <string name="compose_auth_link_signing_in">Signing in…</string>
+    <string name="compose_auth_link_try_again">Try Again</string>
+    <string name="compose_auth_link_waiting">Waiting for approval…</string>
     <string name="compose_auth_or_separator">  or  </string>
     <string name="compose_auth_password">Password</string>
     <string name="compose_auth_sign_in_subtitle">Sign in to access your library and progress</string>
