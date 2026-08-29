@@ -148,8 +148,13 @@ object UnifiedCastRepository {
 
     fun stop() {
         castJob?.cancel()
+        val dev = currentDevice
+        // Immediate UI - X działa od razu
+        isPaused = false
+        currentDevice = null
+        currentProxyUrl = null
+        _state.value = UnifiedCastState.Idle
         scope.launch(Dispatchers.IO) {
-            val dev = currentDevice
             try {
                 when (dev?.protocol) {
                     CastProtocol.DLNA -> dev.dlnaDevice?.let { DlnaCastPlatform.stopPlayback(it) }
@@ -167,10 +172,6 @@ object UnifiedCastRepository {
                     else -> DlnaCastPlatform.stopProxy()
                 }
             } catch (_: Exception) {}
-            isPaused = false
-            currentDevice = null
-            currentProxyUrl = null
-            _state.value = UnifiedCastState.Idle
         }
     }
 

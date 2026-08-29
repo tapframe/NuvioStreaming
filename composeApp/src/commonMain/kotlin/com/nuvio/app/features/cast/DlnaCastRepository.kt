@@ -126,18 +126,16 @@ object DlnaCastRepository {
 
     fun stopCasting() {
         proxyJob?.cancel()
+        val dev = currentCastDevice
+        // Immediate UI feedback - X działa od razu
+        isProxyRunning = false
+        isPaused = false
+        currentProxyUrl = null
+        currentCastDevice = null
+        _state.value = DlnaCastState.Idle
         scope.launch(Dispatchers.IO) {
-            try {
-                currentCastDevice?.let { DlnaCastPlatform.stopPlayback(it) }
-            } catch (_: Exception) {}
-            try {
-                DlnaCastPlatform.stopProxy()
-            } catch (_: Exception) {}
-            isProxyRunning = false
-            isPaused = false
-            currentProxyUrl = null
-            currentCastDevice = null
-            _state.value = DlnaCastState.Idle
+            try { dev?.let { DlnaCastPlatform.stopPlayback(it) } } catch (_: Exception) {}
+            try { DlnaCastPlatform.stopProxy() } catch (_: Exception) {}
         }
     }
 

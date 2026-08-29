@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Audiotrack
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Forward10
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -242,6 +244,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             )
         }
 
+        // Casting overlay below modals so subtitle/audio sheets are usable (on top)
+        RenderCastingOverlay()
         RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode)
         RenderPlaybackOverlays(
             runtime = runtime,
@@ -254,7 +258,6 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             p2pRebufferProgress = p2pRebufferProgress,
         )
         RenderPlayerModals(displayedPositionMs = displayedPositionMs)
-        RenderCastingOverlay()
     }
 }
 
@@ -279,6 +282,11 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, isEpisode: Boolean) {
     val isInPip = rememberIsInPictureInPicture()
+    // Hide local controls when casting to TV - remote controls shown instead
+    val dlnaState by DlnaCastRepository.state.collectAsState()
+    val unifiedState by com.nuvio.app.features.cast.UnifiedCastRepository.state.collectAsState()
+    val isCastingLocal = dlnaState is DlnaCastState.Casting || unifiedState is com.nuvio.app.features.cast.UnifiedCastState.Casting
+    if (isCastingLocal) return
     AnimatedVisibility(
         visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
         enter = fadeIn(),
@@ -823,24 +831,63 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                         Text(formatPlaybackTime(duration), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
                     }
                 }
-                // Subtitle / Audio quick actions (show current selection)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Subtitle button cycles/choose
-                    IconButton(onClick = { showSubtitleModal = true }) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Napisy", style = MaterialTheme.typography.labelSmall, color = Color.White)
-                            Text(if (useCustomSubtitles) "Wł. (burn-in przy transkodzie)" else "Wyłączone", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                // Subtitle / Audio actions - now with icons and working above overlay (modals on top)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Napisy - z ikoną
+                    androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(
+                            onClick = {
+                                // Ensure tracks are fresh before opening
+                                refreshTracks()
+                                showSubtitleModal = true
+                            },
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f))
+                        ) {
+                            Icon(Icons.Rounded.Subtitles, contentDescription = "Napisy", tint = Color.White, modifier = Modifier.size(22.dp))
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (useCustomSubtitles) selectedAddonSubtitle?.language?.uppercase() ?: "Wł." else "Brak",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.8f),
+                            maxLines = 1
+                        )
                     }
-                    Spacer(modifier = Modifier.size(16.dp))
-                    IconButton(onClick = {
-                        if (isUnifiedCasting) com.nuvio.app.features.cast.UnifiedCastRepository.stop() else DlnaCastRepository.stopCasting()
-                        shouldPlay = true; playerController?.play()
-                    }) {
-                        Icon(Icons.Rounded.Stop, contentDescription = "Stop", tint = Color.White)
+                    // Audio - z ikoną, otwiera wybór ścieżki audio
+                    androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        IconButton(
+                            onClick = {
+                                refreshTracks()
+                                showAudioModal = true
+                            },
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f))
+                        ) {
+                            Icon(Icons.Rounded.Audiotrack, contentDescription = "Audio", tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = audioTracks.firstOrNull { it.index == selectedAudioIndex }?.label?.take(8) ?: "Audio",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.8f),
+                            maxLines = 1
+                        )
+                    }
+                    Spacer(modifier = Modifier.size(8.dp))
+                    // Stop
+                    IconButton(
+                        onClick = {
+                            if (isUnifiedCasting) com.nuvio.app.features.cast.UnifiedCastRepository.stop() else DlnaCastRepository.stopCasting()
+                            shouldPlay = true; playerController?.play()
+                        },
+                        modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f))
+                    ) {
+                        Icon(Icons.Rounded.Stop, contentDescription = "Stop", tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                 }
-                Text("Proxy: ${castingProxy.take(60)}...", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+                Text("$castingProtocol • Proxy: ${castingProxy.take(55)}...", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
             }
         }
     }
