@@ -753,7 +753,7 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                         Icon(Icons.Rounded.CastConnected, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                     Column {
-                        Text("$castingProtocol • Odtwarzanie na TV", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                        Text("$castingProtocol • Playing on TV", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
                         Text(castingName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
                     }
                 }
@@ -762,7 +762,7 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                     shouldPlay = true
                     playerController?.play()
                 }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Zatrzymaj cast", tint = Color.White)
+                    Icon(Icons.Rounded.Close, contentDescription = "Stop casting", tint = Color.White)
                 }
             }
 
@@ -781,7 +781,7 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                         val target = (displayPos - 10_000).coerceAtLeast(0)
                         if (isUnifiedCasting) com.nuvio.app.features.cast.UnifiedCastRepository.seek(target) else DlnaCastRepository.seekCasting(target)
                     }) {
-                        Icon(Icons.Rounded.Replay10, contentDescription = "Cofnij 10s", tint = Color.White, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Rounded.Replay10, contentDescription = "Rewind 10s", tint = Color.White, modifier = Modifier.size(32.dp))
                     }
                     Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Color.White).padding(10.dp).then(Modifier), contentAlignment = Alignment.Center) {
                         IconButton(onClick = {
@@ -795,7 +795,7 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                         }) {
                             Icon(
                                 imageVector = if (isRemotePaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                                contentDescription = if (isRemotePaused) "Wznów" else "Pauza",
+                                contentDescription = if (isRemotePaused) "Resume" else "Pause",
                                 tint = Color.Black,
                                 modifier = Modifier.size(32.dp)
                             )
@@ -805,7 +805,7 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                         val target = displayPos + 10_000
                         if (isUnifiedCasting) com.nuvio.app.features.cast.UnifiedCastRepository.seek(target) else DlnaCastRepository.seekCasting(target)
                     }) {
-                        Icon(Icons.Rounded.Forward10, contentDescription = "Dalej 10s", tint = Color.White, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Rounded.Forward10, contentDescription = "Forward 10s", tint = Color.White, modifier = Modifier.size(32.dp))
                     }
                 }
                 // Slider
@@ -836,7 +836,7 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Napisy - z ikoną
+                    // Subtitles - with icon
                     androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(
                             onClick = {
@@ -846,17 +846,17 @@ private fun PlayerScreenRuntime.RenderCastingOverlay() {
                             },
                             modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f))
                         ) {
-                            Icon(Icons.Rounded.Subtitles, contentDescription = "Napisy", tint = Color.White, modifier = Modifier.size(22.dp))
+                            Icon(Icons.Rounded.Subtitles, contentDescription = "Subtitles", tint = Color.White, modifier = Modifier.size(22.dp))
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (useCustomSubtitles) selectedAddonSubtitle?.language?.uppercase() ?: "Wł." else "Brak",
+                            text = if (useCustomSubtitles) selectedAddonSubtitle?.language?.uppercase() ?: "On" else "Off",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.8f),
                             maxLines = 1
                         )
                     }
-                    // Audio - z ikoną, otwiera wybór ścieżki audio
+                    // Audio - with icon, opens audio track picker
                     androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         IconButton(
                             onClick = {

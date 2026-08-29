@@ -68,7 +68,7 @@ object UnifiedCastRepository {
                 _devices.value = all
                 _state.value = if (all.isEmpty()) UnifiedCastState.NoDevices else UnifiedCastState.DevicesFound(all)
             } catch (e: Exception) {
-                _state.value = UnifiedCastState.Error(e.message ?: "Błąd skanowania")
+                _state.value = UnifiedCastState.Error(e.message ?: "Scan error")
             }
         }
     }
@@ -107,10 +107,10 @@ object UnifiedCastRepository {
                 }
 
                 if (!success) {
-                    _state.value = UnifiedCastState.Error("Nie udało się wysłać do ${device.name}")
+                    _state.value = UnifiedCastState.Error("Failed to send to ${device.name}")
                 }
             } catch (e: Exception) {
-                _state.value = UnifiedCastState.Error(e.message ?: "Błąd castowania")
+                _state.value = UnifiedCastState.Error(e.message ?: "Cast error")
             }
         }
     }
@@ -150,7 +150,7 @@ object UnifiedCastRepository {
     fun stop() {
         castJob?.cancel()
         val dev = currentDevice
-        // Immediate UI - X działa od razu
+        // Immediate UI - X works instantly
         isPaused = false
         currentDevice = null
         currentProxyUrl = null

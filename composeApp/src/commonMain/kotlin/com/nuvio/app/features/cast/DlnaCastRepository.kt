@@ -57,7 +57,7 @@ object DlnaCastRepository {
                     }
                 }
             } catch (e: Exception) {
-                _state.value = DlnaCastState.Error(e.message ?: "Błąd skanowania DLNA")
+                _state.value = DlnaCastState.Error(e.message ?: "DLNA scan error")
             }
         }
     }
@@ -87,11 +87,11 @@ object DlnaCastRepository {
                 if (success) {
                     onResult(true, null)
                 } else {
-                    _state.value = DlnaCastState.Error("Nie udało się wysłać do TV")
+                    _state.value = DlnaCastState.Error("Failed to send to TV")
                     onResult(false, "Cast failed")
                 }
             } catch (e: Exception) {
-                _state.value = DlnaCastState.Error(e.message ?: "Błąd castowania")
+                _state.value = DlnaCastState.Error(e.message ?: "Cast error")
                 onResult(false, e.message)
             }
         }
@@ -127,7 +127,7 @@ object DlnaCastRepository {
     fun stopCasting() {
         proxyJob?.cancel()
         val dev = currentCastDevice
-        // Immediate UI feedback - X działa od razu
+        // Immediate UI feedback - X works instantly
         isProxyRunning = false
         isPaused = false
         currentProxyUrl = null

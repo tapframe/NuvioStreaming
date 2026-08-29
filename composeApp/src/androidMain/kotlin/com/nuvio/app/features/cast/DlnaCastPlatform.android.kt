@@ -159,7 +159,7 @@ internal actual object DlnaCastPlatform {
             DlnaScanResult.Success(distinct)
         } catch (e: Exception) {
             Log.e(TAG, "scanDevices error", e)
-            DlnaScanResult.Failure(e.message ?: "Błąd skanowania")
+            DlnaScanResult.Failure(e.message ?: "Scan error")
         } finally {
             try { socket?.close() } catch (_: Exception) {}
             try { multicastLock?.release() } catch (_: Exception) {}
@@ -184,7 +184,7 @@ internal actual object DlnaCastPlatform {
         CastSettingsRepository.ensureLoaded()
         val settings = CastSettingsRepository.uiState.value
 
-        val localIp = getLocalIpAddress() ?: throw IllegalStateException("Brak adresu IP WiFi - sprawdź połączenie")
+        val localIp = getLocalIpAddress() ?: throw IllegalStateException("No Wi-Fi IP address - check connection")
         proxyLocalIp = localIp
 
         // Decide if transcoding needed

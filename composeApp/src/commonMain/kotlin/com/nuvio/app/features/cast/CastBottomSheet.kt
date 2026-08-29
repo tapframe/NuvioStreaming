@@ -46,6 +46,33 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.cast_action
+import nuvio.composeapp.generated.resources.cast_choose_device
+import nuvio.composeapp.generated.resources.cast_chromecast_label
+import nuvio.composeapp.generated.resources.cast_chromecast_playing
+import nuvio.composeapp.generated.resources.cast_close
+import nuvio.composeapp.generated.resources.cast_detects
+import nuvio.composeapp.generated.resources.cast_devices_in_network
+import nuvio.composeapp.generated.resources.cast_dlna_label
+import nuvio.composeapp.generated.resources.cast_dlna_playing
+import nuvio.composeapp.generated.resources.cast_error
+import nuvio.composeapp.generated.resources.cast_footer_chromecast_first
+import nuvio.composeapp.generated.resources.cast_no_devices
+import nuvio.composeapp.generated.resources.cast_not_found_tv
+import nuvio.composeapp.generated.resources.cast_check_chromecast
+import nuvio.composeapp.generated.resources.cast_phone_tv_same_wifi
+import nuvio.composeapp.generated.resources.cast_playing
+import nuvio.composeapp.generated.resources.cast_playing_on_tv
+import nuvio.composeapp.generated.resources.cast_refresh
+import nuvio.composeapp.generated.resources.cast_samsung_badge
+import nuvio.composeapp.generated.resources.cast_scan_again
+import nuvio.composeapp.generated.resources.cast_scan_devices
+import nuvio.composeapp.generated.resources.cast_scanning
+import nuvio.composeapp.generated.resources.cast_searching
+import nuvio.composeapp.generated.resources.cast_stop
+import nuvio.composeapp.generated.resources.cast_try_again
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +83,7 @@ fun CastBottomSheet(
     onDeviceSelected: (DlnaDevice) -> Unit = {},
 ) {
     if (!isVisible) return
-    // Unified = DLNA + Chromecast
+    // Unified = Chromecast first, old Samsung at end
     val unifiedState by UnifiedCastRepository.state.collectAsState()
     val unifiedDevices by UnifiedCastRepository.devices.collectAsState()
     // Fallback legacy DLNA state for detailed casting screen (kept for overlay compatibility)
@@ -88,13 +115,13 @@ fun CastBottomSheet(
             ) {
                 Text(
                     text = when {
-                        unifiedState is UnifiedCastState.Scanning || dlnaCastState is DlnaCastState.Scanning -> "Szukam telewizorów..."
-                        unifiedState is UnifiedCastState.DevicesFound || dlnaCastState is DlnaCastState.DevicesFound -> "Wybierz urządzenie"
-                        unifiedState is UnifiedCastState.NoDevices -> "Nie znaleziono urządzeń"
-                        isUnifiedCasting || isDlnaCasting -> "Odtwarzanie na TV"
-                        unifiedState is UnifiedCastState.Error -> "Błąd"
-                        dlnaCastState is DlnaCastState.Error -> "Błąd"
-                        else -> "Urządzenia w sieci (Chromecast + stary Samsung na końcu)"
+                        unifiedState is UnifiedCastState.Scanning || dlnaCastState is DlnaCastState.Scanning -> stringResource(Res.string.cast_searching)
+                        unifiedState is UnifiedCastState.DevicesFound || dlnaCastState is DlnaCastState.DevicesFound -> stringResource(Res.string.cast_choose_device)
+                        unifiedState is UnifiedCastState.NoDevices -> stringResource(Res.string.cast_no_devices)
+                        isUnifiedCasting || isDlnaCasting -> stringResource(Res.string.cast_playing_on_tv)
+                        unifiedState is UnifiedCastState.Error -> stringResource(Res.string.cast_error)
+                        dlnaCastState is DlnaCastState.Error -> stringResource(Res.string.cast_error)
+                        else -> stringResource(Res.string.cast_devices_in_network)
                     },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.weight(1f),
@@ -103,12 +130,12 @@ fun CastBottomSheet(
                     UnifiedCastRepository.startScan()
                     DlnaCastRepository.startScan()
                 }) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = "Odśwież")
+                    Icon(Icons.Rounded.Refresh, contentDescription = stringResource(Res.string.cast_refresh))
                 }
             }
 
             Text(
-                text = "Telefon i TV muszą być w tej samej sieci Wi-Fi. Najpierw Chromecast (Google Cast), na końcu jako dodatek — stary Samsung (DLNA 7676/smp_).",
+                text = stringResource(Res.string.cast_phone_tv_same_wifi),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -122,7 +149,7 @@ fun CastBottomSheet(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Skanuję (Chromecast + DLNA)...", style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(Res.string.cast_scanning), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -134,11 +161,11 @@ fun CastBottomSheet(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Rounded.Tv, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Nie znaleziono TV", style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(Res.string.cast_not_found_tv), style = MaterialTheme.typography.bodyMedium)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Sprawdź czy Chromecast jest w tej samej sieci. Stary Samsung (DLNA / AllShare) tylko jako dodatek na końcu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(Res.string.cast_check_chromecast), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(12.dp))
-                            Button(onClick = { UnifiedCastRepository.startScan(); DlnaCastRepository.startScan() }) { Text("Skanuj ponownie") }
+                            Button(onClick = { UnifiedCastRepository.startScan(); DlnaCastRepository.startScan() }) { Text(stringResource(Res.string.cast_scan_again)) }
                         }
                     }
                 }
@@ -147,14 +174,14 @@ fun CastBottomSheet(
                     Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
                         Text(msg, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Button(onClick = { UnifiedCastRepository.startScan() }, modifier = Modifier.fillMaxWidth()) { Text("Spróbuj ponownie") }
+                    Button(onClick = { UnifiedCastRepository.startScan() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.cast_try_again)) }
                 }
                 dlnaCastState is DlnaCastState.Error -> {
                     val msg = (dlnaCastState as DlnaCastState.Error).message
                     Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
                         Text(msg, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Button(onClick = { DlnaCastRepository.startScan() }, modifier = Modifier.fillMaxWidth()) { Text("Spróbuj ponownie") }
+                    Button(onClick = { DlnaCastRepository.startScan() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.cast_try_again)) }
                 }
                 isUnifiedCasting -> {
                     val casting = unifiedState as UnifiedCastState.Casting
@@ -170,7 +197,7 @@ fun CastBottomSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(casting.device.name, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    if (casting.device.protocol == CastProtocol.CHROMECAST) "Chromecast • Odtwarzanie..." else "DLNA • Odtwarzanie...",
+                                    if (casting.device.protocol == CastProtocol.CHROMECAST) stringResource(Res.string.cast_chromecast_playing) else stringResource(Res.string.cast_dlna_playing),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 if (casting.proxyUrl.isNotBlank()) {
@@ -180,8 +207,8 @@ fun CastBottomSheet(
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = { UnifiedCastRepository.stop(); DlnaCastRepository.stopCasting() }, modifier = Modifier.weight(1f)) { Text("Zatrzymaj") }
-                        Button(onClick = { dismiss() }, modifier = Modifier.weight(1f)) { Text("Zamknij") }
+                        TextButton(onClick = { UnifiedCastRepository.stop(); DlnaCastRepository.stopCasting() }, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cast_stop)) }
+                        Button(onClick = { dismiss() }, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cast_close)) }
                     }
                 }
                 isDlnaCasting -> {
@@ -194,7 +221,7 @@ fun CastBottomSheet(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(casting.device.friendlyName, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("DLNA • Odtwarzanie...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(Res.string.cast_dlna_playing), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (casting.proxyUrl.isNotBlank()) {
                                     Text(casting.proxyUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
@@ -202,15 +229,14 @@ fun CastBottomSheet(
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = { DlnaCastRepository.stopCasting() }, modifier = Modifier.weight(1f)) { Text("Zatrzymaj") }
-                        Button(onClick = { dismiss() }, modifier = Modifier.weight(1f)) { Text("Zamknij") }
+                        TextButton(onClick = { DlnaCastRepository.stopCasting() }, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cast_stop)) }
+                        Button(onClick = { dismiss() }, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.cast_close)) }
                     }
                 }
                 else -> {
                     val allDevices = if (unifiedDevices.isNotEmpty()) unifiedDevices else emptyList()
                     // Fallback to DLNA devices if unified empty but Dlna has
                     val dlnaAsUnified = if (allDevices.isEmpty()) {
-                        // collect legacy Dlna devices as fallback (for overlay compatibility)
                         emptyList<UnifiedCastDevice>()
                     } else allDevices
 
@@ -235,8 +261,8 @@ fun CastBottomSheet(
                         } else {
                             Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TextButton(onClick = { UnifiedCastRepository.startScan(); DlnaCastRepository.startScan() }) { Text("Skanuj urządzenia") }
-                                    Text("Wykrywa Chromecast (mDNS) i DLNA na końcu", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    TextButton(onClick = { UnifiedCastRepository.startScan(); DlnaCastRepository.startScan() }) { Text(stringResource(Res.string.cast_scan_devices)) }
+                                    Text(stringResource(Res.string.cast_detects), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -246,7 +272,6 @@ fun CastBottomSheet(
                                 UnifiedDeviceRow(device = device, onClick = {
                                     if (castRequest != null) {
                                         UnifiedCastRepository.castToDevice(device, castRequest, chromecastPoster = null)
-                                        // also keep legacy callback
                                         device.dlnaDevice?.let { onDeviceSelected(it) }
                                     }
                                 })
@@ -259,7 +284,7 @@ fun CastBottomSheet(
             // Footer - Chromecast first, old Samsung at very end
             if (unifiedState is UnifiedCastState.DevicesFound || dlnaCastState is DlnaCastState.DevicesFound) {
                 Text(
-                    text = "Najpierw Chromecast (bez transkodu), na końcu jako dodatek stary Samsung (DLNA przez proxy). Wybierz TV.",
+                    text = stringResource(Res.string.cast_footer_chromecast_first),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -291,10 +316,10 @@ private fun DlnaDeviceRow(device: DlnaDevice, onClick: () -> Unit) {
                     }
                 }
                 if (device.locationUrl.contains("7676") || device.locationUrl.contains("smp_")) {
-                    Text("Samsung DLNA (7676/smp_)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                    Text(stringResource(Res.string.cast_samsung_badge), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                 }
             }
-            Icon(Icons.Rounded.Cast, contentDescription = "Cast", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Rounded.Cast, contentDescription = stringResource(Res.string.cast_action), tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -325,7 +350,7 @@ private fun UnifiedDeviceRow(device: UnifiedCastDevice, onClick: () -> Unit) {
                 Text(device.name, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        if (isCast) "Chromecast" else "DLNA",
+                        if (isCast) stringResource(Res.string.cast_chromecast_label) else stringResource(Res.string.cast_dlna_label),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isCast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
@@ -338,12 +363,12 @@ private fun UnifiedDeviceRow(device: UnifiedCastDevice, onClick: () -> Unit) {
                     }
                 }
                 if (!isCast && (device.dlnaDevice?.locationUrl?.contains("7676") == true)) {
-                    Text("Samsung DLNA (7676/smp_)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                    Text(stringResource(Res.string.cast_samsung_badge), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                 }
             }
             Icon(
                 imageVector = if (isCast) Icons.Rounded.SmartDisplay else Icons.Rounded.Cast,
-                contentDescription = "Cast",
+                contentDescription = stringResource(Res.string.cast_action),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
