@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,7 +58,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.AppIconResource
 import com.nuvio.app.core.ui.NuvioBackButton
+import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.core.ui.appTheme
 import com.nuvio.app.core.ui.appIconPainter
+import com.nuvio.app.core.ui.gradientMask
 import com.nuvio.app.core.ui.nuvioTypeScale
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -513,6 +518,7 @@ private fun ProgressControls(
             onValueChange = { value -> onScrubChange(value.toLong()) },
             onValueChangeFinished = { onScrubFinished(displayedPositionMs.coerceIn(0L, durationMs)) },
             valueRange = 0f..durationMs.toFloat(),
+            track = { sliderState -> PlayerProgressTrack(sliderState) },
         )
         Row(
             modifier = Modifier
@@ -580,6 +586,33 @@ private fun ProgressControls(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerProgressTrack(sliderState: SliderState) {
+    val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+    val inactiveTrackColors = SliderDefaults.colors(
+        activeTrackColor = Color.Transparent,
+        disabledActiveTrackColor = Color.Transparent,
+    )
+    val activeTrackColors = SliderDefaults.colors(
+        activeTrackColor = Color.White,
+        inactiveTrackColor = Color.Transparent,
+        disabledActiveTrackColor = Color.White,
+        disabledInactiveTrackColor = Color.Transparent,
+    )
+
+    Box {
+        SliderDefaults.Track(
+            sliderState = sliderState,
+            colors = inactiveTrackColors,
+        )
+        SliderDefaults.Track(
+            sliderState = sliderState,
+            modifier = Modifier.gradientMask(palette.accentBrush()),
+            colors = activeTrackColors,
+        )
     }
 }
 
