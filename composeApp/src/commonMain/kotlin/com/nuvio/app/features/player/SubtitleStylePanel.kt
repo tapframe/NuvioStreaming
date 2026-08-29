@@ -10,9 +10,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -342,10 +347,15 @@ private fun SubtitleAutoSyncSection(
 ) {
     val tokens = MaterialTheme.nuvio
     val capturedPositionMs = state.capturedPositionMs
-    val nearestCues = if (capturedPositionMs == null) {
-        emptyList()
-    } else {
-        state.cues.sortedBy { abs(it.startTimeMs - capturedPositionMs) }.take(5)
+    val cueListState = rememberLazyListState()
+    val highlightedCueIndex = capturedPositionMs?.let { captured ->
+        state.cues.indices.minByOrNull { index -> abs(state.cues[index].startTimeMs - captured) }
+    } ?: -1
+
+    LaunchedEffect(highlightedCueIndex, state.cues.size) {
+        if (highlightedCueIndex >= 0) {
+            cueListState.animateScrollToItem((highlightedCueIndex - 2).coerceAtLeast(0))
+        }
     }
 
     SubtitleStyleSection(title = stringResource(Res.string.compose_player_auto_sync)) {
@@ -366,11 +376,9 @@ private fun SubtitleAutoSyncSection(
             selectedAddonSubtitle == null -> {
                 SubtitleHelperText(stringResource(Res.string.compose_player_select_addon_subtitle_first))
             }
-
             state.isLoading -> {
                 SubtitleHelperText(stringResource(Res.string.compose_player_loading_lines))
             }
-
             state.errorMessage != null -> {
                 Text(
                     text = state.errorMessage,
@@ -378,37 +386,50 @@ private fun SubtitleAutoSyncSection(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-
-            capturedPositionMs != null && nearestCues.isEmpty() -> {
+            capturedPositionMs != null && state.cues.isEmpty() -> {
                 SubtitleHelperText(stringResource(Res.string.compose_player_no_subtitle_lines_found))
             }
         }
 
-        nearestCues.forEach { cue ->
-            Row(
+        if (state.cues.isNotEmpty()) {
+            LazyColumn(
+                state = cueListState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.06f))
-                    .clickable { onCueSelected(cue) }
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
+                    .heightIn(max = 300.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = formatCueTimestamp(cue.startTimeMs),
-                    color = tokens.colors.accent,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = cue.text,
-                    modifier = Modifier.weight(1f),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                itemsIndexed(state.cues) { index, cue ->
+                    val isHighlighted = index == highlightedCueIndex
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isHighlighted) Color.White.copy(alpha = 0.14f)
+                                else Color.White.copy(alpha = 0.06f)
+                            )
+                            .clickable { onCueSelected(cue) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            text = formatCueTimestamp(cue.startTimeMs),
+                            color = if (isHighlighted) Color.White else tokens.colors.accent,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = cue.text,
+                            modifier = Modifier.weight(1f),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
