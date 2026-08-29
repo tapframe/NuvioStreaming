@@ -48,8 +48,16 @@ object UnifiedCastRepository {
                 val castDeferred = async(Dispatchers.IO) {
                     try { ChromecastPlatform.scanDevices(4000) } catch (_: Exception) { emptyList<UnifiedCastDevice>() }
                 }
+                val dialDeferred = async(Dispatchers.IO) {
+                    try { DialPlatform.scanDevices(3000) } catch (_: Exception) { emptyList<UnifiedCastDevice>() }
+                }
+                val airPlayDeferred = async(Dispatchers.IO) {
+                    try { AirPlayPlatform.scanDevices(3000) } catch (_: Exception) { emptyList<UnifiedCastDevice>() }
+                }
                 val dlnaResult = dlnaDeferred.await()
                 val castDevices = castDeferred.await()
+                val dialDevices = dialDeferred.await()
+                val airPlayDevices = airPlayDeferred.await()
 
                 val dlnaUnified = when (dlnaResult) {
                     is DlnaScanResult.Success -> dlnaResult.devices.map { d ->
@@ -63,8 +71,10 @@ object UnifiedCastRepository {
                     }
                     else -> emptyList()
                 }
-                // Chromecast first, old Samsung (DLNA) at very end as addition
-                val all = (castDevices + dlnaUnified).distinctBy { it.id }
+                // Universal order: Chromecast first, then AirPlay, DIAL, old Samsung (DLNA) at very end
+                val allUnsorted = castDevices + airPlayDevices + dialDevices + dlnaUnified
+                val priority = mapOf(CastProtocol.CHROMECAST to 0, CastProtocol.AIRPLAY to 1, CastProtocol.DIAL to 2, CastProtocol.DLNA to 3)
+                val all = allUnsorted.sortedBy { priority[it.protocol] ?: 99 }.distinctBy { it.id }
                 _devices.value = all
                 _state.value = if (all.isEmpty()) UnifiedCastState.NoDevices else UnifiedCastState.DevicesFound(all)
             } catch (e: Exception) {
@@ -103,6 +113,16 @@ object UnifiedCastRepository {
                             )
                             ChromecastPlatform.castToDevice(device, req)
                         }
+                        CastProtocol.DIAL -> {
+                            // DIAL launch via Application-URL POST (Fire TV, Roku) - stub, fallback to DLNA if available
+                            // For now, try DLNA as fallback
+                            val d = device.dlnaDevice
+                            if (d != null) DlnaCastPlatform.castToDevice(d, dlnaRequest, proxyUrl) else false
+                        }
+                        CastProtocol.AIRPLAY -> {
+                            // AirPlay not yet implemented on Android (needs NsdManager + AirPlay protocol)
+                            false
+                        }
                     }
                 }
 
@@ -121,6 +141,8 @@ object UnifiedCastRepository {
             when (dev.protocol) {
                 CastProtocol.DLNA -> dev.dlnaDevice?.let { DlnaCastPlatform.pausePlayback(it) }
                 CastProtocol.CHROMECAST -> ChromecastPlatform.pause()
+                CastProtocol.DIAL -> dev.dlnaDevice?.let { DlnaCastPlatform.pausePlayback(it) }
+                CastProtocol.AIRPLAY -> {} // stub
             }
             isPaused = true
         }
@@ -132,6 +154,8 @@ object UnifiedCastRepository {
             when (dev.protocol) {
                 CastProtocol.DLNA -> dev.dlnaDevice?.let { DlnaCastPlatform.resumePlayback(it) }
                 CastProtocol.CHROMECAST -> ChromecastPlatform.resume()
+                CastProtocol.DIAL -> dev.dlnaDevice?.let { DlnaCastPlatform.resumePlayback(it) }
+                CastProtocol.AIRPLAY -> {}
             }
             isPaused = false
         }
@@ -143,6 +167,8 @@ object UnifiedCastRepository {
             when (dev.protocol) {
                 CastProtocol.DLNA -> dev.dlnaDevice?.let { DlnaCastPlatform.seekPlayback(it, positionMs) }
                 CastProtocol.CHROMECAST -> ChromecastPlatform.seek(positionMs)
+                CastProtocol.DIAL -> dev.dlnaDevice?.let { DlnaCastPlatform.seekPlayback(it, positionMs) }
+                CastProtocol.AIRPLAY -> {}
             }
         }
     }
@@ -160,6 +186,8 @@ object UnifiedCastRepository {
                 when (dev?.protocol) {
                     CastProtocol.DLNA -> dev.dlnaDevice?.let { DlnaCastPlatform.stopPlayback(it) }
                     CastProtocol.CHROMECAST -> ChromecastPlatform.stop()
+                    CastProtocol.DIAL -> dev.dlnaDevice?.let { DlnaCastPlatform.stopPlayback(it) }
+                    CastProtocol.AIRPLAY -> {}
                     else -> {}
                 }
             } catch (_: Exception) {}
@@ -170,6 +198,7 @@ object UnifiedCastRepository {
                         ChromecastPlatform.disconnect()
                         DlnaCastPlatform.stopProxy()
                     }
+                    CastProtocol.DIAL -> DlnaCastPlatform.stopProxy()
                     else -> DlnaCastPlatform.stopProxy()
                 }
             } catch (_: Exception) {}
@@ -181,7 +210,35 @@ object UnifiedCastRepository {
         return when (dev.protocol) {
             CastProtocol.DLNA -> dev.dlnaDevice?.let { DlnaCastPlatform.getPositionInfo(it) }
             CastProtocol.CHROMECAST -> ChromecastPlatform.getPosition()
+            CastProtocol.DIAL -> dev.dlnaDevice?.let { DlnaCastPlatform.getPositionInfo(it) }
+            CastProtocol.AIRPLAY -> null
         }
+    }
+
+    // Capability sniffing - checks GetProtocolInfo for DLNA, assumes modern for Cast
+    suspend fun getCapabilities(device: UnifiedCastDevice): DeviceCapabilities = withContext(Dispatchers.IO) {
+        when (device.protocol) {
+            CastProtocol.CHROMECAST -> DeviceCapabilities(supportsHevc = true, supportsAv1 = true, supportsHls = true, supportsMkv = true)
+            CastProtocol.AIRPLAY -> DeviceCapabilities(supportsHevc = true, supportsAv1 = false, supportsHls = true)
+            CastProtocol.DIAL -> DeviceCapabilities(supportsHevc = false, supportsAv1 = false, supportsMkv = false)
+            CastProtocol.DLNA -> {
+                // Old Samsung DLNA typically only mp4/avc/aac, try GetProtocolInfo
+                try {
+                    val d = device.dlnaDevice ?: return@withContext DeviceCapabilities()
+                    // For now, assume old Samsung = no hevc/av1, no mkv (conservative)
+                    // Future: parse device.modelName and do HTTP GET to fetch protocolInfo
+                    val isSamsungOld = d.modelName?.contains("Samsung", ignoreCase = true) == true || d.locationUrl.contains("smp_")
+                    if (isSamsungOld) DeviceCapabilities(supportsHevc = false, supportsAv1 = false, supportsMkv = false)
+                    else DeviceCapabilities(supportsHevc = false, supportsAv1 = false, supportsMkv = true)
+                } catch (_: Exception) { DeviceCapabilities() }
+            }
+        }
+    }
+
+    // WOL placeholder - send magic packet to TV MAC if known (future: store MAC from discovery)
+    fun wakeOnLan(macAddress: String, broadcastIp: String = "255.255.255.255") {
+        // Stub for universal WOL - magic packet 6x 0xFF + 16x MAC
+        // Will be implemented with DatagramSocket to 9/UDP when MAC is discovered via ARP
     }
 
     fun reset() {

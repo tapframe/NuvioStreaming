@@ -1,8 +1,10 @@
 package com.nuvio.app.features.cast
 
 enum class CastProtocol {
-    DLNA,
-    CHROMECAST
+    CHROMECAST, // first - modern, no transcode
+    DLNA,       // old Samsung at end
+    DIAL,       // Fire TV / Roku via DIAL
+    AIRPLAY     // Apple TV
 }
 
 data class UnifiedCastDevice(
