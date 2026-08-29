@@ -434,7 +434,7 @@
     <string name="cast_section_info">JAK TO DZIAŁA</string>
     <string name="cast_info_title">Prosto i bez kabli</string>
     <string name="cast_info_body">1. Włącz film i naciśnij ikonę „Wyślij na TV”.\n2. Wybierz swój telewizor z listy.\n3. Film pojawi się na dużym ekranie, a telefon stanie się pilotem (pauza, przewijanie, napisy).</string>
-    <string name="cast_info_note">Działa z każdym telewizorem: stary Samsung, Chromecast, Android TV i inne. Jeśli starszy TV nie odtwarza filmu, włącz tryb Automatyczny powyżej – telefon sam dopasuje film.</string>
+    <string name="cast_info_note">Działa głównie z Chromecast, Android TV i nowoczesnymi TV. Jako dodatek — także ze starym Samsungiem.</string>
     <string name="compose_settings_root_about_section">O APLIKACJI</string>
     <string name="compose_settings_root_account_description">Zarządzaj kontem, wyloguj się lub usuń.</string>
     <string name="compose_settings_root_account_section">KONTO</string>

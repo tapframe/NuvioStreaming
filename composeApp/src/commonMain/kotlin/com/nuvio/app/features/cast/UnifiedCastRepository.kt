@@ -63,7 +63,8 @@ object UnifiedCastRepository {
                     }
                     else -> emptyList()
                 }
-                val all = (dlnaUnified + castDevices).distinctBy { it.id }
+                // Chromecast first, old Samsung (DLNA) at very end as addition
+                val all = (castDevices + dlnaUnified).distinctBy { it.id }
                 _devices.value = all
                 _state.value = if (all.isEmpty()) UnifiedCastState.NoDevices else UnifiedCastState.DevicesFound(all)
             } catch (e: Exception) {

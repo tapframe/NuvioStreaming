@@ -538,7 +538,7 @@
     <string name="cast_section_info">HOW IT WORKS</string>
     <string name="cast_info_title">Simple and wireless</string>
     <string name="cast_info_body">1. Play a video and tap “Send to TV”.\n2. Choose your TV from the list.\n3. The video will appear on the big screen and your phone becomes a remote (pause, seek, subtitles).</string>
-    <string name="cast_info_note">Works with any TV: old Samsung, Chromecast, Android TV and more. If an older TV can’t play the video, turn on Automatic mode above — your phone will adapt the video.</string>
+    <string name="cast_info_note">Works with Chromecast, Android TV, Apple TV and most modern TVs. Also works with old Samsung TVs as an extra.</string>
     <string name="compose_settings_root_about_section">ABOUT</string>
     <string name="compose_settings_root_account_description">Account and sync status</string>
     <string name="compose_settings_root_account_section">ACCOUNT</string>

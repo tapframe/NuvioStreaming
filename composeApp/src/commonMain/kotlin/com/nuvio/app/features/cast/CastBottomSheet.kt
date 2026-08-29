@@ -94,7 +94,7 @@ fun CastBottomSheet(
                         isUnifiedCasting || isDlnaCasting -> "Odtwarzanie na TV"
                         unifiedState is UnifiedCastState.Error -> "Błąd"
                         dlnaCastState is DlnaCastState.Error -> "Błąd"
-                        else -> "Urządzenia w sieci (DLNA + Chromecast)"
+                        else -> "Urządzenia w sieci (Chromecast + stary Samsung na końcu)"
                     },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.weight(1f),
@@ -108,7 +108,7 @@ fun CastBottomSheet(
             }
 
             Text(
-                text = "Telefon i TV muszą być w tej samej sieci Wi-Fi. Samsung DLNA (7676/smp_) i Chromecast (Google Cast) pojawią się na liście.",
+                text = "Telefon i TV muszą być w tej samej sieci Wi-Fi. Najpierw Chromecast (Google Cast), na końcu jako dodatek — stary Samsung (DLNA 7676/smp_).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -122,7 +122,7 @@ fun CastBottomSheet(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Skanuję (SSDP DLNA + mDNS Chromecast)...", style = MaterialTheme.typography.bodyMedium)
+                            Text("Skanuję (Chromecast + DLNA)...", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -136,7 +136,7 @@ fun CastBottomSheet(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("Nie znaleziono TV", style = MaterialTheme.typography.bodyMedium)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Sprawdź czy TV ma włączone DLNA / AllShare lub Chromecast jest w tej samej sieci", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Sprawdź czy Chromecast jest w tej samej sieci. Stary Samsung (DLNA / AllShare) tylko jako dodatek na końcu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(onClick = { UnifiedCastRepository.startScan(); DlnaCastRepository.startScan() }) { Text("Skanuj ponownie") }
                         }
@@ -236,7 +236,7 @@ fun CastBottomSheet(
                             Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     TextButton(onClick = { UnifiedCastRepository.startScan(); DlnaCastRepository.startScan() }) { Text("Skanuj urządzenia") }
-                                    Text("Wykrywa DLNA (SSDP) i Chromecast (mDNS)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Wykrywa Chromecast (mDNS) i DLNA na końcu", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -256,10 +256,10 @@ fun CastBottomSheet(
                 }
             }
 
-            // Footer
+            // Footer - Chromecast first, old Samsung at very end
             if (unifiedState is UnifiedCastState.DevicesFound || dlnaCastState is DlnaCastState.DevicesFound) {
                 Text(
-                    text = "Wykryto ${unifiedDevices.size} Chromecast + DLNA. Chromecast wspiera więcej kodeków (bez transkodu), DLNA proxy obsłuży headery/torrent. Wybierz TV.",
+                    text = "Najpierw Chromecast (bez transkodu), na końcu jako dodatek stary Samsung (DLNA przez proxy). Wybierz TV.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
