@@ -83,7 +83,6 @@ fun CastBottomSheet(
     onDeviceSelected: (DlnaDevice) -> Unit = {},
 ) {
     if (!isVisible) return
-    // Unified = Chromecast first, old Samsung at end
     val unifiedState by UnifiedCastRepository.state.collectAsState()
     val unifiedDevices by UnifiedCastRepository.devices.collectAsState()
     // Fallback legacy DLNA state for detailed casting screen (kept for overlay compatibility)
@@ -281,7 +280,6 @@ fun CastBottomSheet(
                 }
             }
 
-            // Footer - Chromecast first, old Samsung at very end
             if (unifiedState is UnifiedCastState.DevicesFound || dlnaCastState is DlnaCastState.DevicesFound) {
                 Text(
                     text = stringResource(Res.string.cast_footer_chromecast_first),

@@ -71,7 +71,7 @@ object UnifiedCastRepository {
                     }
                     else -> emptyList()
                 }
-                // Universal order: Chromecast first, then AirPlay, DIAL, old Samsung (DLNA) at very end
+                // Order by popularity: Chromecast first
                 val allUnsorted = castDevices + airPlayDevices + dialDevices + dlnaUnified
                 val priority = mapOf(CastProtocol.CHROMECAST to 0, CastProtocol.AIRPLAY to 1, CastProtocol.DIAL to 2, CastProtocol.DLNA to 3)
                 val all = allUnsorted.sortedBy { priority[it.protocol] ?: 99 }.distinctBy { it.id }
@@ -225,8 +225,7 @@ object UnifiedCastRepository {
                 // Old Samsung DLNA typically only mp4/avc/aac, try GetProtocolInfo
                 try {
                     val d = device.dlnaDevice ?: return@withContext DeviceCapabilities()
-                    // For now, assume old Samsung = no hevc/av1, no mkv (conservative)
-                    // Future: parse device.modelName and do HTTP GET to fetch protocolInfo
+                    // Conservative: assume DLNA without hevc/av1
                     val isSamsungOld = d.modelName?.contains("Samsung", ignoreCase = true) == true || d.locationUrl.contains("smp_")
                     if (isSamsungOld) DeviceCapabilities(supportsHevc = false, supportsAv1 = false, supportsMkv = false)
                     else DeviceCapabilities(supportsHevc = false, supportsAv1 = false, supportsMkv = true)
