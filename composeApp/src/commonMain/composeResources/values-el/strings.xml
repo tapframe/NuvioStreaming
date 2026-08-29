@@ -133,6 +133,16 @@
     <string name="compose_auth_create_account">Δημιουργία λογαριασμού</string>
     <string name="compose_auth_dont_have_account">Δεν έχετε λογαριασμό; </string>
     <string name="compose_auth_email">Ηλεκτρονικό ταχυδρομείο</string>
+    <string name="compose_auth_link_cancel">Άκυρο</string>
+    <string name="compose_auth_link_code_expired">Αυτός ο κωδικός έληξε.</string>
+    <string name="compose_auth_link_creating_code">Δημιουργία κωδικού…</string>
+    <string name="compose_auth_link_failed">Η σύνδεση μέσω συνδέσμου απέτυχε.</string>
+    <string name="compose_auth_link_open">Άνοιγμα nuvio.tv/link</string>
+    <string name="compose_auth_link_open_failed">Δεν ήταν δυνατό το άνοιγμα του συνδέσμου.</string>
+    <string name="compose_auth_link_sign_in">Σύνδεση με σύνδεσμο</string>
+    <string name="compose_auth_link_signing_in">Γίνεται σύνδεση…</string>
+    <string name="compose_auth_link_try_again">Δοκιμάστε ξανά</string>
+    <string name="compose_auth_link_waiting">Αναμονή έγκρισης…</string>
     <string name="compose_auth_or_separator">  ή  </string>
     <string name="compose_auth_password">Κωδικός</string>
     <string name="compose_auth_sign_in_subtitle">Συνδεθείτε για να αποκτήσετε πρόσβαση στη βιβλιοθήκη και την πρόοδό σας</string>
