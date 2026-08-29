@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.4.12",
+          "buildVersion": "116",
+          "date": "2026-08-29T13:17:20Z",
+          "localizedDescription": "- 501c61d9 fix(tmdb): use multiplatform map insertion @tapframe  \r\n- 793c665c feat(store): automate sideload source updates @tapframe  \r\n- [i18n(el): translate sign-in with link strings (#1813)](https://github.com/NuvioMedia/NuvioMobile/pull/1813) @nosvasedis  \r\n- 388e613c feat(auth): add six-character login codes @tapframe  \r\n- [Port NuvioTV fixes: YouTube extractor, trailer language, scrobble guard, aggregate credits (#1795)](https://github.com/NuvioMedia/NuvioMobile/pull/1795) @skoruppa  \r\n- [fallback CJK cast names and filmography titles to English/Romaji (#1785)](https://github.com/NuvioMedia/NuvioMobile/pull/1785) @halibiram  \r\n- 582ae863 fix(player): keep controls hidden on playback start @tapframe  \r\n- 1c92795c fix(release): group notes by pull request @tapframe  \r\n- 4e838e47 fix(release): target repository explicitly @tapframe  \r\n",
+          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.12/nuvio-0.4.12-full-release.ipa",
+          "size": 51718448,
+          "sha256": "eefce854675c29c86c381c0ecc34082dc57ef24bfeec78309661a2e082b9de2b",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.4.11",
           "buildVersion": "115",
           "date": "2026-08-26T09:40:11Z",
