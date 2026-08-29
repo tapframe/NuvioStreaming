@@ -71,7 +71,6 @@ object UnifiedCastRepository {
                     }
                     else -> emptyList()
                 }
-                // Order by popularity: Chromecast first
                 val allUnsorted = castDevices + airPlayDevices + dialDevices + dlnaUnified
                 val priority = mapOf(CastProtocol.CHROMECAST to 0, CastProtocol.AIRPLAY to 1, CastProtocol.DIAL to 2, CastProtocol.DLNA to 3)
                 val all = allUnsorted.sortedBy { priority[it.protocol] ?: 99 }.distinctBy { it.id }
