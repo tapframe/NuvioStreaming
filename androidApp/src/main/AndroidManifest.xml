@@ -25,6 +25,10 @@
             android:name="io.sentry.auto-init"
             android:value="false" />
 
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.nuvio.app.features.cast.CastOptionsProvider" />
+
         <activity
             android:exported="true"
             android:name="com.nuvio.app.MainActivity"

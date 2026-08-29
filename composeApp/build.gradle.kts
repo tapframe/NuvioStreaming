@@ -412,6 +412,9 @@ kotlin {
                 implementation(libs.nanohttpd)
                 // ffmpeg-kit optional for DLNA transcode HEVC->AVC - uncomment when artifact is available:
                 // implementation(libs.ffmpeg.kit.min.gpl)
+                implementation(libs.play.services.cast)
+                implementation(libs.play.services.cast.framework)
+                implementation(libs.androidx.mediarouter)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sentry.android)
                 implementation(libs.androidx.media3.exoplayer.hls)
