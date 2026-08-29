@@ -409,9 +409,7 @@ kotlin {
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("com.google.code.gson:gson:2.11.0")
                 implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
-                implementation(libs.nanohttpd)
-                // ffmpeg-kit optional for DLNA transcode HEVC->AVC - uncomment when artifact is available:
-                // implementation(libs.ffmpeg.kit.min.gpl)
+                // Proxy and transcode removed - direct URL only (universal cast)
                 implementation(libs.play.services.cast)
                 implementation(libs.play.services.cast.framework)
                 implementation(libs.androidx.mediarouter)

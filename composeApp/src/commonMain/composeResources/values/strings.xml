@@ -556,7 +556,7 @@
     <string name="cast_close">Close</string>
     <string name="cast_refresh">Refresh</string>
     <string name="cast_detects">Detects Chromecast (mDNS) and DLNA at the end</string>
-    <string name="cast_footer_chromecast_first">Chromecast first (no transcode), old Samsung at the end via proxy. Choose your TV.</string>
+    <string name="cast_footer_chromecast_first">Chromecast first, old Samsung at the end. Choose your TV.</string>
     <string name="cast_chromecast_playing">Chromecast • Playing...</string>
     <string name="cast_dlna_playing">DLNA • Playing...</string>
     <string name="cast_samsung_badge">Samsung DLNA (7676/smp_)</string>

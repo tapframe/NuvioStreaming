@@ -452,7 +452,7 @@
     <string name="cast_close">Zamknij</string>
     <string name="cast_refresh">Odśwież</string>
     <string name="cast_detects">Wykrywa Chromecast (mDNS) i DLNA na końcu</string>
-    <string name="cast_footer_chromecast_first">Najpierw Chromecast (bez transkodu), na końcu jako dodatek stary Samsung (DLNA przez proxy). Wybierz TV.</string>
+    <string name="cast_footer_chromecast_first">Najpierw Chromecast, na końcu jako dodatek stary Samsung (DLNA). Wybierz TV.</string>
     <string name="cast_chromecast_playing">Chromecast • Odtwarzanie...</string>
     <string name="cast_dlna_playing">DLNA • Odtwarzanie...</string>
     <string name="cast_samsung_badge">Samsung DLNA (7676/smp_)</string>

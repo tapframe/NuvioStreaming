@@ -23,8 +23,6 @@ internal actual object DlnaCastPlatform {
     private const val SSDP_MX = 3
 
     private var appContext: Context? = null
-    private var proxyServer: LocalHttpProxyServer? = null
-    private var proxyLocalIp: String? = null
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
@@ -35,7 +33,6 @@ internal actual object DlnaCastPlatform {
         var multicastLock: WifiManager.MulticastLock? = null
         var socket: MulticastSocket? = null
         try {
-            // Acquire multicast lock
             try {
                 val wifi = appContext?.applicationContext?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 multicastLock = wifi?.createMulticastLock("nuvio_dlna_scan")
@@ -76,7 +73,6 @@ internal actual object DlnaCastPlatform {
                 } catch (e: Exception) {
                     Log.w(TAG, "Send failed ST=$st: ${e.message}")
                 }
-                // small delay between targets
                 try { Thread.sleep(150) } catch (_: Exception) {}
             }
 
@@ -89,7 +85,6 @@ internal actual object DlnaCastPlatform {
                 try {
                     socket.receive(packet)
                 } catch (e: java.net.SocketTimeoutException) {
-                    // continue loop until deadline
                     continue
                 } catch (e: Exception) {
                     Log.w(TAG, "Receive error: ${e.message}")
@@ -98,7 +93,6 @@ internal actual object DlnaCastPlatform {
                 val response = String(packet.data, 0, packet.length, Charsets.UTF_8)
                 val location = parseLocationHeader(response)
                 if (location != null && location.isNotBlank()) {
-                    // Normalize: trim and ensure http
                     val normalized = location.trim()
                     if (normalized.startsWith("http", ignoreCase = true)) {
                         if (locations.add(normalized)) {
@@ -114,7 +108,6 @@ internal actual object DlnaCastPlatform {
                 return@withContext DlnaScanResult.Success(emptyList())
             }
 
-            // Fetch device descriptions
             val client = OkHttpClient.Builder()
                 .connectTimeout(3, TimeUnit.SECONDS)
                 .readTimeout(3, TimeUnit.SECONDS)
@@ -134,7 +127,6 @@ internal actual object DlnaCastPlatform {
                         Log.w(TAG, "Parse failed for $location")
                         continue
                     }
-                    // Extract IP for display
                     val ip = try { URL(location).host } catch (_: Exception) { null }
                     val device = DlnaDevice(
                         id = parsed.udn,
@@ -154,7 +146,6 @@ internal actual object DlnaCastPlatform {
                 }
             }
 
-            // Deduplicate by UDN
             val distinct = devices.distinctBy { it.id }
             DlnaScanResult.Success(distinct)
         } catch (e: Exception) {
@@ -167,119 +158,35 @@ internal actual object DlnaCastPlatform {
     }
 
     private fun parseLocationHeader(response: String): String? {
-        // Case insensitive search for LOCATION:
         val lines = response.split("\r\n", "\n")
         for (line in lines) {
             if (line.startsWith("LOCATION:", ignoreCase = true) || line.startsWith("Location:", ignoreCase = true)) {
                 return line.substringAfter(":").trim()
             }
         }
-        // fallback regex
         val regex = Regex("(?i)LOCATION:\\s*(\\S+)")
         return regex.find(response)?.groupValues?.getOrNull(1)?.trim()
     }
 
+    // Universal direct URL - no proxy, no transcode. TV must fetch original URL directly.
     actual suspend fun prepareProxyUrl(request: DlnaCastRequest): String = withContext(Dispatchers.IO) {
-        // Ensure settings loaded
-        CastSettingsRepository.ensureLoaded()
-        val settings = CastSettingsRepository.uiState.value
-
-        val localIp = getLocalIpAddress() ?: throw IllegalStateException("No Wi-Fi IP address - check connection")
-        proxyLocalIp = localIp
-
-        // Decide if transcoding needed
-        val shouldTranscode = settings.proxyEnabled &&
-            settings.transcodeMode != CastTranscodeMode.DISABLED &&
-            CastSettingsRepository.shouldTranscodeForCodec(request.codecHint)
-
-        val mime = when {
-            shouldTranscode -> "video/mp4"
-            request.mimeType.isNotBlank() -> request.mimeType
-            else -> "video/mp4"
-        }
-
-        // Handle subtitle download for burn-in if needed
-        var subtitleFile: java.io.File? = null
-        if (shouldTranscode && !request.subtitleUrl.isNullOrBlank()) {
-            try {
-                val ctx = appContext ?: throw IllegalStateException("No context")
-                val dir = java.io.File(ctx.cacheDir, "dlna_subs")
-                dir.mkdirs()
-                val ext = when {
-                    request.subtitleUrl.contains(".ass", ignoreCase = true) -> ".ass"
-                    request.subtitleUrl.contains(".ssa", ignoreCase = true) -> ".ssa"
-                    request.subtitleUrl.contains(".vtt", ignoreCase = true) -> ".vtt"
-                    else -> ".srt"
-                }
-                val f = java.io.File(dir, "sub_${System.currentTimeMillis()}$ext")
-                val client = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).build()
-                val reqBuilder = Request.Builder().url(request.subtitleUrl).get()
-                request.subtitleHeaders.forEach { (k, v) -> if (v.isNotBlank()) reqBuilder.header(k, v) }
-                val resp = client.newCall(reqBuilder.build()).execute()
-                if (resp.isSuccessful) {
-                    val body = resp.body?.bytes()
-                    if (body != null) {
-                        f.writeBytes(body)
-                        subtitleFile = f
-                        Log.i(TAG, "Downloaded subtitle to ${f.absolutePath} ${f.length()} bytes")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Subtitle download failed: ${e.message}")
-            }
-        }
-
-        // Stop old proxy
-        try { proxyServer?.stop() } catch (_: Exception) {}
-
-        val ctx = appContext ?: throw IllegalStateException("No context for proxy")
-        val server: LocalHttpProxyServer = if (shouldTranscode) {
-            Log.i(TAG, "Creating transcoding proxy for codec=${request.codecHint}, maxRes=${settings.maxResolution} sub=${subtitleFile?.name}")
-            TranscodingProxyServer(
-                appContext = ctx,
-                port = 0,
-                sourceUrl = request.sourceUrl,
-                sourceHeaders = request.sourceHeaders,
-                mimeType = mime,
-                shouldTranscode = true,
-                maxResolution = settings.maxResolution,
-                useHardwareAccel = settings.useHardwareAcceleration,
-                subtitleFile = subtitleFile,
-            )
-        } else {
-            Log.i(TAG, "Creating passthrough proxy for ${request.sourceUrl.take(80)}")
-            LocalHttpProxyServer(
-                port = 0,
-                sourceUrl = request.sourceUrl,
-                sourceHeaders = request.sourceHeaders,
-                mimeType = mime,
-            )
-        }
-
-        server.start()
-        proxyServer = server
-        // Wait a bit for port binding
-        var attempts = 0
-        while (!server.isAlive() && attempts < 10) {
-            Thread.sleep(100)
-            attempts++
-        }
-        val port = server.listeningPort
-        if (port <= 0) throw IllegalStateException("Proxy nie wystartował")
-        val proxyUrl = "http://$localIp:$port/video/cast.mp4"
-        Log.i(TAG, "Proxy started at $proxyUrl (transcode=$shouldTranscode)")
-        proxyUrl
+        // Direct URL to TV. Works for public https links, Chromecast, and DLNA TVs that support it.
+        // Torrents (127.0.0.1) will not work without proxy - intentionally removed per request.
+        Log.i(TAG, "Direct URL (no proxy) for ${request.sourceUrl.take(80)}")
+        request.sourceUrl
     }
 
     actual suspend fun castToDevice(device: DlnaDevice, request: DlnaCastRequest, proxyUrl: String): Boolean = withContext(Dispatchers.IO) {
-        val mime = if (CastSettingsRepository.shouldTranscodeForCodec(request.codecHint)) "video/mp4" else request.mimeType.ifBlank { "video/mp4" }
+        // For universal mode, proxyUrl == sourceUrl (direct)
+        val directUrl = proxyUrl.ifBlank { request.sourceUrl }
+        val mime = request.mimeType.ifBlank { "video/mp4" }
         val didl = DlnaSoap.buildDidlMetadata(
             title = request.title.ifBlank { "Nuvio Cast" },
-            proxyUrl = proxyUrl,
+            proxyUrl = directUrl,
             mimeType = mime,
             duration = request.durationMs?.let { DlnaSoap.formatDurationMs(it) }
         )
-        val setUriBody = DlnaSoap.buildSetAvTransportUriBody(uri = proxyUrl, metadata = didl)
+        val setUriBody = DlnaSoap.buildSetAvTransportUriBody(uri = directUrl, metadata = didl)
         val playBody = DlnaSoap.buildPlayBody()
 
         val client = OkHttpClient.Builder()
@@ -287,7 +194,6 @@ internal actual object DlnaCastPlatform {
             .readTimeout(5, TimeUnit.SECONDS)
             .build()
 
-        // SetAVTransportURI
         val setReq = Request.Builder()
             .url(device.controlUrl)
             .post(setUriBody.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
@@ -295,7 +201,7 @@ internal actual object DlnaCastPlatform {
             .header("SOAPACTION", "\"${device.avTransportServiceType}#SetAVTransportURI\"")
             .build()
 
-        Log.i(TAG, "POST SetAVTransportURI to ${device.controlUrl} uri=$proxyUrl")
+        Log.i(TAG, "POST SetAVTransportURI to ${device.controlUrl} uri=$directUrl")
         val setResp = client.newCall(setReq).execute()
         val setBody = setResp.body?.string() ?: ""
         Log.i(TAG, "SetAVTransportURI response ${setResp.code} body=${setBody.take(500)}")
@@ -304,7 +210,6 @@ internal actual object DlnaCastPlatform {
             return@withContext false
         }
 
-        // Small delay before Play (some TVs need it)
         try { Thread.sleep(300) } catch (_: Exception) {}
 
         val playReq = Request.Builder()
@@ -419,7 +324,6 @@ internal actual object DlnaCastPlatform {
 
     actual suspend fun getLocalIpAddress(): String? = withContext(Dispatchers.IO) {
         try {
-            // Prefer WiFi interface
             val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
                 val intf = interfaces.nextElement()
@@ -429,15 +333,13 @@ internal actual object DlnaCastPlatform {
                     val addr = addrs.nextElement()
                     if (addr.isLoopbackAddress) continue
                     val host = addr.hostAddress ?: continue
-                    // IPv4 only for DLNA (Samsung old TV doesn't do IPv6)
-                    if (host.contains(":") ) continue // skip IPv6
+                    if (host.contains(":")) continue
                     if (host.startsWith("10.") || host.startsWith("192.168.") || host.startsWith("172.")) {
                         Log.i(TAG, "Local IP candidate $host from ${intf.name}")
                         return@withContext host
                     }
                 }
             }
-            // Fallback: try WifiManager
             val wifi = appContext?.applicationContext?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             val ipInt = wifi?.connectionInfo?.ipAddress ?: 0
             if (ipInt != 0) {
@@ -461,13 +363,7 @@ internal actual object DlnaCastPlatform {
     }
 
     actual fun stopProxy() {
-        try {
-            proxyServer?.stop()
-            Log.i(TAG, "Proxy stopped")
-        } catch (e: Exception) {
-            Log.w(TAG, "stopProxy error: ${e.message}")
-        } finally {
-            proxyServer = null
-        }
+        // No-op now - proxy removed, direct URL only
+        Log.i(TAG, "stopProxy no-op (proxy removed)")
     }
 }
