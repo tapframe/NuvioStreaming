@@ -1479,7 +1479,7 @@ internal fun englishDiscoverTitlesById(results: List<TmdbDiscoverResult>): Map<I
             ?: result.name?.trim()?.takeIf { it.isNotBlank() }
             ?: return@forEach
         if (!containsCjkOrHangul(text)) {
-            titles.putIfAbsent(result.id, text)
+            titles.getOrPut(result.id) { text }
         }
     }
     return titles
@@ -1499,7 +1499,7 @@ private fun englishCreditTitlesById(credits: TmdbPersonCombinedCreditsResponse?)
             ?: name?.trim()?.takeIf { it.isNotBlank() }
             ?: return
         if (!containsCjkOrHangul(text)) {
-            titles.putIfAbsent(id, text)
+            titles.getOrPut(id) { text }
         }
     }
     credits.cast.forEach { putTitle(it.id, it.title, it.name) }
