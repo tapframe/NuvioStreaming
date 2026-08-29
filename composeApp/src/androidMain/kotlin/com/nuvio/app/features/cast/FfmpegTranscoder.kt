@@ -1,21 +1,19 @@
 package com.nuvio.app.features.cast
 
+import android.content.Context
 import android.util.Log
-import java.io.InputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import java.io.File
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 
 /**
- * Wrapper around ffmpeg-kit for live DLNA transcoding.
- * Falls back gracefully if ffmpeg-kit is not on classpath (e.g. in tests / iOS stub builds).
+ * Production ffmpeg transcoder using ffmpeg-kit (min-gpl).
+ * Uses file-based progressive output: ffmpeg writes to cache file with frag mp4,
+ * NanoHTTPD serves file as it grows (chunked). This avoids pipe complexity and
+ * works on all Samsung DLNA TV (supports http-get mp4).
  *
- * Live pipeline:  ffmpeg -headers "X: Y\r\n" -i <inputUrl> -ss <seek> -c:v <codec> -vf scale... -c:a aac ... -f mp4 -movflags frag_keyframe+empty_moov pipe:1
- * The output InputStream is piped to NanoHTTPD chunked response.
- *
- * For now we use reflection to avoid hard compile dependency on ffmpeg-kit when not present.
- * When ffmpeg-kit is added to build.gradle.kts, reflection will resolve to real FFmpegKit.
+ * Command: ffmpeg -y -headers "..." -i <url> -ss <seek> -c:v h264_mediacodec -vf scale -c:a aac -f mp4 -movflags frag_keyframe+empty_moov <output>
+ * If hw accel fails, fallback to libx264 ultrafast.
  */
 object FfmpegTranscoder {
     private const val TAG = "FfmpegTranscoder"
@@ -23,122 +21,141 @@ object FfmpegTranscoder {
     data class TranscodeConfig(
         val inputUrl: String,
         val sourceHeaders: Map<String, String>,
+        val subtitleUrl: String? = null, // local path after download, burned via subtitles filter
         val seekMs: Long = 0L,
         val maxResolution: CastMaxResolution = CastMaxResolution.P1080,
         val useHardwareAccel: Boolean = true,
         val transcodeAudio: Boolean = true,
-        val mimeHint: String = "video/mp4",
+        val outputFile: File,
     )
 
-    // Heuristic: detect if input is already AVC (no transcode needed) - caller should check CastSettings.shouldTranscodeForCodec()
     fun buildCommand(config: TranscodeConfig): String {
         val headersArg = if (config.sourceHeaders.isNotEmpty()) {
             val headerLines = config.sourceHeaders.entries.joinToString("\\r\\n") { "${it.key}: ${it.value}" }
-            // ffmpeg -headers expects each line ends with \r\n
-            "-headers \"$headerLines\\r\\n\""
+            "-headers \"${headerLines}\\r\\n\""
         } else ""
 
         val seekArg = if (config.seekMs > 0) "-ss ${config.seekMs / 1000.0}" else ""
 
-        val scaleFilter = when (config.maxResolution) {
-            CastMaxResolution.SOURCE -> ""
-            CastMaxResolution.P1080 -> "-vf \"scale='min(1920,iw)':-2\""
-            CastMaxResolution.P720 -> "-vf \"scale='min(1280,iw)':-2\""
-            CastMaxResolution.P480 -> "-vf \"scale='min(854,iw)':-2\""
+        // Build video filter chain: scale + subtitles burn-in if needed
+        val filters = mutableListOf<String>()
+        when (config.maxResolution) {
+            CastMaxResolution.SOURCE -> {}
+            CastMaxResolution.P1080 -> filters.add("scale='min(1920,iw)':-2")
+            CastMaxResolution.P720 -> filters.add("scale='min(1280,iw)':-2")
+            CastMaxResolution.P480 -> filters.add("scale='min(854,iw)':-2")
         }
+        config.subtitleUrl?.let { subPath ->
+            // Escape path for ffmpeg subtitles filter
+            val escaped = subPath.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+            filters.add("subtitles='$escaped'")
+        }
+        val vfArg = if (filters.isNotEmpty()) "-vf \"${filters.joinToString(",")}\"" else ""
 
         val videoCodec = if (config.useHardwareAccel) "h264_mediacodec" else "libx264"
         val videoArgs = if (config.useHardwareAccel) {
-            "-c:v $videoCodec -b:v 4M -maxrate 6M"
+            "-c:v $videoCodec -b:v 4M -maxrate 6M -pix_fmt yuv420p"
         } else {
-            "-c:v $videoCodec -preset ultrafast -crf 23"
+            "-c:v $videoCodec -preset ultrafast -crf 23 -pix_fmt yuv420p"
         }
 
         val audioArgs = if (config.transcodeAudio) "-c:a aac -b:a 128k -ac 2" else "-c:a copy"
 
-        // Use frag MP4 for streaming (moov at start, no seek index required)
         return listOf(
+            "-y",
             headersArg,
             seekArg,
             "-i \"${config.inputUrl}\"",
+            if (config.subtitleUrl != null && vfArg.isBlank()) "" else vfArg,
             videoArgs,
-            scaleFilter,
             audioArgs,
-            "-f mp4 -movflags frag_keyframe+empty_moov pipe:1"
+            "-f mp4 -movflags frag_keyframe+empty_moov \"${config.outputFile.absolutePath}\""
         ).filter { it.isNotBlank() }.joinToString(" ")
     }
 
     /**
-     * Starts an ffmpeg process and returns InputStream of stdout.
-     * Uses ProcessBuilder fallback if ffmpeg-kit not available.
-     * Caller must close stream when done and call future.cancel(true).
+     * Starts async ffmpeg to [outputFile] via reflection (optional ffmpeg-kit).
+     * Returns opaque session object for cancellation or null if not available (fallback to passthrough).
      */
-    fun start(config: TranscodeConfig): Pair<InputStream, Future<*>>? {
-        val command = buildCommand(config)
-        Log.i(TAG, "Starting transcode: ffmpeg $command")
-        return tryStartWithFfmpegKit(command) ?: tryStartWithProcess(command)
-    }
-
-    private fun tryStartWithFfmpegKit(command: String): Pair<InputStream, Future<*>>? {
+    fun startAsync(context: Context, config: TranscodeConfig, onComplete: (Boolean) -> Unit = {}): Any? {
+        val cmd = buildCommand(config)
+        Log.i(TAG, "FFmpeg start: $cmd -> ${config.outputFile}")
+        config.outputFile.parentFile?.mkdirs()
+        if (config.outputFile.exists()) config.outputFile.delete()
         return try {
-            // Reflective call to com.arthenica.ffmpegkit.FFmpegKit.executeAsync
-            val ffmpegKitClazz = Class.forName("com.arthenica.ffmpegkit.FFmpegKit")
+            val kitClazz = Class.forName("com.arthenica.ffmpegkit.FFmpegKit")
+            val returnCodeClazz = Class.forName("com.arthenica.ffmpegkit.ReturnCode")
+            val sessionStateClazz = Class.forName("com.arthenica.ffmpegkit.SessionState")
             val sessionClazz = Class.forName("com.arthenica.ffmpegkit.FFmpegSession")
-            // For pipe mode, ffmpeg-kit cannot easily give InputStream, we use file pipe temp?
-            // Instead we fallback to ProcessBuilder for true streaming.
-            // Return null to trigger ProcessBuilder path.
-            Log.d(TAG, "ffmpeg-kit found but using ProcessBuilder for pipe streaming")
-            null
+
+            val executeAsync = kitClazz.getMethod(
+                "executeAsync",
+                String::class.java,
+                Class.forName("com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback"),
+                Class.forName("com.arthenica.ffmpegkit.LogCallback"),
+                Class.forName("com.arthenica.ffmpegkit.StatisticsCallback")
+            )
+
+            // Build callbacks via dynamic proxy
+            val completeCb = Proxy.newProxyInstance(
+                kitClazz.classLoader,
+                arrayOf(Class.forName("com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback"))
+            ) { _, _, args ->
+                val sess = args[0]
+                val state = sess.javaClass.getMethod("getState").invoke(sess)
+                val rc = sess.javaClass.getMethod("getReturnCode").invoke(sess)
+                val isSuccess = returnCodeClazz.getMethod("isSuccess", Class.forName("com.arthenica.ffmpegkit.ReturnCode")).invoke(null, rc) as Boolean
+                val failedState = sessionStateClazz.getField("FAILED").get(null)
+                val completedState = sessionStateClazz.getField("COMPLETED").get(null)
+                when {
+                    isSuccess -> {
+                        Log.i(TAG, "FFmpeg success")
+                        onComplete(true)
+                    }
+                    state == failedState -> {
+                        Log.e(TAG, "FFmpeg failed rc=$rc")
+                        if (config.useHardwareAccel) {
+                            Log.w(TAG, "Retry with libx264")
+                            val fallback = config.copy(useHardwareAccel = false)
+                            startAsync(context, fallback, onComplete)
+                        } else onComplete(false)
+                    }
+                    state == completedState -> {
+                        Log.i(TAG, "FFmpeg completed success=$isSuccess")
+                        onComplete(isSuccess)
+                    }
+                }
+                null
+            }
+            val logCb = Proxy.newProxyInstance(kitClazz.classLoader, arrayOf(Class.forName("com.arthenica.ffmpegkit.LogCallback"))) { _, _, args ->
+                val log = args[0]
+                val msg = log.javaClass.getMethod("getMessage").invoke(log) as String
+                Log.d(TAG, "ffmpeg: $msg")
+                null
+            }
+            val statsCb = Proxy.newProxyInstance(kitClazz.classLoader, arrayOf(Class.forName("com.arthenica.ffmpegkit.StatisticsCallback"))) { _, _, args ->
+                // ignore
+                null
+            }
+            executeAsync.invoke(null, cmd, completeCb, logCb, statsCb) as Any
         } catch (e: ClassNotFoundException) {
-            Log.w(TAG, "ffmpeg-kit not on classpath, transcoding will use ProcessBuilder or fail gracefully")
+            Log.w(TAG, "ffmpeg-kit not available, fallback to passthrough: ${e.message}")
+            onComplete(false)
             null
         } catch (e: Exception) {
-            Log.w(TAG, "ffmpeg-kit reflection failed: ${e.message}")
+            Log.e(TAG, "ffmpeg start failed", e)
+            onComplete(false)
             null
         }
     }
 
-    private fun tryStartWithProcess(command: String): Pair<InputStream, Future<*>>? {
-        return try {
-            // For environments without ffmpeg binary (emulator), we cannot spawn ffmpeg.
-            // Return null so caller falls back to passthrough proxy.
-            val ffmpegBinary = findFfmpegBinary() ?: run {
-                Log.w(TAG, "ffmpeg binary not found on device, fallback to passthrough")
-                return null
-            }
-            val fullCmd = "$ffmpegBinary $command"
-            Log.i(TAG, "Exec: $fullCmd")
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", fullCmd))
-            val executor = Executors.newSingleThreadExecutor()
-            val future = executor.submit {
-                val err = process.errorStream.bufferedReader().readText()
-                if (err.isNotBlank()) Log.w(TAG, "ffmpeg stderr: ${err.take(2000)}")
-                process.waitFor()
-                Log.i(TAG, "ffmpeg exited ${process.exitValue()}")
-            }
-            // Wrap stdout as InputStream; if process fails, stream will close
-            val input: InputStream = process.inputStream
-            input to future
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start ffmpeg process", e)
-            null
-        }
+    fun cancel(session: Any?) {
+        try {
+            session?.javaClass?.getMethod("cancel")?.invoke(session)
+        } catch (_: Exception) {}
     }
 
-    private fun findFfmpegBinary(): String? {
-        // Check common locations; on Android ffmpeg-kit provides lib, not binary.
-        // We ship via ffmpeg-kit, so binary not directly accessible.
-        // For now return null to indicate we should use passthrough.
-        // When ffmpeg-kit is integrated properly, use FFmpegKitConfig.getFFmpegSessions etc.
-        return null
-    }
-
-    fun isAvailable(): Boolean {
-        return try {
-            Class.forName("com.arthenica.ffmpegkit.FFmpegKit")
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
+    fun isAvailable(): Boolean = try {
+        Class.forName("com.arthenica.ffmpegkit.FFmpegKit"); true
+    } catch (_: Exception) { false }
 }

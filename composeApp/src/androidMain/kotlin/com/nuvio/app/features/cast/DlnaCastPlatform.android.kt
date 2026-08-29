@@ -198,12 +198,45 @@ internal actual object DlnaCastPlatform {
             else -> "video/mp4"
         }
 
+        // Handle subtitle download for burn-in if needed
+        var subtitleFile: java.io.File? = null
+        if (shouldTranscode && !request.subtitleUrl.isNullOrBlank()) {
+            try {
+                val ctx = appContext ?: throw IllegalStateException("No context")
+                val dir = java.io.File(ctx.cacheDir, "dlna_subs")
+                dir.mkdirs()
+                val ext = when {
+                    request.subtitleUrl.contains(".ass", ignoreCase = true) -> ".ass"
+                    request.subtitleUrl.contains(".ssa", ignoreCase = true) -> ".ssa"
+                    request.subtitleUrl.contains(".vtt", ignoreCase = true) -> ".vtt"
+                    else -> ".srt"
+                }
+                val f = java.io.File(dir, "sub_${System.currentTimeMillis()}$ext")
+                val client = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).build()
+                val reqBuilder = Request.Builder().url(request.subtitleUrl).get()
+                request.subtitleHeaders.forEach { (k, v) -> if (v.isNotBlank()) reqBuilder.header(k, v) }
+                val resp = client.newCall(reqBuilder.build()).execute()
+                if (resp.isSuccessful) {
+                    val body = resp.body?.bytes()
+                    if (body != null) {
+                        f.writeBytes(body)
+                        subtitleFile = f
+                        Log.i(TAG, "Downloaded subtitle to ${f.absolutePath} ${f.length()} bytes")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Subtitle download failed: ${e.message}")
+            }
+        }
+
         // Stop old proxy
         try { proxyServer?.stop() } catch (_: Exception) {}
 
+        val ctx = appContext ?: throw IllegalStateException("No context for proxy")
         val server: LocalHttpProxyServer = if (shouldTranscode) {
-            Log.i(TAG, "Creating transcoding proxy for codec=${request.codecHint}, maxRes=${settings.maxResolution}")
+            Log.i(TAG, "Creating transcoding proxy for codec=${request.codecHint}, maxRes=${settings.maxResolution} sub=${subtitleFile?.name}")
             TranscodingProxyServer(
+                appContext = ctx,
                 port = 0,
                 sourceUrl = request.sourceUrl,
                 sourceHeaders = request.sourceHeaders,
@@ -211,6 +244,7 @@ internal actual object DlnaCastPlatform {
                 shouldTranscode = true,
                 maxResolution = settings.maxResolution,
                 useHardwareAccel = settings.useHardwareAcceleration,
+                subtitleFile = subtitleFile,
             )
         } else {
             Log.i(TAG, "Creating passthrough proxy for ${request.sourceUrl.take(80)}")
@@ -303,6 +337,63 @@ internal actual object DlnaCastPlatform {
         } catch (e: Exception) {
             Log.w(TAG, "stopPlayback failed: ${e.message}")
             false
+        }
+    }
+
+    actual suspend fun pausePlayback(device: DlnaDevice): Boolean = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val client = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).build()
+            val body = DlnaSoap.buildPauseBody()
+            val req = Request.Builder()
+                .url(device.controlUrl)
+                .post(body.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
+                .header("Content-Type", "text/xml; charset=\"utf-8\"")
+                .header("SOAPACTION", "\"${device.avTransportServiceType}#Pause\"")
+                .build()
+            val resp = client.newCall(req).execute()
+            Log.i(TAG, "Pause response ${resp.code}")
+            resp.isSuccessful
+        } catch (e: Exception) {
+            Log.w(TAG, "pause failed: ${e.message}")
+            false
+        }
+    }
+
+    actual suspend fun resumePlayback(device: DlnaDevice): Boolean = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val client = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).build()
+            val body = DlnaSoap.buildPlayBody()
+            val req = Request.Builder()
+                .url(device.controlUrl)
+                .post(body.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
+                .header("Content-Type", "text/xml; charset=\"utf-8\"")
+                .header("SOAPACTION", "\"${device.avTransportServiceType}#Play\"")
+                .build()
+            val resp = client.newCall(req).execute()
+            Log.i(TAG, "Resume Play response ${resp.code}")
+            resp.isSuccessful
+        } catch (e: Exception) {
+            Log.w(TAG, "resume failed: ${e.message}")
+            false
+        }
+    }
+
+    actual suspend fun getPositionInfo(device: DlnaDevice): Long? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val client = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).build()
+            val body = DlnaSoap.buildGetPositionInfoBody()
+            val req = Request.Builder()
+                .url(device.controlUrl)
+                .post(body.toRequestBody("text/xml; charset=\"utf-8\"".toMediaType()))
+                .header("Content-Type", "text/xml; charset=\"utf-8\"")
+                .header("SOAPACTION", "\"${device.avTransportServiceType}#GetPositionInfo\"")
+                .build()
+            val resp = client.newCall(req).execute()
+            val xml = resp.body?.string() ?: return@withContext null
+            DlnaSoap.parsePositionInfo(xml)
+        } catch (e: Exception) {
+            Log.w(TAG, "getPositionInfo failed: ${e.message}")
+            null
         }
     }
 

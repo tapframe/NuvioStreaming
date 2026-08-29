@@ -27,6 +27,9 @@ internal object DlnaSoap {
     fun buildSeekBody(instanceId: Int = 0, target: String): String =
         """<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:Seek xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>$instanceId</InstanceID><Unit>REL_TIME</Unit><Target>$target</Target></u:Seek></s:Body></s:Envelope>"""
 
+    fun buildPauseBody(instanceId: Int = 0): String =
+        """<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:Pause xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>$instanceId</InstanceID></u:Pause></s:Body></s:Envelope>"""
+
     fun buildGetPositionInfoBody(instanceId: Int = 0): String =
         """<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:GetPositionInfo xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>$instanceId</InstanceID></u:GetPositionInfo></s:Body></s:Envelope>"""
 
@@ -135,6 +138,36 @@ internal object DlnaSoap {
         val eventSubUrl: String?,
         val serviceType: String,
     )
+
+    fun parsePositionInfo(xml: String): Long? {
+        return try {
+            // Look for <RelTime> or <AbsTime> like 0:01:23
+            val relTimeRegex = Regex("<RelTime[^>]*>([^<]+)</RelTime>", RegexOption.IGNORE_CASE)
+            val match = relTimeRegex.find(xml)?.groupValues?.getOrNull(1)?.trim()
+            if (match == null || match == "NOT_IMPLEMENTED" || match == "00:00:00") {
+                // Some Samsung return 0 initially, treat as 0
+                if (match == "00:00:00") return 0L
+                return null
+            }
+            parseTimeToMs(match)
+        } catch (_: Exception) { null }
+    }
+
+    fun parseTimeToMs(time: String): Long? {
+        return try {
+            val parts = time.split(":")
+            if (parts.size != 3) return null
+            val h = parts[0].trim().toLongOrNull() ?: return null
+            val m = parts[1].trim().toLongOrNull() ?: return null
+            val secParts = parts[2].split(".")
+            val s = secParts[0].toLongOrNull() ?: return null
+            val ms = if (secParts.size > 1) {
+                val frac = secParts[1].padEnd(3, '0').take(3).toLongOrNull() ?: 0L
+                frac
+            } else 0L
+            ((h * 3600 + m * 60 + s) * 1000 + ms)
+        } catch (_: Exception) { null }
+    }
 
     private fun xmlEscape(s: String): String = s
         .replace("&", "&amp;")

@@ -10,13 +10,52 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CastConnected
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.nuvio.app.features.cast.DlnaCastRepository
 import com.nuvio.app.features.cast.DlnaCastRequest
+import com.nuvio.app.features.cast.DlnaCastState
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.p2p.formatP2pMegabytes
 import com.nuvio.app.features.p2p.formatP2pSpeed
 import com.nuvio.app.isIos
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
@@ -215,6 +254,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             p2pRebufferProgress = p2pRebufferProgress,
         )
         RenderPlayerModals(displayedPositionMs = displayedPositionMs)
+        RenderCastingOverlay()
     }
 }
 
@@ -429,7 +469,15 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
     if (showCastSheet) {
         val p2pUrl = p2pResolvedSourceUrl
         val effectiveUrl = if (activeTorrentInfoHash != null && p2pUrl != null) p2pUrl else activeSourceUrl
-        val codecHint = activeStreamTitle + " " + (activeStreamSubtitle ?: "")
+        val codecHint = activeStreamTitle + " " + (activeStreamSubtitle ?: "") + " " + (selectedAddonSubtitle?.url ?: "")
+        // Subtitle for burn-in when transcode enabled
+        val subUrl = if (useCustomSubtitles) selectedAddonSubtitle?.url else null
+        val subHeaders = if (subUrl != null) {
+            // Find headers for this subtitle from externalSubtitles or addon list
+            (externalSubtitles.firstOrNull { it.url == subUrl }?.headers
+                ?: addonSubtitles.firstOrNull { it.url == subUrl }?.let { emptyMap() } // addon subs have no headers
+                ?: emptyMap())
+        } else emptyMap()
         val castRequest = DlnaCastRequest(
             sourceUrl = effectiveUrl,
             sourceHeaders = activeSourceHeaders,
@@ -443,6 +491,9 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             },
             codecHint = codecHint,
             durationMs = playbackSnapshot.durationMs.takeIf { it > 0 },
+            subtitleUrl = subUrl,
+            subtitleHeaders = subHeaders,
+            startPositionMs = playbackSnapshot.positionMs,
         )
         com.nuvio.app.features.cast.CastBottomSheet(
             isVisible = showCastSheet,
@@ -615,4 +666,162 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             showSubmitIntroModal = false
         },
     )
+}
+
+@Composable
+private fun PlayerScreenRuntime.RenderCastingOverlay() {
+    val castState by DlnaCastRepository.state.collectAsState()
+    val isCasting = castState is DlnaCastState.Casting
+    // Pause local playback when casting starts
+    LaunchedEffect(isCasting) {
+        if (isCasting) {
+            shouldPlay = false
+            playerController?.pause()
+            controlsVisible = true
+        }
+    }
+    if (!isCasting) return
+    val casting = castState as DlnaCastState.Casting
+    var remotePosMs by remember { mutableStateOf(0L) }
+    var remoteDurationMs by remember { mutableStateOf(playbackSnapshot.durationMs) }
+    var isRemotePaused by remember { mutableStateOf(false) }
+    var isScrubbingRemote by remember { mutableStateOf(false) }
+    var scrubRemoteMs by remember { mutableStateOf<Long?>(null) }
+
+    // Poll position from TV every 1s for progress sync
+    LaunchedEffect(casting.device.id) {
+        while (isCasting) {
+            try {
+                val pos = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    // Use platform specific call via repository? Direct via DlnaCastPlatform if available
+                    // We poll via DlnaCastRepository helper (added below)
+                    DlnaCastRepository.getRemotePosition()
+                }
+                if (pos != null) {
+                    remotePosMs = pos
+                    // Sync watch progress periodically
+                    if (!isScrubbingRemote) {
+                        // Don't override scrubbing
+                    }
+                }
+            } catch (_: Exception) {}
+            delay(1000)
+        }
+    }
+
+    val displayPos = scrubRemoteMs ?: remotePosMs
+    val duration = remoteDurationMs.coerceAtLeast(1L)
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.72f))
+                .padding(horizontal = horizontalSafePadding + metrics.horizontalPadding, vertical = metrics.verticalPadding),
+        ) {
+            // Top bar
+            Row(
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.CastConnected, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Column {
+                        Text("Odtwarzanie na TV", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                        Text(casting.device.friendlyName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                    }
+                }
+                IconButton(onClick = {
+                    DlnaCastRepository.stopCasting()
+                    shouldPlay = true
+                    playerController?.play()
+                }) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Zatrzymaj cast", tint = Color.White)
+                }
+            }
+
+            // Center controls
+            Column(
+                modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 2)
+                if (activeEpisodeTitle != null) {
+                    Text("S${activeSeasonNumber}E${activeEpisodeNumber} • $activeEpisodeTitle", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { DlnaCastRepository.seekCasting((displayPos - 10_000).coerceAtLeast(0)) }) {
+                        Icon(Icons.Rounded.Replay10, contentDescription = "Cofnij 10s", tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                    Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(Color.White).padding(10.dp).then(Modifier), contentAlignment = Alignment.Center) {
+                        IconButton(onClick = {
+                            if (isRemotePaused) {
+                                DlnaCastRepository.resumeCasting()
+                                isRemotePaused = false
+                            } else {
+                                DlnaCastRepository.pauseCasting()
+                                isRemotePaused = true
+                            }
+                        }) {
+                            Icon(
+                                imageVector = if (isRemotePaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                                contentDescription = if (isRemotePaused) "Wznów" else "Pauza",
+                                tint = Color.Black,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    IconButton(onClick = { DlnaCastRepository.seekCasting(displayPos + 10_000) }) {
+                        Icon(Icons.Rounded.Forward10, contentDescription = "Dalej 10s", tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                }
+                // Slider
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Slider(
+                        value = displayPos.toFloat(),
+                        onValueChange = {
+                            isScrubbingRemote = true
+                            scrubRemoteMs = it.toLong()
+                        },
+                        onValueChangeFinished = {
+                            val target = scrubRemoteMs ?: displayPos
+                            isScrubbingRemote = false
+                            scrubRemoteMs = null
+                            DlnaCastRepository.seekCasting(target)
+                            remotePosMs = target
+                        },
+                        valueRange = 0f..duration.toFloat(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(formatPlaybackTime(displayPos), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
+                        Text(formatPlaybackTime(duration), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
+                    }
+                }
+                // Subtitle / Audio quick actions (show current selection)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Subtitle button cycles/choose
+                    IconButton(onClick = { showSubtitleModal = true }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Napisy", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                            Text(if (useCustomSubtitles) "Wł. (burn-in przy transkodzie)" else "Wyłączone", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                        }
+                    }
+                    Spacer(modifier = Modifier.size(16.dp))
+                    IconButton(onClick = { DlnaCastRepository.stopCasting(); shouldPlay = true; playerController?.play() }) {
+                        Icon(Icons.Rounded.Stop, contentDescription = "Stop", tint = Color.White)
+                    }
+                }
+                Text("Proxy: ${casting.proxyUrl.take(60)}...", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+            }
+        }
+    }
 }

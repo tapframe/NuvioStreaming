@@ -410,8 +410,8 @@ kotlin {
                 implementation("com.google.code.gson:gson:2.11.0")
                 implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
                 implementation(libs.nanohttpd)
-                // ffmpeg-kit optional for DLNA transcode HEVC->AVC - uncomment when adding full transcode:
-                // implementation("com.arthenica:ffmpeg-kit-min-gpl:6.0")
+                // ffmpeg-kit optional for DLNA transcode HEVC->AVC - uncomment when artifact is available:
+                // implementation(libs.ffmpeg.kit.min.gpl)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sentry.android)
                 implementation(libs.androidx.media3.exoplayer.hls)

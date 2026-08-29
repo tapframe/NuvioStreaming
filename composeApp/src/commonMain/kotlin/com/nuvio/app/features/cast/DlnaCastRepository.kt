@@ -28,6 +28,12 @@ object DlnaCastRepository {
     private var currentProxyUrl: String? = null
     private var currentCastDevice: DlnaDevice? = null
 
+    val castDevice: DlnaDevice? get() = currentCastDevice
+    val proxyUrl: String? get() = currentProxyUrl
+
+    var isPaused: Boolean = false
+        private set
+
     fun startScan() {
         if (_state.value is DlnaCastState.Scanning) return
         scanJob?.cancel()
@@ -91,6 +97,33 @@ object DlnaCastRepository {
         }
     }
 
+    fun pauseCasting() {
+        val dev = currentCastDevice ?: return
+        scope.launch(Dispatchers.IO) {
+            try {
+                DlnaCastPlatform.pausePlayback(dev)
+                isPaused = true
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun resumeCasting() {
+        val dev = currentCastDevice ?: return
+        scope.launch(Dispatchers.IO) {
+            try {
+                DlnaCastPlatform.resumePlayback(dev)
+                isPaused = false
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun seekCasting(positionMs: Long) {
+        val dev = currentCastDevice ?: return
+        scope.launch(Dispatchers.IO) {
+            try { DlnaCastPlatform.seekPlayback(dev, positionMs) } catch (_: Exception) {}
+        }
+    }
+
     fun stopCasting() {
         proxyJob?.cancel()
         scope.launch(Dispatchers.IO) {
@@ -101,10 +134,16 @@ object DlnaCastRepository {
                 DlnaCastPlatform.stopProxy()
             } catch (_: Exception) {}
             isProxyRunning = false
+            isPaused = false
             currentProxyUrl = null
             currentCastDevice = null
             _state.value = DlnaCastState.Idle
         }
+    }
+
+    suspend fun getRemotePosition(): Long? {
+        val dev = currentCastDevice ?: return null
+        return try { DlnaCastPlatform.getPositionInfo(dev) } catch (_: Exception) { null }
     }
 
     fun reset() {

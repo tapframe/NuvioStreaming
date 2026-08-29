@@ -20,6 +20,9 @@ data class DlnaCastRequest(
     val mimeType: String = "video/mp4",
     val codecHint: String? = null, // hevc, avc, av1 ...
     val durationMs: Long? = null,
+    val subtitleUrl: String? = null,
+    val subtitleHeaders: Map<String, String> = emptyMap(),
+    val startPositionMs: Long = 0L,
 )
 
 sealed interface DlnaCastState {
