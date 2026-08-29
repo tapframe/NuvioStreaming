@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import com.nuvio.app.features.cast.DlnaCastRequest
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.p2p.formatP2pMegabytes
 import com.nuvio.app.features.p2p.formatP2pSpeed
@@ -286,6 +287,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             },
             onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
             onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
+            onCastClick = { showCastSheet = true },
             onOpenInExternalPlayer = args.onOpenInExternalPlayer?.let { openExternal ->
                 {
                     val loadedSubtitles = addonSubtitles
@@ -423,6 +425,32 @@ private fun BoxScope.RenderPlaybackOverlays(
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+    // DLNA Cast sheet - respects iOS note: on iOS it just shows error via repository
+    if (showCastSheet) {
+        val p2pUrl = p2pResolvedSourceUrl
+        val effectiveUrl = if (activeTorrentInfoHash != null && p2pUrl != null) p2pUrl else activeSourceUrl
+        val codecHint = activeStreamTitle + " " + (activeStreamSubtitle ?: "")
+        val castRequest = DlnaCastRequest(
+            sourceUrl = effectiveUrl,
+            sourceHeaders = activeSourceHeaders,
+            title = title,
+            subtitle = activeStreamSubtitle,
+            mimeType = when {
+                effectiveUrl.contains(".m3u8", ignoreCase = true) -> "application/x-mpegURL"
+                effectiveUrl.contains(".mpd", ignoreCase = true) -> "application/dash+xml"
+                effectiveUrl.endsWith(".mkv", ignoreCase = true) -> "video/x-matroska"
+                else -> "video/mp4"
+            },
+            codecHint = codecHint,
+            durationMs = playbackSnapshot.durationMs.takeIf { it > 0 },
+        )
+        com.nuvio.app.features.cast.CastBottomSheet(
+            isVisible = showCastSheet,
+            castRequest = castRequest,
+            onDismiss = { showCastSheet = false },
+            onDeviceSelected = { /* handled inside sheet */ },
+        )
+    }
     PlayerScreenModalHosts(
         pendingP2pSwitch = pendingP2pSwitch,
         onPendingP2pSwitchChanged = { pendingP2pSwitch = it },
