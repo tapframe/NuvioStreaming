@@ -31,6 +31,7 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      release_commit: ${{ steps.release.outputs.release_commit }}
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
@@ -51,11 +52,17 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           CURRENT_BUMP: ${{ steps.release.outputs.current_bump }}
           RELEASE_COMMIT: ${{ steps.release.outputs.release_commit }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           RELEASE_REF_TYPE: ${{ github.ref_type }}
           RELEASE_MODE: ${{ inputs.mode }}
         run: |
           if [[ "${RELEASE_REF_TYPE}" != "branch" ]]; then
             echo "Releases must be dispatched from a branch, not ${RELEASE_REF_TYPE}." >&2
+            exit 1
+          fi
+          if [[ "${RELEASE_BRANCH}" != "${DEFAULT_BRANCH}" ]]; then
+            echo "Releases must be dispatched from the default branch (${DEFAULT_BRANCH})." >&2
             exit 1
           fi
 
@@ -70,7 +77,7 @@ jobs:
 
           unexpected_changes="$(
             git diff --name-only "${CURRENT_BUMP}..${RELEASE_COMMIT}" \
-              | grep -Ev '^(\.github/workflows/android-release\.yml|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh)$' \
+              | grep -Ev '^(\.github/workflows/(android-release|update-store-source)\.yml|store\.json|scripts/(build-ios-ipa|generate-release-notes|prepare-ios-dependencies|release-metadata)\.sh|scripts/update-store-source\.py)$' \
               || true
           )"
           if [[ -n "${unexpected_changes}" ]]; then
@@ -269,7 +276,7 @@ jobs:
       RELEASE_MODE: ${{ inputs.mode }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-      RELEASE_BRANCH: ${{ github.ref_name }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.release_commit }}
 
     steps:
       - name: Download release artifacts
@@ -289,7 +296,7 @@ jobs:
           release_args=(
             "${RELEASE_TAG}"
             --repo "${GITHUB_REPOSITORY}"
-            --target "${RELEASE_BRANCH}"
+            --target "${RELEASE_COMMIT}"
             --title "${RELEASE_VERSION}"
             --notes-file release-assets/release-notes.md
           )
@@ -297,3 +304,16 @@ jobs:
             release_args+=(--draft)
           fi
           gh release create "${release_args[@]}" "${release_files[@]}"
+
+  store:
+    name: Update sideload source
+    if: inputs.mode == 'publish'
+    needs:
+      - prepare
+      - release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/update-store-source.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      version: ${{ needs.prepare.outputs.version }}
