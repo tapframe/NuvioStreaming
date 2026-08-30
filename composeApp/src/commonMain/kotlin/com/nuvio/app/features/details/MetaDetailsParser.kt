@@ -54,6 +54,7 @@ internal object MetaDetailsParser {
             defaultVideoId = meta.behaviorHints().string("defaultVideoId"),
             trailers = meta.trailers(),
             links = links,
+            seasonPosters = meta.seasonPosters(),
             videos = meta.videos(),
         )
     }
@@ -239,6 +240,17 @@ internal object MetaDetailsParser {
                 streams = video.embeddedStreams(),
             )
         }
+
+    private fun JsonObject.seasonPosters(): Map<Int, String> {
+        val appExtras = this["app_extras"] as? JsonObject ?: return emptyMap()
+        val posters = appExtras["seasonPosters"] as? JsonArray ?: return emptyMap()
+        return posters.mapIndexedNotNull { index, element ->
+            (element as? JsonPrimitive)?.contentOrNull
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+                ?.let { index + 1 to it }
+        }.toMap()
+    }
 
     private fun JsonObject.trailers(): List<MetaTrailer> =
         array("trailers").mapNotNull { element ->

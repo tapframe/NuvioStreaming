@@ -191,9 +191,11 @@ fun DetailSeriesContent(
         ) {
             if (seasons.size > 1) {
                 val hasSeasonPosters = seasons.any { season ->
-                    groupedEpisodes[season]
-                        .orEmpty()
-                        .any { !it.seasonPoster.isNullOrBlank() }
+                    resolveSeasonPoster(
+                        season = season,
+                        groupedEpisodes = groupedEpisodes,
+                        meta = meta,
+                    ) != null
                 }
                 Column(
                     modifier = Modifier.animateContentSize(animationSpec = tween(280)),
@@ -501,9 +503,11 @@ private fun SeasonPosterScrollRow(
         items(seasons, key = { season -> season }) { season ->
             SeasonPosterButton(
                 label = season.label(),
-                imageUrl = groupedEpisodes[season]
-                    .orEmpty()
-                    .firstNotNullOfOrNull { episode -> episode.seasonPoster }
+                imageUrl = resolveSeasonPoster(
+                    season = season,
+                    groupedEpisodes = groupedEpisodes,
+                    meta = meta,
+                )
                     ?: meta.poster
                     ?: meta.background,
                 isSelected = season == currentSeason,
@@ -514,6 +518,15 @@ private fun SeasonPosterScrollRow(
         }
     }
 }
+
+private fun resolveSeasonPoster(
+    season: Int,
+    groupedEpisodes: Map<Int, List<MetaVideo>>,
+    meta: MetaDetails,
+): String? = groupedEpisodes[season]
+    .orEmpty()
+    .firstNotNullOfOrNull { episode -> episode.seasonPoster?.takeIf(String::isNotBlank) }
+    ?: meta.seasonPosters[season]?.takeIf(String::isNotBlank)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

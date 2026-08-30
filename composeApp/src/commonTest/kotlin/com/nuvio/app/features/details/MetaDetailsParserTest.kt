@@ -85,4 +85,34 @@ class MetaDetailsParserTest {
 
         assertEquals("show:1:2", result.defaultVideoId)
     }
+
+    @Test
+    fun `parse reads AIOMetadata season posters from app extras`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "seasonPosters": [
+                    "https://example.com/season-1.jpg",
+                    null,
+                    "https://example.com/season-3.jpg"
+                  ]
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(
+                1 to "https://example.com/season-1.jpg",
+                3 to "https://example.com/season-3.jpg",
+            ),
+            result.seasonPosters,
+        )
+    }
 }
