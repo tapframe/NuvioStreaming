@@ -115,4 +115,46 @@ class MetaDetailsParserTest {
             result.seasonPosters,
         )
     }
+
+    @Test
+    fun `parse reads localized AIOMetadata certification`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "certificationLocal": " 16 ",
+                  "certification": "TV-MA"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("16", result.ageRating)
+    }
+
+    @Test
+    fun `parse falls back to AIOMetadata default certification`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "movie",
+                "type": "movie",
+                "name": "Movie",
+                "app_extras": {
+                  "certificationLocal": " ",
+                  "certification": "PG-13"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("PG-13", result.ageRating)
+    }
 }

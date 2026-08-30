@@ -40,7 +40,7 @@ internal object MetaDetailsParser {
             lastAirDate = meta.string("lastAirDate"),
             status = meta.string("status"),
             imdbRating = meta.string("imdbRating"),
-            ageRating = meta.string("ageRating"),
+            ageRating = meta.ageRating(),
             runtime = meta.string("runtime"),
             genres = meta.stringList("genres"),
             director = meta.directors(links),
@@ -115,6 +115,17 @@ internal object MetaDetailsParser {
 
     private fun JsonObject.looksLikeMetaObject(): Boolean =
         string("id") != null && string("type") != null && string("name") != null
+
+    private fun JsonObject.ageRating(): String? {
+        val appExtras = this["app_extras"] as? JsonObject
+        return listOf(
+            string("ageRating"),
+            appExtras?.string("certificationLocal"),
+            appExtras?.string("certification"),
+        ).firstNotNullOfOrNull { value ->
+            value?.trim()?.takeIf(String::isNotBlank)
+        }
+    }
 
     private fun JsonObject.directors(links: List<MetaLink>): List<String> {
         val appExtras = this["app_extras"] as? JsonObject
