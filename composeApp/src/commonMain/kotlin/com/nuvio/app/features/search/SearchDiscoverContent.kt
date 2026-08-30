@@ -32,6 +32,7 @@ import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.discoverContent(
     state: DiscoverUiState,
+    isSourceLoading: Boolean,
     columns: Int,
     networkCondition: NetworkCondition,
     onTypeSelected: (String) -> Unit,
@@ -74,7 +75,7 @@ internal fun LazyListScope.discoverContent(
     }
 
     when {
-        state.isLoading && state.items.isEmpty() -> {
+        (state.isLoading || isSourceLoading) && state.items.isEmpty() -> {
             items(2) {
                 PosterGridSkeletonRow(
                     columns = columns,
@@ -200,7 +201,10 @@ private fun DiscoverEmptyStateCard(
     onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    if (networkCondition == NetworkCondition.NoInternet || networkCondition == NetworkCondition.ServersUnreachable) {
+    if (
+        reason == DiscoverEmptyStateReason.RequestFailed &&
+        (networkCondition == NetworkCondition.NoInternet || networkCondition == NetworkCondition.ServersUnreachable)
+    ) {
         NuvioNetworkOfflineCard(
             condition = networkCondition,
             modifier = modifier,
@@ -238,6 +242,12 @@ private fun DiscoverEmptyStateCard(
         modifier = modifier,
         title = title,
         message = message,
+        actionLabel = if (reason == DiscoverEmptyStateReason.RequestFailed) {
+            stringResource(Res.string.action_retry)
+        } else {
+            null
+        },
+        onActionClick = if (reason == DiscoverEmptyStateReason.RequestFailed) onRetry else null,
     )
 }
 

@@ -49,6 +49,19 @@ data class HomeUiState(
     val errorMessage: String? = null,
 )
 
+internal fun shouldShowInitialHomeLoading(
+    hasRenderableHomeRows: Boolean,
+    addonManifestsLoading: Boolean,
+    homeCatalogLoading: Boolean,
+): Boolean = !hasRenderableHomeRows && (addonManifestsLoading || homeCatalogLoading)
+
+internal fun shouldShowHomeHeroSlot(
+    heroEnabled: Boolean,
+    hasHeroItems: Boolean,
+    isResolvingHeroSources: Boolean,
+    hasRenderableHomeRows: Boolean,
+): Boolean = heroEnabled && (hasHeroItems || isResolvingHeroSources || hasRenderableHomeRows)
+
 internal data class CatalogRequest(
     val addon: ManagedAddon,
     val catalogId: String,

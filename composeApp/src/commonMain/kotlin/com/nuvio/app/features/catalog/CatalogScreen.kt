@@ -60,6 +60,7 @@ import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
@@ -368,7 +369,10 @@ private fun CatalogEmptyState(
     networkCondition: NetworkCondition,
     onRetry: (() -> Unit)? = null,
 ) {
-    if (networkCondition == NetworkCondition.NoInternet || networkCondition == NetworkCondition.ServersUnreachable) {
+    if (
+        !errorMessage.isNullOrBlank() &&
+        (networkCondition == NetworkCondition.NoInternet || networkCondition == NetworkCondition.ServersUnreachable)
+    ) {
         NuvioNetworkOfflineCard(
             condition = networkCondition,
             onRetry = onRetry,
@@ -376,24 +380,15 @@ private fun CatalogEmptyState(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = stringResource(Res.string.catalog_empty_title),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = errorMessage ?: stringResource(Res.string.catalog_empty_message),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    val loadFailed = !errorMessage.isNullOrBlank()
+    HomeEmptyStateCard(
+        title = stringResource(
+            if (loadFailed) Res.string.catalog_load_failed_title else Res.string.catalog_empty_title,
+        ),
+        message = errorMessage ?: stringResource(Res.string.catalog_empty_message),
+        actionLabel = if (loadFailed) stringResource(Res.string.action_retry) else null,
+        onActionClick = if (loadFailed) onRetry else null,
+    )
 }
 
 @Composable
