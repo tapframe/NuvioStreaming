@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player.skip
 
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.simkl.SIMKL_API_BASE_URL
 import com.nuvio.app.features.simkl.SimklConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -10,8 +11,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
-
-private const val BASE = "https://api.simkl.com"
 
 internal object SimklIdResolver {
 
@@ -48,7 +47,7 @@ internal object SimklIdResolver {
         if (SimklConfig.CLIENT_ID.isBlank()) return null
 
         return try {
-            val searchText = httpGetText("$BASE/search/id?$source=$id&${commonParams()}")
+            val searchText = httpGetText("$SIMKL_API_BASE_URL/search/id?$source=$id&${commonParams()}")
             val results = json.parseToJsonElement(searchText).jsonArray
             if (results.isEmpty()) return null
             val simklId = results[0].jsonObject["ids"]?.jsonObject?.get("simkl")?.jsonPrimitive?.long ?: return null
@@ -60,7 +59,7 @@ internal object SimklIdResolver {
                 else -> "anime"
             }
 
-            val detailsText = httpGetText("$BASE/$mediaType/$simklId?extended=full&${commonParams()}")
+            val detailsText = httpGetText("$SIMKL_API_BASE_URL/$mediaType/$simklId?extended=full&${commonParams()}")
             val details = json.parseToJsonElement(detailsText).jsonObject
             val ids = details["ids"]?.jsonObject
 
@@ -83,7 +82,7 @@ internal object SimklIdResolver {
         if (SimklConfig.CLIENT_ID.isBlank()) return emptyList()
 
         return try {
-            val text = httpGetText("$BASE/$type/episodes/$simklId?${commonParams()}")
+            val text = httpGetText("$SIMKL_API_BASE_URL/$type/episodes/$simklId?${commonParams()}")
             val episodes = json.parseToJsonElement(text).jsonArray
             val mapping = mutableListOf<EpisodeMapping>()
             for (ep in episodes) {
