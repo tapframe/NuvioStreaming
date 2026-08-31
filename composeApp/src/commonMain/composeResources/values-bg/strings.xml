@@ -651,7 +651,7 @@
     <string name="settings_account_status">Статус</string>
     <string name="settings_account_status_anonymous">Анонимен</string>
     <string name="settings_account_status_signed_in">Влезли сте</string>
-    <string name="settings_appearance_amoled_black">AMOLED черено</string>
+    <string name="settings_appearance_amoled_black">AMOLED черно</string>
     <string name="settings_appearance_amoled_description">Използвай чисто черни фонове за OLED екрани.</string>
     <string name="settings_appearance_app_icon">Икона на приложението</string>
     <string name="settings_appearance_app_icon_arctic_blue">Арктиеско синьо</string>
@@ -1084,12 +1084,12 @@
     <string name="settings_playback_regex_pattern">Regex шаблон</string>
     <string name="settings_playback_regex_placeholder">Няма зададен шаблон. Пример: 4K|2160p|Remux</string>
     <string name="settings_playback_regex_preset_any_1080p">Всяко 1080p+</string>
-    <string name="settings_playback_regex_preset_avc_x264">AVC / x264</string>
+    <string name="settings_playback_regex_preset_avc_x264">AVC/x264</string>
     <string name="settings_playback_regex_preset_bluray_quality">BluRay качество</string>
     <string name="settings_playback_regex_preset_dolby_atmos_dts">Dolby Atmos / DTS</string>
     <string name="settings_playback_regex_preset_english">Английски</string>
     <string name="settings_playback_regex_preset_hdr_dolby_vision">HDR / Dolby Vision</string>
-    <string name="settings_playback_regex_preset_hevc_x265">HEVC / x265</string>
+    <string name="settings_playback_regex_preset_hevc_x265">HEVC/x265</string>
     <string name="settings_playback_regex_preset_no_cam_ts">Без CAM/TS</string>
     <string name="settings_playback_regex_preset_no_remux_hdr">Без REMUX/HDR</string>
     <string name="settings_playback_regex_preset_quality_1080p_standard">1080p стандартно</string>
