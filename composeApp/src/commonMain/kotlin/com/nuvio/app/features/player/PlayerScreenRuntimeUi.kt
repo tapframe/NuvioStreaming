@@ -214,6 +214,14 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             p2pRebufferProgress = p2pRebufferProgress,
         )
         RenderPlayerModals(displayedPositionMs = displayedPositionMs)
+
+        if (showStreamInfo) {
+            StreamInfoOverlay(
+                data = streamInfoData,
+                onDismiss = { dismissStreamInfo() },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
@@ -324,6 +332,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             } else {
                 null
             },
+            onShowStreamInfo = { toggleStreamInfo() },
             parentalWarnings = parentalWarnings,
             showParentalGuide = showParentalGuide,
             onParentalGuideAnimationComplete = { showParentalGuide = false },

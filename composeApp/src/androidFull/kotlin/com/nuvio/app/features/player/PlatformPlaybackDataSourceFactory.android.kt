@@ -27,7 +27,7 @@ internal object PlatformPlaybackDataSourceFactory {
             externalSubtitles = externalSubtitles
         )
         val baseFactory: DataSource.Factory = DefaultDataSource.Factory(context, subtitleHeaderFactory)
-        return if (defaultResponseHeaders.isEmpty()) {
+        val responseFactory: DataSource.Factory = if (defaultResponseHeaders.isEmpty()) {
             baseFactory
         } else {
             ResponseHeaderOverridingDataSourceFactory(
@@ -35,5 +35,11 @@ internal object PlatformPlaybackDataSourceFactory {
                 defaultResponseHeaders = defaultResponseHeaders,
             )
         }
+        // Wrap in the TTFB probe so the stream-info overlay can read
+        // time-to-first-byte of the media fetch.
+        return LoggingDataSourceFactory(
+            upstreamFactory = responseFactory,
+            site = "android",
+        )
     }
 }

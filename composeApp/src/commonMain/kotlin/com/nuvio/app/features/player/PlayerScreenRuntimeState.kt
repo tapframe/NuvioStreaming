@@ -154,6 +154,9 @@ internal class PlayerScreenRuntime(
     var hasSentCompletionScrobbleForCurrentItem by mutableStateOf(false)
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
 
+    var showStreamInfo by mutableStateOf(false)
+    var streamInfoData by mutableStateOf<StreamInfoData?>(null)
+
     var showSourcesPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
     var showSubmitIntroModal by mutableStateOf(false)
@@ -201,4 +204,28 @@ internal class PlayerScreenRuntime(
     var lastSyncedSettingsResizeMode: PlayerResizeMode? = null
     var lastResetPlaybackIdentity: String? = null
     var lastResetVideoIdentity: String? = null
+
+    fun buildStreamInfoData(): StreamInfoData =
+        StreamInfoData(
+            addonName = activeProviderName.takeIf { it.isNotBlank() },
+            streamName = activeStreamTitle.takeIf { it.isNotBlank() },
+            streamDescription = activeStreamSubtitle?.takeIf { it.isNotBlank() },
+            streamUrl = activeSourceUrl.takeIf { it.isNotBlank() },
+            timeToFirstByteMs = PlayerTtfbProbe.firstOpenMillis().takeIf { it >= 0L },
+        )
+
+    fun toggleStreamInfo() {
+        if (showStreamInfo) {
+            showStreamInfo = false
+            streamInfoData = null
+        } else {
+            streamInfoData = buildStreamInfoData()
+            showStreamInfo = true
+        }
+    }
+
+    fun dismissStreamInfo() {
+        showStreamInfo = false
+        streamInfoData = null
+    }
 }
