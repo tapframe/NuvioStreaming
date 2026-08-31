@@ -27,6 +27,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
@@ -48,6 +51,14 @@ private data class AddonPushItem(
 
 private const val ADDON_PUSH_DEBOUNCE_MS = 500L
 
+// Manifest-fetch hardening: parsed manifests are cached in-memory (via
+// `ManagedAddon.manifest`) and re-fetched only after this TTL, with a bounded
+// exponential-backoff retry so a burst of addon refreshes cannot hammer a
+// rate-limiting addon host into a storm.
+private val MANIFEST_CACHE_TTL = 6.hours
+private const val MANIFEST_FETCH_MAX_ATTEMPTS = 3
+private const val MANIFEST_FETCH_BACKOFF_BASE_MS = 300L
+
 object AddonRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("AddonRepository")
@@ -60,6 +71,7 @@ object AddonRepository {
     private var currentProfileId: Int = 1
     private val activeRefreshJobs = mutableMapOf<String, Job>()
     private val pushJobsByProfile = mutableMapOf<Int, Job>()
+    private val lastManifestFetchMark = mutableMapOf<String, TimeMark>()
 
     fun initialize() {
         val effectiveProfileId = resolveEffectiveProfileId(ProfileRepository.activeProfileId)
@@ -99,6 +111,7 @@ object AddonRepository {
         currentProfileId = effectiveProfileId
         initialized = false
         pulledFromServer = false
+        lastManifestFetchMark.clear()
         _uiState.value = AddonsUiState()
     }
 
@@ -109,6 +122,7 @@ object AddonRepository {
         currentProfileId = 1
         initialized = false
         pulledFromServer = false
+        lastManifestFetchMark.clear()
         _uiState.value = AddonsUiState()
     }
 
@@ -352,20 +366,18 @@ object AddonRepository {
         val existingJob = activeRefreshJobs[manifestUrl]
         if (existingJob?.isActive == true) return
 
+        // Skip re-fetching a manifest that was fetched within the cache TTL
+        // unless a forced refresh is requested (e.g. user-initiated refresh).
+        if (!forceRefresh && isManifestFresh(manifestUrl)) return
+
         markRefreshing(manifestUrl)
         var refreshJob: Job? = null
         refreshJob = scope.launch {
             try {
-                val result = runCatching {
-                    val payload = fetchAddonResponseText(
-                        url = manifestUrl,
-                        forceRefresh = forceRefresh,
-                    )
-                    AddonManifestParser.parse(
-                        manifestUrl = manifestUrl,
-                        payload = payload,
-                    )
-                }
+                val result = fetchManifestWithRetry(
+                    manifestUrl = manifestUrl,
+                    forceRefresh = forceRefresh,
+                )
 
                 _uiState.update { current ->
                     current.copy(
@@ -375,6 +387,7 @@ object AddonRepository {
                             } else {
                                 result.fold(
                                     onSuccess = { manifest ->
+                                        lastManifestFetchMark[manifestUrl] = TimeSource.Monotonic.markNow()
                                         addon.copy(
                                             manifest = manifest,
                                             isRefreshing = false,
@@ -399,6 +412,40 @@ object AddonRepository {
             }
         }
         activeRefreshJobs[manifestUrl] = refreshJob
+    }
+
+    private fun isManifestFresh(manifestUrl: String): Boolean {
+        val fetchedAt = lastManifestFetchMark[manifestUrl] ?: return false
+        return fetchedAt.elapsedNow() < MANIFEST_CACHE_TTL
+    }
+
+    private suspend fun fetchManifestWithRetry(
+        manifestUrl: String,
+        forceRefresh: Boolean,
+    ): Result<AddonManifest> {
+        var lastError: Throwable? = null
+        for (attempt in 1..MANIFEST_FETCH_MAX_ATTEMPTS) {
+            try {
+                val payload = fetchAddonResponseText(
+                    url = manifestUrl,
+                    forceRefresh = forceRefresh,
+                )
+                return Result.success(
+                    AddonManifestParser.parse(
+                        manifestUrl = manifestUrl,
+                        payload = payload,
+                    ),
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                lastError = error
+                if (attempt < MANIFEST_FETCH_MAX_ATTEMPTS) {
+                    delay(MANIFEST_FETCH_BACKOFF_BASE_MS * attempt)
+                }
+            }
+        }
+        return Result.failure(lastError ?: IllegalStateException("addon manifest fetch failed"))
     }
 
     private fun pushToServer() {
