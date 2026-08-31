@@ -97,6 +97,16 @@ enum class MetaEpisodeCardStyle {
     }
 }
 
+internal fun MetaScreenSectionItem.tabGroupForRendering(
+    episodeCardStyle: MetaEpisodeCardStyle,
+): Int? = if (
+    key == MetaScreenSectionKey.EPISODES && episodeCardStyle == MetaEpisodeCardStyle.List
+) {
+    null
+} else {
+    tabGroup
+}
+
 @Serializable
 private data class StoredMetaScreenSectionPreference(
     val key: String,
