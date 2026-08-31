@@ -117,6 +117,88 @@ class MetaDetailsParserTest {
     }
 
     @Test
+    fun `parse maps AIOMetadata specials poster to season zero`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "seasonPosters": [
+                    "https://example.com/specials.jpg",
+                    "https://example.com/season-1.jpg"
+                  ]
+                },
+                "videos": [
+                  {
+                    "id": "show:0:1",
+                    "title": "Special 1",
+                    "season": 0,
+                    "episode": 1
+                  },
+                  {
+                    "id": "show:1:1",
+                    "title": "Episode 1",
+                    "season": 1,
+                    "episode": 1
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(
+                0 to "https://example.com/specials.jpg",
+                1 to "https://example.com/season-1.jpg",
+            ),
+            result.seasonPosters,
+        )
+    }
+
+    @Test
+    fun `parse keeps season one mapping when specials poster is omitted`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "seasonPosters": [
+                    "https://example.com/season-1.jpg"
+                  ]
+                },
+                "videos": [
+                  {
+                    "id": "show:0:1",
+                    "title": "Special 1",
+                    "season": 0,
+                    "episode": 1
+                  },
+                  {
+                    "id": "show:1:1",
+                    "title": "Episode 1",
+                    "season": 1,
+                    "episode": 1
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(1 to "https://example.com/season-1.jpg"),
+            result.seasonPosters,
+        )
+    }
+
+    @Test
     fun `parse reads localized AIOMetadata certification`() {
         val result = MetaDetailsParser.parse(
             """

@@ -27,6 +27,7 @@ internal object MetaDetailsParser {
         val meta = root.extractMetaObject()
             ?: error("Response did not contain a valid meta object")
         val links = meta.links()
+        val videos = meta.videos()
 
         return MetaDetails(
             id = meta.requiredString("id"),
@@ -54,8 +55,8 @@ internal object MetaDetailsParser {
             defaultVideoId = meta.behaviorHints().string("defaultVideoId"),
             trailers = meta.trailers(),
             links = links,
-            seasonPosters = meta.seasonPosters(),
-            videos = meta.videos(),
+            seasonPosters = meta.seasonPosters(videos),
+            videos = videos,
         )
     }
 
@@ -252,14 +253,25 @@ internal object MetaDetailsParser {
             )
         }
 
-    private fun JsonObject.seasonPosters(): Map<Int, String> {
+    private fun JsonObject.seasonPosters(videos: List<MetaVideo>): Map<Int, String> {
         val appExtras = this["app_extras"] as? JsonObject ?: return emptyMap()
         val posters = appExtras["seasonPosters"] as? JsonArray ?: return emptyMap()
+        val seasons = videos
+            .mapNotNull(MetaVideo::season)
+            .filter { it >= SPECIALS_SEASON_NUMBER }
+            .distinct()
+            .sorted()
+        val positiveSeasons = seasons.filter { it > SPECIALS_SEASON_NUMBER }
+        val posterSeasons = when {
+            seasons.size == posters.size -> seasons
+            positiveSeasons.size == posters.size -> positiveSeasons
+            else -> List(posters.size) { index -> index + 1 }
+        }
         return posters.mapIndexedNotNull { index, element ->
             (element as? JsonPrimitive)?.contentOrNull
                 ?.trim()
                 ?.takeIf(String::isNotBlank)
-                ?.let { index + 1 to it }
+                ?.let { posterSeasons[index] to it }
         }.toMap()
     }
 
