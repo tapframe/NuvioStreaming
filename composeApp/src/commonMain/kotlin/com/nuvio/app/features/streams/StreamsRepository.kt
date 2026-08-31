@@ -3,6 +3,7 @@ package com.nuvio.app.features.streams
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.boomio.BoomioStreamResolver
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
@@ -155,6 +156,7 @@ object StreamsRepository {
         }
 
         val installedAddons = AddonRepository.uiState.value.addons.enabledAddons()
+        val boomioEnabled = BoomioStreamResolver.isEnabled()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.getEnabledScrapersForType(type)
         } else {
@@ -165,7 +167,7 @@ object StreamsRepository {
             groupByRepository = pluginUiState.groupStreamsByRepository,
         )
 
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && !boomioEnabled) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -194,7 +196,7 @@ object StreamsRepository {
 
         log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && !boomioEnabled) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -205,6 +207,18 @@ object StreamsRepository {
 
         // Initialise loading placeholders
         val installedAddonOrder = streamAddons.map { it.addonName }
+        val boomioGroups = if (boomioEnabled) {
+            listOf(
+                AddonStreamGroup(
+                    addonName = BoomioStreamResolver.ADDON_NAME,
+                    addonId = BoomioStreamResolver.ADDON_ID,
+                    streams = emptyList(),
+                    isLoading = true,
+                ),
+            )
+        } else {
+            emptyList()
+        }
         val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
@@ -219,7 +233,7 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }, installedAddonOrder)
+        } + boomioGroups, installedAddonOrder)
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         _uiState.value = StreamsUiState(
             requestToken = requestToken,
@@ -238,7 +252,8 @@ object StreamsRepository {
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
             val totalTasks = streamAddons.size +
-                pluginProviderGroups.sumOf { it.scrapers.size }
+                pluginProviderGroups.sumOf { it.scrapers.size } +
+                (if (boomioEnabled) 1 else 0)
 
             val installedAddonNames = installedAddonOrder.toSet()
             val installedAddonIds = streamAddons.map { it.addonId }.toSet()
@@ -465,6 +480,40 @@ object StreamsRepository {
                             AddonStreamGroup(
                                 addonName = displayName,
                                 addonId = addon.addonId,
+                                streams = emptyList(),
+                                isLoading = false,
+                                error = err.message,
+                            )
+                        },
+                    )
+                    publishCompletion(StreamLoadCompletion.Addon(group))
+                }
+            }
+
+            if (boomioEnabled) {
+                launch {
+                    val displayName = BoomioStreamResolver.ADDON_NAME
+                    val group = runCatchingUnlessCancelled {
+                        BoomioStreamResolver.resolve(
+                            videoId = videoId,
+                            season = season,
+                            episode = episode,
+                        )
+                    }.fold(
+                        onSuccess = { streams ->
+                            log.d { "Got ${streams.size} streams from ${displayName}" }
+                            AddonStreamGroup(
+                                addonName = displayName,
+                                addonId = BoomioStreamResolver.ADDON_ID,
+                                streams = streams,
+                                isLoading = false,
+                            )
+                        },
+                        onFailure = { err ->
+                            log.w(err) { "Failed to resolve streams from ${displayName}" }
+                            AddonStreamGroup(
+                                addonName = displayName,
+                                addonId = BoomioStreamResolver.ADDON_ID,
                                 streams = emptyList(),
                                 isLoading = false,
                                 error = err.message,
