@@ -22,4 +22,17 @@ object BoomioConfig {
 
     /** Base URL of the BSM rating service, e.g. `https://bsm.example.com`. */
     var bsmBaseUrl: String = ""
+
+    /**
+     * Base URL of the bsc companion hub, e.g. `wss://bsc.example.com`. The phone
+     * companion bridge connects to `{companionBaseUrl}/ws/phone?session_token=…&device_id=…`
+     * and the TV to `{companionBaseUrl}/ws`. Sourced from `BOOMIO_COMPANION_URL` in
+     * `local.properties` (via the generated [BoomioCompanionConfig]); override at
+     * startup if needed. Inert when blank — mirrors the blank-inert pattern of the
+     * other seams above.
+     */
+    var companionBaseUrl: String = BoomioCompanionConfig.BASE_URL
+
+    /** True when the companion seam is configured ([companionBaseUrl] is set). */
+    fun companionEnabled(): Boolean = companionBaseUrl.isNotBlank()
 }

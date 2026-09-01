@@ -40,6 +40,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:Input
     abstract val sentryEnvironment: Property<String>
 
+    @get:Input
+    abstract val companionBaseUrl: Property<String>
+
     @TaskAction
     fun generate() {
         val props = Properties()
@@ -70,6 +73,19 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |object SentryConfig {
                 |    const val DSN = "${sentryDsn.get()}"
                 |    const val ENVIRONMENT = "${sentryEnvironment.get()}"
+                |}
+                """.trimMargin()
+            )
+        }
+
+        outDir.resolve("com/nuvio/app/features/boomio").apply {
+            mkdirs()
+            resolve("BoomioCompanionConfig.kt").writeText(
+                """
+                |package com.nuvio.app.features.boomio
+                |
+                |object BoomioCompanionConfig {
+                |    const val BASE_URL = "${companionBaseUrl.get()}"
                 |}
                 """.trimMargin()
             )
@@ -300,6 +316,7 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
             else -> "production"
         }
     )
+    companionBaseUrl.set(runtimeConfigValue("BOOMIO_COMPANION_URL"))
 }
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
