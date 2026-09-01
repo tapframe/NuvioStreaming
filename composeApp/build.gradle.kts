@@ -479,6 +479,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.atomicfu)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.websockets)
             implementation(libs.kmpalette.core)
             implementation(libs.androidx.navigation3.ui)
             implementation(libs.kermit)

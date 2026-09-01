@@ -36,3 +36,13 @@ object BoomioConfig {
     /** True when the companion seam is configured ([companionBaseUrl] is set). */
     fun companionEnabled(): Boolean = companionBaseUrl.isNotBlank()
 }
+
+/** REST (`https://`) variant of [BoomioConfig.companionBaseUrl] for the bsc companion API. */
+val BoomioConfig.companionRestBaseUrl: String
+    get() = companionBaseUrl.trimEnd('/')
+        .replaceFirst("wss://", "https://")
+        .replaceFirst("ws://", "http://")
+
+/** Phone companion websocket endpoint (`{base}/ws/phone`). */
+val BoomioConfig.companionPhoneWsUrl: String
+    get() = companionBaseUrl.trimEnd('/') + "/ws/phone"

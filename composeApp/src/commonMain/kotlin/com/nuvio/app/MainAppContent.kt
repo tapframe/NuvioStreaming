@@ -84,6 +84,7 @@ import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
 import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
+import com.nuvio.app.features.boomio.CompanionScreen
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryPlaybackResult
 import com.nuvio.app.features.cloud.CloudLibraryPlaybackTargetLookupResult
@@ -314,6 +315,7 @@ internal fun MainAppContent(
     val downloadsSettingsTitle = stringResource(Res.string.compose_settings_root_downloads_title)
     val addonsSettingsTitle = stringResource(Res.string.compose_settings_page_addons)
     val pluginsSettingsTitle = stringResource(Res.string.compose_settings_page_plugins)
+    val companionTitle = stringResource(Res.string.compose_settings_page_companion)
     val accountSettingsTitle = stringResource(Res.string.compose_settings_page_account)
     val supportersSettingsTitle = stringResource(Res.string.compose_settings_page_supporters_contributors)
     val licensesSettingsTitle = stringResource(Res.string.compose_settings_page_licenses_attributions)
@@ -1351,6 +1353,7 @@ internal fun MainAppContent(
                                         navController.navigate(PluginsSettingsRoute(pluginsSettingsTitle))
                                     }
                                 },
+                                onCompanionSettingsClick = { navController.navigate(CompanionRoute(companionTitle)) },
                                 onAccountSettingsClick = { navController.navigate(AccountSettingsRoute(accountSettingsTitle)) },
                                 onSupportersContributorsSettingsClick = {
                                     if (AppFeaturePolicy.supportersContributorsPageEnabled) {
@@ -1526,6 +1529,11 @@ internal fun MainAppContent(
                 entry<AddonsSettingsRoute> { route ->
                     SettingsDestination(route, navController) { onBack ->
                         AddonsSettingsScreen(onBack = onBack)
+                    }
+                }
+                entry<CompanionRoute> { route ->
+                    SettingsDestination(route, navController) { onBack ->
+                        CompanionScreen(onBack = onBack)
                     }
                 }
                 if (AppFeaturePolicy.pluginsEnabled) {
