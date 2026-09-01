@@ -29,6 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.accentBrush
+import com.nuvio.app.core.ui.appTheme
 import kotlinx.coroutines.delay
 
 private val ParentalGuideRowHeight = 18.dp
@@ -47,6 +50,7 @@ internal fun ParentalGuideOverlay(
     val count = warnings.size
     val totalLineHeight = (ParentalGuideRowHeight.value * count) +
         (ParentalGuideRowGap.value * (count - 1))
+    val guideAccentBrush = ThemeColors.getColorPalette(MaterialTheme.appTheme).accentBrush()
 
     val containerAlpha = remember { Animatable(0f) }
     val lineHeightFraction = remember { Animatable(0f) }
@@ -104,7 +108,7 @@ internal fun ParentalGuideOverlay(
                 .width(3.dp)
                 .height((totalLineHeight * lineHeightFraction.value).dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(MaterialTheme.colorScheme.primary),
+                .background(guideAccentBrush),
         )
 
         Column(

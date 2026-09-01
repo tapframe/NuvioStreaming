@@ -1,0 +1,60 @@
+{
+  "name": "Nuvio",
+  "subtitle": "A free, open-source media app for your phone, your desktop, and the TV you already own.",
+  "description": "A free, open-source media app for your phone, your desktop, and the TV you already own.\n\nBring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.",
+  "website": "https://nuvio.tv",
+  "iconURL": "https://raw.githubusercontent.com/NuvioMedia/NuvioMobile/0.4.11/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
+  "tintColor": "#1E88E5",
+  "featuredApps": [
+    "com.nuvio.media"
+  ],
+  "apps": [
+    {
+      "name": "Nuvio",
+      "bundleIdentifier": "com.nuvio.media",
+      "developerName": "NuvioMedia",
+      "subtitle": "A free, open-source media app for your phone, your desktop, and the TV you already own.",
+      "localizedDescription": "A free, open-source media app for your phone, your desktop, and the TV you already own.\n\nBring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.",
+      "iconURL": "https://raw.githubusercontent.com/NuvioMedia/NuvioMobile/0.4.11/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
+      "tintColor": "#1E88E5",
+      "category": "entertainment",
+      "versions": [
+        {
+          "version": "0.4.13",
+          "buildVersion": "117",
+          "date": "2026-08-30T19:02:51Z",
+          "localizedDescription": "- 0504af98 feat(details): parse addon certifications @tapframe  \r\n- f5726012 fix(details): parse addon season posters @tapframe   \r\n- 085e8dc6 fix(ui): handle delayed addon content states @tapframe  \r\n- e68cbb08 fix(android): adjust launcher icon scale @tapframe  \r\n- b86932b9 feat(player): apply member gradients to player accents @tapframe  \r\n- [fix(player): reset subtitle selection on source change (#1812)](https://github.com/NuvioMedia/NuvioMobile/pull/1812) @guuilp  \r\n",
+          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.13/nuvio-0.4.13-full-release.ipa",
+          "size": 51726937,
+          "sha256": "1e4458b0613c6e827459f02b6922d2c06e0e246624a097dac0a80bfc1dfb7c5a",
+          "minOSVersion": "16.1"
+        },
+        {
+          "version": "0.4.12",
+          "buildVersion": "116",
+          "date": "2026-08-29T13:17:20Z",
+          "localizedDescription": "- 501c61d9 fix(tmdb): use multiplatform map insertion @tapframe  \r\n- 793c665c feat(store): automate sideload source updates @tapframe  \r\n- [i18n(el): translate sign-in with link strings (#1813)](https://github.com/NuvioMedia/NuvioMobile/pull/1813) @nosvasedis  \r\n- 388e613c feat(auth): add six-character login codes @tapframe  \r\n- [Port NuvioTV fixes: YouTube extractor, trailer language, scrobble guard, aggregate credits (#1795)](https://github.com/NuvioMedia/NuvioMobile/pull/1795) @skoruppa  \r\n- [fallback CJK cast names and filmography titles to English/Romaji (#1785)](https://github.com/NuvioMedia/NuvioMobile/pull/1785) @halibiram  \r\n- 582ae863 fix(player): keep controls hidden on playback start @tapframe  \r\n- 1c92795c fix(release): group notes by pull request @tapframe  \r\n- 4e838e47 fix(release): target repository explicitly @tapframe  \r\n",
+          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.12/nuvio-0.4.12-full-release.ipa",
+          "size": 51718448,
+          "sha256": "eefce854675c29c86c381c0ecc34082dc57ef24bfeec78309661a2e082b9de2b",
+          "minOSVersion": "16.1"
+        },
+        {
+          "version": "0.4.11",
+          "buildVersion": "115",
+          "date": "2026-08-26T09:40:11Z",
+          "localizedDescription": "## What's Changed\r\n\r\n- 04ca1226 feat(details): add tappable expandable descriptions @tapframe\r\n- [fix: Simkl anime type classification and landscape poster aspect ratio (#1786)](https://github.com/NuvioMedia/NuvioMobile/pull/1786) @skoruppa\r\n- aa67e069 fix(details): reset episode position when switching seasons @tapframe\r\n- ab57cf1b fix(search): persist discover catalog selection @tapframe\r\n- 560e5a28 fix(ios): correct launch screen configuration @tapframe\r\n- 2c7438d6 fix(player): make subtitle aggregation multiplatform @tapframe\r\n- [Respect corner radius for trailers and episodes (#1784)](https://github.com/NuvioMedia/NuvioMobile/pull/1784) @skoruppa\r\n- [i18n(el): add missing Greek translations (#1783)](https://github.com/NuvioMedia/NuvioMobile/pull/1783) @nosvasedis\r\n- 96fb98c4 fix(catalog): preserve scroll position after details @tapframe\r\n- 191be42a fix: address mobile crash clusters (NUVIO-MOBILE-4 NUVIO-MOBILE-QK NUVIO-MOBILE-FZ) @tapframe\r\n- [Latest strings added to the Bulgarian translation (#1779)](https://github.com/NuvioMedia/NuvioMobile/pull/1779) @viiktr\r\n- [fix: per-episode rating from addon metadata is never parsed (#1776)](https://github.com/NuvioMedia/NuvioMobile/pull/1776) @6ip\r\n- [feat(player): port sidecar addon subtitles, fix selection state, and parallelize fetching (#1705)](https://github.com/NuvioMedia/NuvioMobile/pull/1705) @halibiram\r\n",
+          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.11/nuvio-0.4.11-full-release.ipa",
+          "size": 51638510,
+          "sha256": "712e32aa5957c770a1e6769223769d1b56d0c9f957f369901190637f3cb49114",
+          "minOSVersion": "16.1"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}

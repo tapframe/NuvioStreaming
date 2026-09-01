@@ -29,6 +29,55 @@ import kotlin.test.assertTrue
 class HomeScreenTest {
 
     @Test
+    fun `home remains loading while initial addon manifests are pending`() {
+        assertTrue(
+            shouldShowInitialHomeLoading(
+                hasRenderableHomeRows = false,
+                addonManifestsLoading = true,
+                homeCatalogLoading = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `home does not show loading over rows or a terminal empty state`() {
+        assertFalse(
+            shouldShowInitialHomeLoading(
+                hasRenderableHomeRows = true,
+                addonManifestsLoading = true,
+                homeCatalogLoading = true,
+            ),
+        )
+        assertFalse(
+            shouldShowInitialHomeLoading(
+                hasRenderableHomeRows = false,
+                addonManifestsLoading = false,
+                homeCatalogLoading = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `home collapses hero space for terminal empty content`() {
+        assertFalse(
+            shouldShowHomeHeroSlot(
+                heroEnabled = true,
+                hasHeroItems = false,
+                isResolvingHeroSources = false,
+                hasRenderableHomeRows = false,
+            ),
+        )
+        assertTrue(
+            shouldShowHomeHeroSlot(
+                heroEnabled = true,
+                hasHeroItems = false,
+                isResolvingHeroSources = true,
+                hasRenderableHomeRows = false,
+            ),
+        )
+    }
+
+    @Test
     fun `home trakt continue watching candidate limits match TV`() {
         assertEquals(300, HomeContinueWatchingMaxRecentProgressItems)
         assertEquals(32, HomeNextUpInitialResolutionLimit)

@@ -22,15 +22,15 @@ concurrency:
 jobs:
   build:
     name: Build unsigned full ${{ inputs.configuration }} IPA
-    runs-on: ${{ inputs.configuration == 'Release' && 'macos-26-intel' || 'macos-26' }}
+    runs-on: macos-26
     timeout-minutes: ${{ inputs.configuration == 'Release' && 75 || 30 }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       GRADLE_OPTS: -Dfile.encoding=UTF-8
       IOS_CONFIGURATION: ${{ inputs.configuration }}
       KOTLIN_DAEMON_JVMARGS: -Xmx2048M
-      NUVIO_GRADLE_JVMARGS: ${{ inputs.configuration == 'Release' && '-Xmx9216M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=1024M' || '-Xmx4608M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M' }}
-      NUVIO_KOTLIN_NATIVE_JVMARGS: ${{ inputs.configuration == 'Release' && '-Xmx9216M' || '-Xmx4608M' }}
+      NUVIO_GRADLE_JVMARGS: -Xmx4608M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M
+      NUVIO_KOTLIN_NATIVE_JVMARGS: -Xmx4608M
       RELEASE_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
 
     steps:
@@ -45,6 +45,14 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache Kotlin Native
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            konan-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Verify Apple toolchain
         run: |
@@ -61,7 +69,19 @@ jobs:
         run: ./scripts/prepare-ios-dependencies.sh
 
       - name: Build unsigned full ${{ inputs.configuration }} IPA
-        run: ./scripts/build-ios-ipa.sh
+        run: |
+          (
+            while sleep 60; do
+              echo "::group::Build resources $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+              uptime
+              vm_stat
+              ps -Ao pid,etime,%cpu,rss,command -r | head -n 12 || true
+              echo "::endgroup::"
+            done
+          ) &
+          monitor_pid=$!
+          trap 'kill "${monitor_pid}" 2>/dev/null || true' EXIT
+          ./scripts/build-ios-ipa.sh
 
       - name: Summarize IPA
         run: |

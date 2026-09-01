@@ -84,16 +84,6 @@ data class AniSkipInterval(
     @SerialName("endTime") val endTime: Double,
 )
 
-// --- ARM API response models ---
-
-@Serializable
-data class ArmEntry(
-    @SerialName("myanimelist") val myanimelist: Int? = null,
-    @SerialName("anilist") val anilist: Int? = null,
-    @SerialName("kitsu") val kitsu: Int? = null,
-    @SerialName("imdb") val imdb: String? = null,
-)
-
 // --- Anime-Skip GraphQL API response models ---
 
 @Serializable
