@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -123,8 +124,13 @@ object CompanionBridge {
 
     // Long-lived socket: only a connect timeout — a request/socket timeout would
     // kill an idle connection (inbound can be quiet while the 10s heartbeat runs).
+    // The WebSockets plugin is required for webSocket() — without it every
+    // connect throws and the companion link never opens.
     private val wsClient = HttpClient {
         install(HttpTimeout) { connectTimeoutMillis = 10_000 }
+        install(WebSockets) {
+            pingInterval = 30_000L
+        }
     }
 
     private val _connected = MutableStateFlow(false)
