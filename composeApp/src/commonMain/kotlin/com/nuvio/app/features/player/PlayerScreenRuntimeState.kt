@@ -171,6 +171,7 @@ internal class PlayerScreenRuntime(
     var playbackStartedForParentalGuide by mutableStateOf(false)
     var nextEpisodeInfo by mutableStateOf<NextEpisodeInfo?>(null)
     var showNextEpisodeCard by mutableStateOf(false)
+    var nextEpisodeCardDismissed by mutableStateOf(false)
     var nextEpisodeAutoPlaySearching by mutableStateOf(false)
     var nextEpisodeAutoPlaySourceName by mutableStateOf<String?>(null)
     var nextEpisodeAutoPlayCountdown by mutableStateOf<Int?>(null)

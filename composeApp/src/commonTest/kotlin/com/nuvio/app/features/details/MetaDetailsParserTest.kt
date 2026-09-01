@@ -85,4 +85,158 @@ class MetaDetailsParserTest {
 
         assertEquals("show:1:2", result.defaultVideoId)
     }
+
+    @Test
+    fun `parse reads AIOMetadata season posters from app extras`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "seasonPosters": [
+                    "https://example.com/season-1.jpg",
+                    null,
+                    "https://example.com/season-3.jpg"
+                  ]
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(
+                1 to "https://example.com/season-1.jpg",
+                3 to "https://example.com/season-3.jpg",
+            ),
+            result.seasonPosters,
+        )
+    }
+
+    @Test
+    fun `parse maps AIOMetadata specials poster to season zero`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "seasonPosters": [
+                    "https://example.com/specials.jpg",
+                    "https://example.com/season-1.jpg"
+                  ]
+                },
+                "videos": [
+                  {
+                    "id": "show:0:1",
+                    "title": "Special 1",
+                    "season": 0,
+                    "episode": 1
+                  },
+                  {
+                    "id": "show:1:1",
+                    "title": "Episode 1",
+                    "season": 1,
+                    "episode": 1
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(
+                0 to "https://example.com/specials.jpg",
+                1 to "https://example.com/season-1.jpg",
+            ),
+            result.seasonPosters,
+        )
+    }
+
+    @Test
+    fun `parse keeps season one mapping when specials poster is omitted`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "seasonPosters": [
+                    "https://example.com/season-1.jpg"
+                  ]
+                },
+                "videos": [
+                  {
+                    "id": "show:0:1",
+                    "title": "Special 1",
+                    "season": 0,
+                    "episode": 1
+                  },
+                  {
+                    "id": "show:1:1",
+                    "title": "Episode 1",
+                    "season": 1,
+                    "episode": 1
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            mapOf(1 to "https://example.com/season-1.jpg"),
+            result.seasonPosters,
+        )
+    }
+
+    @Test
+    fun `parse reads localized AIOMetadata certification`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "show",
+                "type": "series",
+                "name": "Show",
+                "app_extras": {
+                  "certificationLocal": " 16 ",
+                  "certification": "TV-MA"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("16", result.ageRating)
+    }
+
+    @Test
+    fun `parse falls back to AIOMetadata default certification`() {
+        val result = MetaDetailsParser.parse(
+            """
+            {
+              "meta": {
+                "id": "movie",
+                "type": "movie",
+                "name": "Movie",
+                "app_extras": {
+                  "certificationLocal": " ",
+                  "certification": "PG-13"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("PG-13", result.ageRating)
+    }
 }
