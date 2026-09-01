@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
+import androidx.compose.material.icons.rounded.People
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
@@ -160,6 +161,7 @@ fun MetaDetailsScreen(
     onOpenMeta: ((MetaPreview) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)? = null,
     onCompanyClick: ((MetaCompany, String) -> Unit)? = null,
+    onWatchParty: ((type: String, imdbId: String, title: String, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?) -> Unit)? = null,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
@@ -749,6 +751,22 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
+                // Watch-party entry: launches the party picker with the same
+                // episode context the Play button would use (series → the
+                // primary action's season/episode; movie → null/null).
+                val onWatchPartyClick: (() -> Unit)? = onWatchParty?.let { launch ->
+                    {
+                        val action = seriesAction?.takeIf { meta.type == "series" || hasEpisodes }
+                        launch(
+                            meta.type,
+                            meta.id,
+                            meta.name,
+                            action?.seasonNumber,
+                            action?.episodeNumber,
+                            action?.episodeTitle,
+                        )
+                    }
+                }
                 val manualPlayHandler = onPlayManually
                 val showManualPlayOption = manualPlayHandler != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                 val onPrimaryPlayLongClick: (() -> Unit)? = manualPlayHandler
@@ -1048,6 +1066,7 @@ fun MetaDetailsScreen(
                                 onSaveClick = toggleSaved,
                                 onSaveLongClick = openLibraryListPicker,
                                 onWatchedClick = toggleWatched,
+                                onWatchPartyClick = onWatchPartyClick,
                                 showManualPlayOption = showManualPlayOption,
                                 preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                 preferredEpisodeNumber = seriesAction?.episodeNumber,
@@ -1721,6 +1740,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
+    onWatchPartyClick: (() -> Unit)?,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -1797,6 +1817,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
                     onWatchedClick = onWatchedClick,
+                    onWatchPartyClick = onWatchPartyClick,
                     showManualPlayOption = showManualPlayOption,
                     preferredEpisodeSeasonNumber = preferredEpisodeSeasonNumber,
                     preferredEpisodeNumber = preferredEpisodeNumber,
@@ -1946,6 +1967,7 @@ private fun ConfiguredMetaSections(
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
+    onWatchPartyClick: (() -> Unit)?,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -2033,6 +2055,13 @@ private fun ConfiguredMetaSections(
                             onClick = onSaveClick,
                             onLongClick = onSaveLongClick,
                         ))
+                        if (onWatchPartyClick != null) {
+                            add(DetailSecondaryAction(
+                                label = stringResource(Res.string.watch_party_action),
+                                icon = Icons.Rounded.People,
+                                onClick = onWatchPartyClick,
+                            ))
+                        }
                     },
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,

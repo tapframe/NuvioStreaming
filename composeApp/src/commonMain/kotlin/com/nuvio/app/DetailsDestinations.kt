@@ -17,6 +17,7 @@ import com.nuvio.app.navigation.DetailRoute
 import com.nuvio.app.navigation.EntityBrowseRoute
 import com.nuvio.app.navigation.NuvioNavigator
 import com.nuvio.app.navigation.PersonDetailRoute
+import com.nuvio.app.navigation.WatchPartyRoute
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.person_role_creator
@@ -123,6 +124,18 @@ internal fun DetailsDestination(
                     ),
                 )
             }
+        },
+        onWatchParty = { type, imdbId, title, seasonNumber, episodeNumber, episodeTitle ->
+            navController.navigate(
+                WatchPartyRoute(
+                    type = type,
+                    imdbId = imdbId,
+                    title = title,
+                    season = seasonNumber,
+                    episode = episodeNumber,
+                    episodeTitle = episodeTitle,
+                ),
+            )
         },
         sharedTransitionScope = sharedTransitionScope,
         animatedVisibilityScope = animatedVisibilityScope,

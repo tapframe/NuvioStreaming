@@ -94,6 +94,17 @@ data class AddonsSettingsRoute(override val title: String = "") : SettingsDestin
 @Serializable
 data class CompanionRoute(override val title: String = "") : SettingsDestinationRoute
 
+/** N3 watch-party flow, launched from a title's detail screen. */
+@Serializable
+data class WatchPartyRoute(
+    val type: String,
+    val imdbId: String,
+    override val title: String? = null,
+    val season: Int? = null,
+    val episode: Int? = null,
+    val episodeTitle: String? = null,
+) : AppRoute
+
 @Serializable
 data class PluginsSettingsRoute(override val title: String = "") : SettingsDestinationRoute
 

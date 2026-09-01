@@ -85,6 +85,7 @@ import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.boomio.CompanionScreen
+import com.nuvio.app.features.boomio.WatchPartyScreen
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryPlaybackResult
 import com.nuvio.app.features.cloud.CloudLibraryPlaybackTargetLookupResult
@@ -1429,6 +1430,10 @@ internal fun MainAppContent(
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = LocalNavAnimatedContentScope.current,
                     )
+                }
+                entry<WatchPartyRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    WatchPartyScreen(route = route, onBack = onBack)
                 }
                 entry<PersonDetailRoute> { route ->
                     PersonDestination(
