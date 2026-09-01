@@ -128,9 +128,7 @@ object CompanionBridge {
     // connect throws and the companion link never opens.
     private val wsClient = HttpClient {
         install(HttpTimeout) { connectTimeoutMillis = 10_000 }
-        install(WebSockets) {
-            pingInterval = 30_000L
-        }
+        install(WebSockets)
     }
 
     private val _connected = MutableStateFlow(false)
