@@ -81,8 +81,9 @@ internal fun AppEnvironment(content: @Composable () -> Unit) {
                     ),
                 )
             }
-            .configurePlatformImageLoader()
+            .configurePlatformImageLoader(context)
             .build()
+
     }
     val selectedTheme by remember {
         ThemeSettingsRepository.ensureLoaded()
