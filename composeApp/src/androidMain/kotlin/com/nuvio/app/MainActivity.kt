@@ -68,11 +68,19 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesStorage
 import com.nuvio.app.features.watchprogress.ResumePromptStorage
 import com.nuvio.app.features.watchprogress.WatchProgressStorage
 
+import org.conscrypt.Conscrypt
+import java.security.Security
+
 open class MainActivity : AppCompatActivity() {
     private var pipRemoteActionReceiver: PipRemoteActionReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        try {
+            Security.insertProviderAt(Conscrypt.newProvider(), 1)
+        } catch (_: Throwable) {
+        }
         installSplashScreen()
+
         enableEdgeToEdge(
             navigationBarStyle = SystemBarStyle.dark(
                 scrim = 0xFF020404.toInt(),

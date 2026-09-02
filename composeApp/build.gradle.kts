@@ -423,7 +423,10 @@ kotlin {
                 implementation(libs.androidx.media3.container)
                 implementation(libs.androidx.media3.extractor)
                 implementation(libs.mpv.android.lib)
+                implementation(libs.conscrypt.android)
+
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+
                 implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
                 if (androidDistribution == "full") {
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
