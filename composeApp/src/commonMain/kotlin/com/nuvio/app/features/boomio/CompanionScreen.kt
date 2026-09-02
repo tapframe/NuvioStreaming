@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,16 +14,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,8 +48,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioScreen
@@ -46,12 +61,20 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.NuvioToastController
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.companion_cancel
 import nuvio.composeapp.generated.resources.companion_connected_hub
 import nuvio.composeapp.generated.resources.companion_connecting_hub
 import nuvio.composeapp.generated.resources.companion_connect
 import nuvio.composeapp.generated.resources.companion_disconnect_tv
+import nuvio.composeapp.generated.resources.companion_key_back
+import nuvio.composeapp.generated.resources.companion_key_down
+import nuvio.composeapp.generated.resources.companion_key_left
+import nuvio.composeapp.generated.resources.companion_key_ok
+import nuvio.composeapp.generated.resources.companion_key_right
+import nuvio.composeapp.generated.resources.companion_key_up
 import nuvio.composeapp.generated.resources.companion_link_failed_expired
 import nuvio.composeapp.generated.resources.companion_link_failed_start
 import nuvio.composeapp.generated.resources.companion_link_failed_unauthenticated
@@ -65,10 +88,16 @@ import nuvio.composeapp.generated.resources.companion_play_pause
 import nuvio.composeapp.generated.resources.companion_playing
 import nuvio.composeapp.generated.resources.companion_remote_title
 import nuvio.composeapp.generated.resources.companion_remove
+import nuvio.composeapp.generated.resources.companion_search_go
+import nuvio.composeapp.generated.resources.companion_search_hint
+import nuvio.composeapp.generated.resources.companion_search_mic
+import nuvio.composeapp.generated.resources.companion_search_no_speech
+import nuvio.composeapp.generated.resources.companion_search_title
 import nuvio.composeapp.generated.resources.companion_toast_not_paired
 import nuvio.composeapp.generated.resources.companion_toast_rate_limited
 import nuvio.composeapp.generated.resources.companion_toast_state_restored
 import nuvio.composeapp.generated.resources.companion_toast_timeout
+import nuvio.composeapp.generated.resources.companion_tv_navigation
 import nuvio.composeapp.generated.resources.companion_unlink
 import nuvio.composeapp.generated.resources.companion_unlink_confirm
 import nuvio.composeapp.generated.resources.companion_unlinked_description
@@ -296,6 +325,13 @@ private fun RemoteControls(
     val playPauseLabel = stringResource(Res.string.companion_play_pause)
     val volumeLabel = stringResource(Res.string.companion_volume)
     val disconnectLabel = stringResource(Res.string.companion_disconnect_tv)
+    val tvNavigationLabel = stringResource(Res.string.companion_tv_navigation)
+    val okLabel = stringResource(Res.string.companion_key_ok)
+    val backLabel = stringResource(Res.string.companion_key_back)
+    val upLabel = stringResource(Res.string.companion_key_up)
+    val downLabel = stringResource(Res.string.companion_key_down)
+    val leftLabel = stringResource(Res.string.companion_key_left)
+    val rightLabel = stringResource(Res.string.companion_key_right)
 
     val device = devices.firstOrNull { it.deviceId == pairedDeviceId }
 
@@ -341,6 +377,18 @@ private fun RemoteControls(
             Text(playPauseLabel)
         }
 
+        SearchRemoteControl()
+
+        TvControlPad(
+            label = tvNavigationLabel,
+            upLabel = upLabel,
+            downLabel = downLabel,
+            leftLabel = leftLabel,
+            rightLabel = rightLabel,
+            okLabel = okLabel,
+            backLabel = backLabel,
+        )
+
         if (device != null && device.durationMs > 0L) {
             SeekBar(device = device)
         }
@@ -357,6 +405,85 @@ private fun RemoteControls(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(disconnectLabel)
+        }
+    }
+}
+
+/**
+ * TV-search input for the phone remote — for TVs whose own search bar has no
+ * keyboard or speech input (e.g. mic-less demo units). The phone's soft
+ * keyboard does the typing; a mic button runs the system voice dialog. Text is
+ * forwarded as whole-query `keyboard_input` replacements so the TV's live
+ * search updates per keystroke; Enter or the Search button submits. Focusing
+ * the field opens the TV's Search screen via `stealth_search`.
+ */
+@Composable
+private fun SearchRemoteControl() {
+    val titleLabel = stringResource(Res.string.companion_search_title)
+    val hint = stringResource(Res.string.companion_search_hint)
+    val goLabel = stringResource(Res.string.companion_search_go)
+    val micLabel = stringResource(Res.string.companion_search_mic)
+    val noSpeech = stringResource(Res.string.companion_search_no_speech)
+    var query by remember { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val launchSpeech = rememberSpeechLauncher(prompt = hint) { transcript ->
+        if (transcript != null) {
+            query = transcript
+            CompanionBridge.sendSearchText(transcript)
+            CompanionBridge.submitSearch()
+        }
+    }
+
+    NuvioSurfaceCard {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                titleLabel.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { next ->
+                    query = next
+                    CompanionBridge.sendSearchText(next)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { if (it.isFocused) CompanionBridge.openSearch() },
+                singleLine = true,
+                placeholder = { Text(hint) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = {
+                    CompanionBridge.submitSearch()
+                    keyboard?.hide()
+                }),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        val launched = launchSpeech()
+                        if (!launched) NuvioToastController.show(noSpeech)
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Mic,
+                        contentDescription = micLabel,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(micLabel)
+                }
+                Button(
+                    onClick = {
+                        CompanionBridge.submitSearch()
+                        keyboard?.hide()
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(goLabel)
+                }
+            }
         }
     }
 }
@@ -387,6 +514,10 @@ private fun SeekBar(device: CompanionDevice) {
 @Composable
 private fun VolumeSlider(volumeLabel: String) {
     var volume by remember { mutableIntStateOf(50) }
+    // bsc caps stealth_volume at 5/s — coalesce a drag to ~4/s and always commit
+    // the final value on release so the TV lands exactly where the user lets go.
+    var lastSentVolume by remember { mutableIntStateOf(-1) }
+    var lastVolumeSendAt by remember { mutableStateOf(TimeSource.Monotonic.markNow()) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             volumeLabel,
@@ -397,9 +528,112 @@ private fun VolumeSlider(volumeLabel: String) {
             value = volume.toFloat(),
             onValueChange = { newValue ->
                 volume = newValue.toInt()
-                CompanionBridge.setVolume(volume)
+                val now = TimeSource.Monotonic.markNow()
+                if (volume != lastSentVolume &&
+                    (lastSentVolume < 0 || now - lastVolumeSendAt >= 250.milliseconds)
+                ) {
+                    lastVolumeSendAt = now
+                    lastSentVolume = volume
+                    CompanionBridge.setVolume(volume)
+                }
+            },
+            onValueChangeFinished = {
+                if (volume != lastSentVolume) {
+                    lastSentVolume = volume
+                    CompanionBridge.setVolume(volume)
+                }
             },
             valueRange = 0f..100f,
+        )
+    }
+}
+
+/**
+ * A TV-style navigation pad: directional arrows around an OK key plus a Back
+ * button. Presses are forwarded to the TV as `stealth_keyevent` frames and drive
+ * whatever screen is focused there (home rows, player, settings).
+ */
+@Composable
+private fun TvControlPad(
+    label: String,
+    upLabel: String,
+    downLabel: String,
+    leftLabel: String,
+    rightLabel: String,
+    okLabel: String,
+    backLabel: String,
+) {
+    NuvioSurfaceCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row {
+                NavPadKey(
+                    keyCode = CompanionKeyCodes.DPAD_UP,
+                    icon = Icons.Rounded.KeyboardArrowUp,
+                    label = upLabel,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NavPadKey(
+                    keyCode = CompanionKeyCodes.DPAD_LEFT,
+                    icon = Icons.Rounded.KeyboardArrowLeft,
+                    label = leftLabel,
+                )
+                FilledTonalButton(
+                    onClick = { CompanionBridge.pressKey(CompanionKeyCodes.DPAD_CENTER) },
+                    modifier = Modifier.size(width = 56.dp, height = 56.dp),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text(okLabel, style = MaterialTheme.typography.labelLarge)
+                }
+                NavPadKey(
+                    keyCode = CompanionKeyCodes.DPAD_RIGHT,
+                    icon = Icons.Rounded.KeyboardArrowRight,
+                    label = rightLabel,
+                )
+            }
+            Row {
+                NavPadKey(
+                    keyCode = CompanionKeyCodes.DPAD_DOWN,
+                    icon = Icons.Rounded.KeyboardArrowDown,
+                    label = downLabel,
+                )
+            }
+            OutlinedButton(
+                onClick = { CompanionBridge.pressKey(CompanionKeyCodes.BACK) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
+                Text(backLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavPadKey(
+    keyCode: Int,
+    icon: ImageVector,
+    label: String,
+) {
+    FilledTonalButton(
+        onClick = { CompanionBridge.pressKey(keyCode) },
+        modifier = Modifier.size(width = 56.dp, height = 56.dp),
+        shape = CircleShape,
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(30.dp),
         )
     }
 }

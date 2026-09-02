@@ -553,6 +553,13 @@
     <string name="companion_remote_title">Remote</string>
     <string name="companion_play_pause">Play / Pause</string>
     <string name="companion_volume">Volume</string>
+    <string name="companion_tv_navigation">TV controls</string>
+    <string name="companion_key_ok">OK</string>
+    <string name="companion_key_back">Back</string>
+    <string name="companion_key_up">Up</string>
+    <string name="companion_key_down">Down</string>
+    <string name="companion_key_left">Left</string>
+    <string name="companion_key_right">Right</string>
     <string name="companion_now_playing">Now Playing</string>
     <string name="companion_nothing_playing">Nothing playing</string>
     <string name="companion_playing">Playing</string>
@@ -561,6 +568,11 @@
     <string name="companion_toast_not_paired">Choose a TV first.</string>
     <string name="companion_toast_rate_limited">Too many commands — slow down.</string>
     <string name="companion_toast_state_restored">TV reconnected.</string>
+    <string name="companion_search_title">TV search</string>
+    <string name="companion_search_hint">Type or speak a search</string>
+    <string name="companion_search_go">Search</string>
+    <string name="companion_search_mic">Voice search</string>
+    <string name="companion_search_no_speech">No speech recognition on this phone.</string>
     <string name="watch_party_action">Watch party</string>
     <string name="watch_party_title">Watch party</string>
     <string name="watch_party_unlinked_title">Not connected</string>

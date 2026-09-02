@@ -84,6 +84,20 @@ sealed interface CompanionEvent {
 }
 
 /**
+ * Android [KeyEvent] key codes the TV's companion manager forwards into its UI
+ * on `stealth_keyevent` — same values a physical remote delivers (see
+ * BoomioCompanionManager.dispatchCompanionKey on the nuvio-tv side).
+ */
+object CompanionKeyCodes {
+    const val BACK = 4
+    const val DPAD_UP = 19
+    const val DPAD_DOWN = 20
+    const val DPAD_LEFT = 21
+    const val DPAD_RIGHT = 22
+    const val DPAD_CENTER = 23
+}
+
+/**
  * The phone's live link to the bsc companion hub: owns the `/ws/phone`
  * connection (reconnect + heartbeat), the companion REST calls, and the
  * device list / pairing state the CompanionScreen renders.
@@ -92,7 +106,8 @@ sealed interface CompanionEvent {
  * `bsc/routes/companion-api.js`:
  *   connect  {base}/ws/phone?session_token=…&device_id=…
  *   outbound stealth_playpause | stealth_volume {percent} | scrub_* {positionMs}
- *            | companion:heartbeat (≤1/s, TTL 30s — sent every 10s)
+ *            | stealth_keyevent {keyCode} | stealth_search | keyboard_input {text}
+ *            | keyboard_submit | companion:heartbeat (≤1/s, TTL 30s — sent every 10s)
  *   inbound  companion:state_restored | companion:now_playing_changed |
  *            media_changed | audio_fork | companion:timeout | error not_paired
  *   REST     GET  /api/companion/devices   (Bearer)
@@ -102,13 +117,16 @@ sealed interface CompanionEvent {
  * Inert when there is no [BoomioSession]. Screen-driven: call [ensureStarted]
  * once from the CompanionScreen; the bridge follows the session flow.
  *
- * NOTE: `stealth_volume` and `scrub_*` are sent faithfully but the N1 AndroidTV
- * build only acts on `stealth_playpause` — seek/volume become effective once the
- * TV learns those frames (small follow-up on the TV side).
+ * The TV's companion manager handles `stealth_playpause`, `scrub_*`,
+ * `stealth_volume`, `stealth_keyevent`, `stealth_search`, `keyboard_input`
+ * and `keyboard_submit` (see BoomioCompanionManager on the nuvio-tv side).
  */
 object CompanionBridge {
     /** Minimum gap between `scrub_update` frames — bsc caps at 10/s. */
     private val SCRUB_UPDATE_MIN_INTERVAL: Duration = 120.milliseconds
+
+    /** Minimum gap between `keyboard_input` frames — bsc caps at 20/s. */
+    private val SEARCH_TEXT_MIN_INTERVAL: Duration = 60.milliseconds
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("CompanionBridge")
@@ -159,6 +177,8 @@ object CompanionBridge {
 
     @Volatile private var wsSession: DefaultClientWebSocketSession? = null
     @Volatile private var lastScrubUpdate: TimeSource.Monotonic.ValueTimeMark? = null
+    @Volatile private var lastSearchTextSendAt: TimeSource.Monotonic.ValueTimeMark? = null
+    @Volatile private var pendingSearchText: String? = null
 
     /**
      * Binds the bridge to [BoomioSessionRepository.session]. Idempotent — call
@@ -272,6 +292,50 @@ object CompanionBridge {
             lastScrubUpdate = now
             sendFrame { put("type", "scrub_update"); put("positionMs", positionMs) }
         }
+    }
+
+    /** Send a D-pad / OK / back key press to the paired TV's focused screen. */
+    fun pressKey(keyCode: Int) {
+        if (keyCode <= 0) return
+        sendFrame { put("type", "stealth_keyevent"); put("keyCode", keyCode) }
+    }
+
+    /**
+     * Open the TV's search screen and focus its field, ready for text/voice
+     * from this remote — for TVs whose own search bar has no keyboard or mic.
+     */
+    fun openSearch() =
+        sendFrame { put("type", "stealth_search") }
+
+    /**
+     * Send the TV search field's full current [text] as a replacement on
+     * `keyboard_input {text}`. Whole-text semantics keep backspace and mid-edit
+     * unambiguous — the TV replaces its whole query, so a dropped frame only
+     * means the next keystroke (or [submitSearch]) carries the newest text.
+     * Frames are coalesced under bsc's 20/s cap.
+     */
+    fun sendSearchText(text: String) {
+        val now = TimeSource.Monotonic.markNow()
+        val last = lastSearchTextSendAt
+        if (last == null || now - last >= SEARCH_TEXT_MIN_INTERVAL) {
+            lastSearchTextSendAt = now
+            pendingSearchText = null
+            sendFrame { put("type", "keyboard_input"); put("text", text) }
+        } else {
+            // Inside the rate window — remember the newest text so nothing is
+            // lost; it goes out on the next keystroke or the submit flush.
+            pendingSearchText = text
+        }
+    }
+
+    /** Ask the TV to run its search (Enter). Flushes any pending text first. */
+    fun submitSearch() {
+        pendingSearchText?.let { pending ->
+            pendingSearchText = null
+            lastSearchTextSendAt = TimeSource.Monotonic.markNow()
+            sendFrame { put("type", "keyboard_input"); put("text", pending) }
+        }
+        sendFrame { put("type", "keyboard_submit") }
     }
 
     private inline fun sendFrame(build: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) {
