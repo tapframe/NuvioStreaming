@@ -97,8 +97,15 @@ internal object AddonHttpClientProvider {
     fun get(): OkHttpClient = client
 }
 
-private fun buildAddonHttpClient(cache: Cache? = null): OkHttpClient =
-    OkHttpClient.Builder()
+private fun buildAddonHttpClient(cache: Cache? = null): OkHttpClient {
+    val dispatcher = okhttp3.Dispatcher().apply {
+        maxRequests = 64
+        maxRequestsPerHost = 16
+    }
+    val pool = okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES)
+    return OkHttpClient.Builder()
+        .dispatcher(dispatcher)
+        .connectionPool(pool)
         .dns(IPv4FirstDns())
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -113,6 +120,8 @@ private fun buildAddonHttpClient(cache: Cache? = null): OkHttpClient =
             }
         }
         .build()
+}
+
 
 private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 

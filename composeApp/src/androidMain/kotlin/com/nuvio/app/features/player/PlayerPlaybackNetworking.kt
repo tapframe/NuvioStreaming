@@ -46,7 +46,14 @@ internal object PlayerPlaybackNetworking {
     }
 
     private val playbackHttpClient: OkHttpClient by lazy {
+        val dispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 64
+            maxRequestsPerHost = 32
+        }
+        val pool = okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES)
         OkHttpClient.Builder()
+            .dispatcher(dispatcher)
+            .connectionPool(pool)
             .dns(IPv4FirstDns())
             .sslSocketFactory(sslContext.socketFactory, trustAllManager)
             .hostnameVerifier(playbackHostnameVerifier)
@@ -59,6 +66,7 @@ internal object PlayerPlaybackNetworking {
             .addInterceptor(SentryNetworkBreadcrumbInterceptor())
             .build()
     }
+
 
     private val loopbackPlaybackHttpClient: OkHttpClient by lazy {
         playbackHttpClient.newBuilder()
