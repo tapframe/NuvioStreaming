@@ -422,7 +422,9 @@ kotlin {
                 implementation(libs.androidx.media3.common)
                 implementation(libs.androidx.media3.container)
                 implementation(libs.androidx.media3.extractor)
+                implementation(libs.androidx.media3.database)
                 implementation(libs.mpv.android.lib)
+
                 implementation(libs.conscrypt.android)
 
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
