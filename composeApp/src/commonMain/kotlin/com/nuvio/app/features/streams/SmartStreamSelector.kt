@@ -50,7 +50,7 @@ object SmartStreamSelector {
                     else -> 45
                 }
                 context.displayHeight != null -> {
-                    val displayHeight = context.displayHeight
+                    val displayHeight = context.displayHeight!!
                     when {
                         resolution <= displayHeight -> 100 + resolution / 100
                         else -> maxOf(0, 100 - (resolution - displayHeight) / 20)
@@ -71,7 +71,9 @@ object SmartStreamSelector {
         val bandwidthKbps = context.estimatedBandwidthKbps
         val durationSeconds = parsed?.duration?.takeIf { it > 0 }
         if (bandwidthKbps != null && bandwidthKbps > 0 && sizeBytes != null && durationSeconds != null) {
-            val requiredKbps = (sizeBytes * 8L / 1000L / durationSeconds).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            val requiredKbps = (sizeBytes * 8L / 1000L / durationSeconds)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt()
             score += when {
                 requiredKbps <= bandwidthKbps * 60 / 100 -> 35
                 requiredKbps <= bandwidthKbps * 75 / 100 -> 20
@@ -85,9 +87,7 @@ object SmartStreamSelector {
             listOf("dolby vision", "dolbyvision", "hdr10", "hdr10+", "hlg").any { it in text }
         score += if (hdr) {
             if (context.supportsHdr) 20 else -25
-        } else {
-            5
-        }
+        } else 5
 
         val codec = parsed?.codec?.lowercase() ?: when {
             "av1" in text -> "av1"
@@ -104,9 +104,7 @@ object SmartStreamSelector {
 
         if (context.preferredAudioLanguage != null && parsed?.languages.orEmpty().any {
                 it.equals(context.preferredAudioLanguage, ignoreCase = true)
-            }) {
-            score += 12
-        }
+            }) score += 12
 
         if (stream.isDirectDebridStream || stream.isCachedDebridTorrentStream) score += 35
         if (stream.clientResolve?.isCached == true) score += 35
