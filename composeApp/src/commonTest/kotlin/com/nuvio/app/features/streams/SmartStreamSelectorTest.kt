@@ -72,6 +72,32 @@ class SmartStreamSelectorTest {
     }
 
     @Test
+    fun `explicit stream preference outranks quality score`() {
+        fun stream(name: String, resolution: String) = StreamItem(
+            name = name,
+            url = "https://cdn.example.com/$name.mkv",
+            addonName = "Test",
+            addonId = "addon.test",
+            clientResolve = StreamClientResolve(
+                stream = StreamClientResolveStream(
+                    raw = StreamClientResolveRaw(
+                        parsed = StreamClientResolveParsed(resolution = resolution)
+                    )
+                )
+            )
+        )
+        val preferred = stream("DV", "1080p")
+        val higherQuality = stream("HDR", "2160p")
+        assertEquals(
+            preferred,
+            SmartStreamSelector.rank(
+                listOf(higherQuality, preferred),
+                SmartStreamSelector.Context(preferredStreamTerms = listOf("DV", "HDR"))
+            ).first()
+        )
+    }
+
+    @Test
     fun `keeps equal-score ordering deterministic`() {
         fun stream(name: String) = StreamItem(
             name = name,
