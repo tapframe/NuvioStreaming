@@ -3,6 +3,9 @@ package com.nuvio.app.features.streams
 /**
  * Deterministic quality-aware ordering for automatic stream selection.
  * Manual stream selection is intentionally unaffected.
+ *
+ * Explicit preferences are applied before the general quality score. This keeps
+ * automatic ranking from overriding a user's configured stream preference.
  */
 object SmartStreamSelector {
     data class Context(
@@ -13,6 +16,7 @@ object SmartStreamSelector {
         val dataSaver: Boolean = false,
         val preferredVideoCodec: String? = null,
         val preferredAudioLanguage: String? = null,
+        val preferredStreamTerms: List<String> = emptyList(),
     )
 
     fun rank(
@@ -21,10 +25,32 @@ object SmartStreamSelector {
     ): List<StreamItem> = streams
         .withIndex()
         .sortedWith(
-            compareByDescending<IndexedValue<StreamItem>> { score(it.value, context) }
+            compareByDescending<IndexedValue<StreamItem>> { preferenceScore(it.value, context) }
+                .thenByDescending { score(it.value, context) }
                 .thenBy { it.index }
         )
         .map { it.value }
+
+    private fun preferenceScore(stream: StreamItem, context: Context): Int {
+        if (context.preferredStreamTerms.isEmpty()) return 0
+        val text = listOfNotNull(
+            stream.name,
+            stream.description,
+            stream.behaviorHints.filename,
+            stream.clientResolve?.filename,
+            stream.clientResolve?.torrentName,
+            stream.clientResolve?.stream?.raw?.parsed?.resolution,
+            stream.clientResolve?.stream?.raw?.parsed?.quality,
+            stream.clientResolve?.stream?.raw?.parsed?.codec,
+        ).joinToString(" ").lowercase()
+
+        context.preferredStreamTerms.forEachIndexed { index, term ->
+            if (term.isNotBlank() && term.lowercase() in text) {
+                return (context.preferredStreamTerms.size - index) * 1_000
+            }
+        }
+        return 0
+    }
 
     private fun score(stream: StreamItem, context: Context): Int {
         val parsed = stream.clientResolve?.stream?.raw?.parsed
