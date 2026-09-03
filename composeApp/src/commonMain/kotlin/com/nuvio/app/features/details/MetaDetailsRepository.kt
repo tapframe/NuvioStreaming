@@ -114,9 +114,9 @@ object MetaDetailsRepository {
 
         scope.launch {
             val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-            val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
+            val candidates = findReadyMetaCandidates(type = type, id = metaLookupId)
 
-            if (manifests.isEmpty()) {
+            if (candidates.isEmpty()) {
                 val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
                 if (tmdbMeta != null) {
                     publishLoadedMeta(
@@ -138,16 +138,18 @@ object MetaDetailsRepository {
                 return@launch
             }
 
-            for (manifest in manifests) {
-                val result = withContext(Dispatchers.Default) {
-                    tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
+            for (candidate in candidates) {
+                val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
+                    withContext(Dispatchers.Default) {
+                        tryFetchMeta(candidate.manifest, candidate.candidateType, metaLookupId, includeMdbList = false)
+                    }
                 }
                 if (result != null) {
                     publishLoadedMeta(
                         requestKey = requestKey,
                         meta = result,
                         fallbackItemId = metaLookupId,
-                        fallbackItemType = type,
+                        fallbackItemType = candidate.candidateType,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
                     )
@@ -198,11 +200,11 @@ object MetaDetailsRepository {
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
         val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-        val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
+        val candidates = findReadyMetaCandidates(type = type, id = metaLookupId)
 
-        for (manifest in manifests) {
+        for (candidate in candidates) {
             val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-                tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
+                tryFetchMeta(candidate.manifest, candidate.candidateType, metaLookupId, includeMdbList = false)
             }
             if (result != null) {
                 if (cacheResult) {
@@ -220,9 +222,155 @@ object MetaDetailsRepository {
     }
 
     private const val FETCH_TIMEOUT_MS = 5_000L
-    private const val METADATA_PROVIDER_READY_TIMEOUT_MS = 10_000L
+    private const val METADATA_PROVIDER_READY_TIMEOUT_MS = 1_500L
     private const val TMDB_ENRICH_TIMEOUT_MS = 5_000L
     private const val MDBLIST_ENRICH_TIMEOUT_MS = 5_000L
+
+    internal data class MetaCandidate(
+        val manifest: AddonManifest,
+        val candidateType: String,
+    )
+
+    private suspend fun findReadyMetaCandidates(type: String, id: String): List<MetaCandidate> {
+        AddonRepository.initialize()
+
+        findMetaCandidates(AddonRepository.uiState.value, type, id).takeIf { it.isNotEmpty() }?.let { return it }
+
+        if (!AddonRepository.uiState.value.hasPendingEnabledAddonManifests()) {
+            return emptyList()
+        }
+
+        val readyState = withTimeoutOrNull(METADATA_PROVIDER_READY_TIMEOUT_MS) {
+            AddonRepository.uiState.first { state ->
+                findMetaCandidates(state, type, id).isNotEmpty() ||
+                    !state.hasPendingEnabledAddonManifests()
+            }
+        } ?: AddonRepository.uiState.value
+
+        return findMetaCandidates(readyState, type, id)
+    }
+
+    internal fun findMetaCandidates(
+        state: com.nuvio.app.features.addons.AddonsUiState,
+        type: String,
+        id: String,
+    ): List<MetaCandidate> {
+        val manifests = state.addons.enabledAddons().mapNotNull { it.manifest }
+        val requestedType = type.trim()
+        val inferredType = inferCanonicalType(requestedType, id)
+        val metaResourceManifests = manifests.filter { manifest ->
+            manifest.resources.any { it.name == "meta" }
+        }
+
+        // Priority order (matching NuvioTV MetaRepositoryImpl):
+        // 1) Addons that explicitly support requested type AND explicitly match the ID prefix
+        // 2) Addons that support inferred canonical type AND explicitly match the ID prefix
+        // 3) Top addon in installed order that exposes meta resource and explicitly matches ID prefix
+        // 4) Fallback: Addons that support requested type but have no idPrefixes (accept all IDs)
+        // 5) Fallback: Addons that support inferred canonical type with no idPrefixes
+        // 6) Fallback: Top addon in installed order that exposes meta resource with no idPrefixes
+        val prioritizedCandidates = linkedSetOf<MetaCandidate>()
+
+        manifests.forEach { manifest ->
+            if (manifest.supportsMetaType(requestedType) && manifest.hasExplicitMetaIdPrefix(id)) {
+                prioritizedCandidates.add(MetaCandidate(manifest, requestedType))
+            }
+        }
+
+        if (!inferredType.equals(requestedType, ignoreCase = true)) {
+            manifests.forEach { manifest ->
+                if (manifest.supportsMetaType(inferredType) && manifest.hasExplicitMetaIdPrefix(id)) {
+                    prioritizedCandidates.add(MetaCandidate(manifest, inferredType))
+                }
+            }
+        }
+
+        metaResourceManifests.firstOrNull { it.hasExplicitMetaIdPrefix(id) }?.let { topMetaManifest ->
+            topMetaManifest.supportedCandidateType(requestedType, inferredType)?.let { fallbackType ->
+                prioritizedCandidates.add(MetaCandidate(topMetaManifest, fallbackType))
+            }
+        }
+
+        if (prioritizedCandidates.isEmpty()) {
+            manifests.forEach { manifest ->
+                if (manifest.supportsMetaType(requestedType) && manifest.hasNoMetaIdPrefixes()) {
+                    prioritizedCandidates.add(MetaCandidate(manifest, requestedType))
+                }
+            }
+            if (!inferredType.equals(requestedType, ignoreCase = true)) {
+                manifests.forEach { manifest ->
+                    if (manifest.supportsMetaType(inferredType) && manifest.hasNoMetaIdPrefixes()) {
+                        prioritizedCandidates.add(MetaCandidate(manifest, inferredType))
+                    }
+                }
+            }
+            metaResourceManifests.firstOrNull { it.hasNoMetaIdPrefixes() }?.let { topMetaManifest ->
+                topMetaManifest.supportedCandidateType(requestedType, inferredType)?.let { fallbackType ->
+                    prioritizedCandidates.add(MetaCandidate(topMetaManifest, fallbackType))
+                }
+            }
+        }
+
+        return prioritizedCandidates.toList()
+    }
+
+    private fun AddonManifest.supportsMetaType(type: String): Boolean {
+        val target = type.trim()
+        if (target.isBlank()) return false
+        return resources.any { resource ->
+            resource.name == "meta" && resource.supportsType(target)
+        }
+    }
+
+    private fun com.nuvio.app.features.addons.AddonResource.supportsType(type: String): Boolean {
+        if (types.isEmpty()) return true
+        return types.any { it.equals(type, ignoreCase = true) }
+    }
+
+    private fun AddonManifest.hasExplicitMetaIdPrefix(id: String): Boolean {
+        val metaResource = resources.firstOrNull { it.name == "meta" }
+        if (metaResource?.idPrefixes != null && metaResource.idPrefixes.isNotEmpty()) {
+            return metaResource.idPrefixes.any { prefix -> id.startsWith(prefix, ignoreCase = true) }
+        }
+        if (idPrefixes.isNotEmpty()) {
+            return idPrefixes.any { prefix -> id.startsWith(prefix, ignoreCase = true) }
+        }
+        return false
+    }
+
+    private fun AddonManifest.hasNoMetaIdPrefixes(): Boolean {
+        val metaResource = resources.firstOrNull { it.name == "meta" }
+        val resourcePrefixes = metaResource?.idPrefixes
+        if (resourcePrefixes != null) {
+            return resourcePrefixes.isEmpty()
+        }
+        return idPrefixes.isEmpty()
+    }
+
+    private fun inferCanonicalType(type: String, id: String): String {
+        val normalizedType = type.trim()
+        if (normalizedType.equals("tv", ignoreCase = true)) return "series"
+        val known = setOf("movie", "series", "channel", "anime")
+        if (normalizedType.lowercase() in known) return normalizedType
+
+        val normalizedId = id.lowercase()
+        return when {
+            ":movie:" in normalizedId -> "movie"
+            ":series:" in normalizedId -> "series"
+            ":tv:" in normalizedId -> "series"
+            ":anime:" in normalizedId -> "anime"
+            else -> normalizedType
+        }
+    }
+
+    private fun AddonManifest.supportedCandidateType(requestedType: String, inferredType: String): String? = when {
+        supportsMetaType(requestedType) -> requestedType
+        supportsMetaType(inferredType) -> inferredType
+        else -> null
+    }
+
+    private fun findMetaManifests(state: com.nuvio.app.features.addons.AddonsUiState, type: String, id: String): List<AddonManifest> =
+        findMetaCandidates(state, type, id).map { it.manifest }.distinct()
 
     private suspend fun tryFetchMeta(
         manifest: AddonManifest,
@@ -275,36 +423,6 @@ object MetaDetailsRepository {
         }
     }
 
-    private suspend fun findReadyMetaManifests(type: String, id: String): List<AddonManifest> {
-        AddonRepository.initialize()
-
-        findMetaManifests(AddonRepository.uiState.value, type, id).takeIf { it.isNotEmpty() }?.let { return it }
-
-        if (!AddonRepository.uiState.value.hasPendingEnabledAddonManifests()) {
-            return emptyList()
-        }
-
-        val readyState = withTimeoutOrNull(METADATA_PROVIDER_READY_TIMEOUT_MS) {
-            AddonRepository.uiState.first { state ->
-                findMetaManifests(state, type, id).isNotEmpty() ||
-                    !state.hasPendingEnabledAddonManifests()
-            }
-        } ?: AddonRepository.uiState.value
-
-        return findMetaManifests(readyState, type, id)
-    }
-
-    private fun findMetaManifests(state: com.nuvio.app.features.addons.AddonsUiState, type: String, id: String): List<AddonManifest> =
-        state.addons
-            .enabledAddons()
-            .mapNotNull { it.manifest }
-            .filter { manifest ->
-                manifest.resources.any { resource ->
-                    resource.name == "meta" &&
-                        resource.types.contains(type) &&
-                        (resource.idPrefixes.isEmpty() || resource.idPrefixes.any { id.startsWith(it) })
-                }
-            }
 
     private fun com.nuvio.app.features.addons.AddonsUiState.hasPendingEnabledAddonManifests(): Boolean =
         addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
