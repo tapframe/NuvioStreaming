@@ -22,11 +22,12 @@ internal object PlatformPlaybackDataSourceFactory {
             externalSubtitles = externalSubtitles
         )
         val baseFactory: DataSource.Factory = DefaultDataSource.Factory(context, subtitleHeaderFactory)
+        val cachedFactory = VideoPlaybackCache.wrapWithCache(context.applicationContext, baseFactory)
         return if (defaultResponseHeaders.isEmpty()) {
-            baseFactory
+            cachedFactory
         } else {
             ResponseHeaderOverridingDataSourceFactory(
-                upstreamFactory = baseFactory,
+                upstreamFactory = cachedFactory,
                 defaultResponseHeaders = defaultResponseHeaders,
             )
         }

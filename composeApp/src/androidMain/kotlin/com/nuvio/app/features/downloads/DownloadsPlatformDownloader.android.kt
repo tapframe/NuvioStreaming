@@ -22,12 +22,15 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 
 private val downloadHttpClient = OkHttpClient.Builder()
+    .dns(com.nuvio.app.core.network.IPv4FirstDns())
+    .connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
     .connectTimeout(60, TimeUnit.SECONDS)
     .readTimeout(60, TimeUnit.SECONDS)
     .writeTimeout(60, TimeUnit.SECONDS)
     .followRedirects(true)
     .followSslRedirects(true)
     .build()
+
 
 internal actual object DownloadsPlatformDownloader {
     private var appContext: Context? = null

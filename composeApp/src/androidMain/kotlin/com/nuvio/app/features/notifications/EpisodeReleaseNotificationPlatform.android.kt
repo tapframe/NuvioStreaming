@@ -56,6 +56,11 @@ internal actual object EpisodeReleaseNotificationPlatform {
     private var pendingPermissionContinuation: kotlin.coroutines.Continuation<Boolean>? = null
     private val httpClient by lazy {
         HttpClient(OkHttp) {
+            engine {
+                config {
+                    dns(com.nuvio.app.core.network.IPv4FirstDns())
+                }
+            }
             install(HttpTimeout) {
                 requestTimeoutMillis = 15_000
                 connectTimeoutMillis = 15_000
@@ -63,6 +68,7 @@ internal actual object EpisodeReleaseNotificationPlatform {
             }
         }
     }
+
 
     fun initialize(context: Context) {
         appContext = context.applicationContext

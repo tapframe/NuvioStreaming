@@ -5,8 +5,9 @@ import java.net.Inet4Address
 import java.net.InetAddress
 
 /**
- * Reorders DNS results to prefer IPv4 first. This helps avoid broken IPv6 routes
- * on some emulator and network setups.
+ * Custom DNS that reorders resolved addresses to place IPv4 (Inet4Address)
+ * before IPv6 (Inet6Address). This avoids timeout delays on mobile networks
+ * and Wi-Fi routers with broken IPv6 routing.
  */
 class IPv4FirstDns(private val delegate: Dns = Dns.SYSTEM) : Dns {
     override fun lookup(hostname: String): List<InetAddress> {
