@@ -27,9 +27,11 @@ object SmartStreamSelector {
         platformContextProvider = provider
     }
 
+    fun currentContext(): Context = platformContextProvider?.invoke() ?: Context()
+
     fun rank(
         streams: List<StreamItem>,
-        context: Context = platformContextProvider?.invoke() ?: Context(),
+        context: Context = currentContext(),
     ): List<StreamItem> = streams
         .withIndex()
         .sortedWith(
@@ -83,14 +85,15 @@ object SmartStreamSelector {
                     resolution <= 1080 -> 80
                     else -> 45
                 }
-                context.displayHeight != null -> {
-                    val displayHeight = context.displayHeight!!
+                context.displayHeight?.takeIf { it > 0 } != null -> {
+                    val displayHeight = context.displayHeight!!.coerceAtLeast(1)
                     when {
                         resolution <= displayHeight -> 100 + resolution / 100
                         else -> maxOf(0, 100 - (resolution - displayHeight) / 20)
                     }
                 }
                 else -> when (resolution) {
+                    4320 -> 150
                     2160 -> 130
                     1440 -> 120
                     1080 -> 110
@@ -108,12 +111,13 @@ object SmartStreamSelector {
             val requiredKbps = (sizeBytes * 8L / 1000L / durationSeconds)
                 .coerceAtMost(Int.MAX_VALUE.toLong())
                 .toInt()
+            val bandwidth = bandwidthKbps.toLong()
             score += when {
-                requiredKbps <= bandwidthKbps * 60 / 100 -> 35
-                requiredKbps <= bandwidthKbps * 75 / 100 -> 20
-                requiredKbps <= bandwidthKbps * 90 / 100 -> 5
-                requiredKbps <= bandwidthKbps -> 0
-                requiredKbps <= bandwidthKbps * 125 / 100 -> -15
+                requiredKbps.toLong() * 100 <= bandwidth * 60 -> 35
+                requiredKbps.toLong() * 100 <= bandwidth * 75 -> 20
+                requiredKbps.toLong() * 100 <= bandwidth * 90 -> 5
+                requiredKbps.toLong() * 100 <= bandwidth * 100 -> 0
+                requiredKbps.toLong() * 100 <= bandwidth * 125 -> -15
                 else -> -60
             }
         }
@@ -124,22 +128,22 @@ object SmartStreamSelector {
         score += if (hdr) {
             when {
                 context.supportedHdrTypes.isNotEmpty() &&
-                    hdrTypes.any { it in context.supportedHdrTypes } -> 20
+                    hdrTypes.any { it in context.supportedHdrTypes.map(String::lowercase).toSet() } -> 20
                 context.supportsHdr -> 20
                 else -> -25
             }
         } else 5
 
-        val codec = parsed?.codec?.lowercase() ?: when {
+        val codec = normalizeCodec(parsed?.codec ?: when {
             "av1" in text -> "av1"
             "hevc" in text || "h265" in text || "x265" in text -> "hevc"
             "h264" in text || "x264" in text -> "h264"
             else -> ""
-        }
-        if (context.preferredVideoCodec?.equals(codec, ignoreCase = true) == true) score += 15
+        })
+        if (normalizeCodec(context.preferredVideoCodec) == codec && codec.isNotEmpty()) score += 15
         score += when (codec) {
-            "av1", "hevc", "h265", "x265" -> 5
-            "h264", "x264" -> 3
+            "av1", "hevc" -> 5
+            "h264" -> 3
             else -> 0
         }
 
@@ -166,6 +170,13 @@ object SmartStreamSelector {
                 "hlg" in normalized -> add("hlg")
             }
         }
+    }
+
+    private fun normalizeCodec(codec: String?): String = when (codec?.trim()?.lowercase()) {
+        "hevc", "h265", "x265" -> "hevc"
+        "h264", "avc", "x264" -> "h264"
+        "av1" -> "av1"
+        else -> ""
     }
 
     private fun resolutionHeight(value: String): Int {
