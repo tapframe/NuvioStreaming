@@ -21,13 +21,17 @@ import com.nuvio.app.features.trakt.shouldUseTraktMoreLikeThis
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
@@ -46,6 +50,8 @@ object MetaDetailsRepository {
     val uiState: StateFlow<MetaDetailsUiState> = _uiState.asStateFlow()
     private var activeRequestKey: String? = null
     private val cachedMetaByRequestKey = mutableMapOf<String, CachedMetaEntry>()
+    private val inFlightBaseMeta = mutableMapOf<String, Deferred<Pair<MetaDetails, String>?>>()
+    private val inFlightMutex = Mutex()
 
     fun load(type: String, id: String) {
         log.d { "load() called — type=$type id=$id" }
@@ -92,8 +98,9 @@ object MetaDetailsRepository {
                         settingsFingerprint = metaScreenSettingsFingerprint,
                     )
                 }
-                _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
-                activeRequestKey = requestKey
+                if (activeRequestKey == requestKey) {
+                    _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
+                }
             }
             return
         }
@@ -113,67 +120,27 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState(isLoading = true)
 
         scope.launch {
-            val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-            val candidates = findReadyMetaCandidates(type = type, id = metaLookupId)
-
-            if (candidates.isEmpty()) {
-                val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
-                if (tmdbMeta != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = tmdbMeta,
-                        fallbackItemId = id,
-                        fallbackItemType = type,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+            val baseResult = fetchBaseMeta(type, id)
+            if (baseResult == null) {
+                log.w { "Failed to load meta for type=$type id=$id" }
+                if (activeRequestKey == requestKey) {
+                    _uiState.value = MetaDetailsUiState(
+                        errorMessage = getString(Res.string.details_load_failed_all_addons),
                     )
-                    return@launch
+                    activeRequestKey = null
                 }
-
-                log.w { "No addon provides meta for type=$type id=$id" }
-                _uiState.value = MetaDetailsUiState(
-                    errorMessage = getString(Res.string.details_no_addon_meta),
-                )
-                activeRequestKey = null
                 return@launch
             }
 
-            for (candidate in candidates) {
-                val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-                    withContext(Dispatchers.Default) {
-                        tryFetchMeta(candidate.manifest, candidate.candidateType, metaLookupId, includeMdbList = false)
-                    }
-                }
-                if (result != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = result,
-                        fallbackItemId = metaLookupId,
-                        fallbackItemType = candidate.candidateType,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-            }
-
-            val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
-            if (tmdbMeta != null) {
-                publishLoadedMeta(
-                    requestKey = requestKey,
-                    meta = tmdbMeta,
-                    fallbackItemId = id,
-                    fallbackItemType = type,
-                    mdbListSettings = mdbListSettings,
-                    metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                )
-                return@launch
-            }
-
-            _uiState.value = MetaDetailsUiState(
-                errorMessage = getString(Res.string.details_load_failed_all_addons),
+            val (baseMeta, candidateType) = baseResult
+            publishLoadedMeta(
+                requestKey = requestKey,
+                meta = baseMeta,
+                fallbackItemId = id,
+                fallbackItemType = candidateType,
+                mdbListSettings = mdbListSettings,
+                metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
             )
-            activeRequestKey = null
         }
     }
 
@@ -192,6 +159,8 @@ object MetaDetailsRepository {
     fun clear() {
         activeRequestKey = null
         cachedMetaByRequestKey.clear()
+        inFlightBaseMeta.values.forEach { it.cancel() }
+        inFlightBaseMeta.clear()
         _uiState.value = MetaDetailsUiState()
     }
 
@@ -199,26 +168,55 @@ object MetaDetailsRepository {
         val requestKey = "$type:$id"
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
-        val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-        val candidates = findReadyMetaCandidates(type = type, id = metaLookupId)
+        val baseResult = fetchBaseMeta(type, id) ?: return null
+        val (baseMeta, _) = baseResult
+        if (cacheResult) {
+            cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = baseMeta)
+        }
+        return baseMeta
+    }
 
-        for (candidate in candidates) {
-            val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-                tryFetchMeta(candidate.manifest, candidate.candidateType, metaLookupId, includeMdbList = false)
-            }
-            if (result != null) {
-                if (cacheResult) {
-                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+    private suspend fun fetchBaseMeta(
+        type: String,
+        id: String,
+    ): Pair<MetaDetails, String>? {
+        val requestKey = "$type:$id"
+        val deferred = inFlightMutex.withLock {
+            inFlightBaseMeta.getOrPut(requestKey) {
+                scope.async(Dispatchers.Default) {
+                    try {
+                        val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
+                        val candidates = findReadyMetaCandidates(type = type, id = metaLookupId)
+
+                        for (candidate in candidates) {
+                            val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
+                                tryFetchMeta(
+                                    manifest = candidate.manifest,
+                                    type = candidate.candidateType,
+                                    id = metaLookupId,
+                                    includeMdbList = false,
+                                )
+                            }
+                            if (result != null) {
+                                return@async result to candidate.candidateType
+                            }
+                        }
+
+                        val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
+                        if (tmdbMeta != null) {
+                            return@async tmdbMeta to type
+                        }
+
+                        null
+                    } finally {
+                        inFlightMutex.withLock {
+                            inFlightBaseMeta.remove(requestKey)
+                        }
+                    }
                 }
-                return result
             }
         }
-
-        return tryFetchTmdbFallbackMeta(type = type, id = id)?.also { result ->
-            if (cacheResult) {
-                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
-            }
-        }
+        return deferred.await()
     }
 
     private const val FETCH_TIMEOUT_MS = 5_000L
@@ -423,7 +421,6 @@ object MetaDetailsRepository {
         }
     }
 
-
     private fun com.nuvio.app.features.addons.AddonsUiState.hasPendingEnabledAddonManifests(): Boolean =
         addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
 
@@ -463,15 +460,21 @@ object MetaDetailsRepository {
         cachedMetaByRequestKey[requestKey] = cachedEntry
 
         if (!shouldEnrichForMetaScreen(meta, fallbackItemId, mdbListSettings)) {
-            _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter())
-            activeRequestKey = requestKey
+            if (activeRequestKey == requestKey) {
+                _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter())
+            }
             return
         }
 
-        _uiState.value = MetaDetailsUiState(
-            isLoading = true,
-            meta = meta,
-        )
+        // Emit immediately with TMDB-enriched meta (hero/logo/poster/backdrop are already final
+        // from tryFetchMeta, so no layout shift occurs here — matching Desktop behaviour)
+        if (activeRequestKey == requestKey) {
+            _uiState.value = MetaDetailsUiState(
+                isLoading = true,
+                meta = meta.withUnreleasedFilter(),
+            )
+        }
+
         val enrichedMeta = withContext(Dispatchers.Default) {
             enrichForMetaScreen(
                 requestKey = requestKey,
@@ -486,8 +489,9 @@ object MetaDetailsRepository {
             metaScreenMeta = enrichedMeta,
             metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
         )
-        _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
-        activeRequestKey = requestKey
+        if (activeRequestKey == requestKey) {
+            _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
+        }
     }
 
     private suspend fun enrichForMetaScreen(
@@ -505,6 +509,7 @@ object MetaDetailsRepository {
                 settings = settings,
             )
         } ?: meta
+
         val enrichedMeta = applyMoreLikeThisSource(
             meta = mdbListEnrichedMeta,
             fallbackItemId = fallbackItemId,
