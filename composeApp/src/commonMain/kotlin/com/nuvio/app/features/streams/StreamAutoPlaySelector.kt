@@ -12,7 +12,7 @@ object StreamAutoPlaySelector {
 
         val addonRankByName = HashMap<String, Int>(installedOrder.size)
         installedOrder.forEachIndexed { index, addonName ->
-            if (addonName !in addonRankByName) addonRankByName[index] = index
+            if (addonName !in addonRankByName) addonRankByName[addonName] = index
         }
 
         val (directDebridEntries, remainingEntries) = groups.partition { group ->
@@ -124,10 +124,7 @@ object StreamAutoPlaySelector {
             preferredReadyStream?.let(::add)
             rankedReadyStreams.filterNot { it == preferredReadyStream }.forEach(::add)
         }
-        return StreamAutoPlayEvaluation(
-            stream = readyStreams.firstOrNull(),
-            readyStreams = readyStreams,
-        )
+        return StreamAutoPlayEvaluation(stream = readyStreams.firstOrNull(), readyStreams = readyStreams)
     }
 
     private fun StreamItem.isAutoPlayable(debridEnabled: Boolean, activeResolverProviderId: String?): Boolean =
