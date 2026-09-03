@@ -171,11 +171,18 @@ object StreamAutoPlaySelector {
         }
         if (matchingStreams.isEmpty() && preferredReadyStream == null) return StreamAutoPlayEvaluation()
 
+        val rankingContext = if (mode == StreamAutoPlayMode.REGEX_MATCH) {
+            smartSelectionContext.copy(
+                preferredStreamTerms = extractOrderedRegexPreferences(regexPattern)
+            )
+        } else {
+            smartSelectionContext
+        }
         val rankedReadyStreams = SmartStreamSelector.rank(
             matchingStreams.filter { stream ->
                 stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
             },
-            smartSelectionContext,
+            rankingContext,
         )
         val readyStreams = buildList {
             preferredReadyStream?.let(::add)
@@ -197,6 +204,22 @@ object StreamAutoPlaySelector {
                 it.isPendingDebridAutoPlay(debridEnabled, activeResolverProviderId)
             },
         )
+    }
+
+    /**
+     * Preserves the common Regex preference form `(DV|HDR)` by treating the
+     * alternatives from left to right as explicit priority. More complex
+     * regexes remain filters; they are not guessed as preferences.
+     */
+    private fun extractOrderedRegexPreferences(pattern: String): List<String> {
+        val groups = Regex("\\((?:\\?:)?([^()]+\\|[^()]+)\\)")
+            .findAll(pattern)
+            .flatMap { it.groupValues[1].split("|").asSequence() }
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filter { !it.contains('\\') && !it.contains('[') && !it.contains(']') }
+            .toList()
+        return groups
     }
 
     private fun StreamItem.isAutoPlayable(
