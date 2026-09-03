@@ -112,8 +112,9 @@ object SmartStreamSelector {
                 requiredKbps <= bandwidthKbps * 60 / 100 -> 35
                 requiredKbps <= bandwidthKbps * 75 / 100 -> 20
                 requiredKbps <= bandwidthKbps * 90 / 100 -> 5
-                requiredKbps <= bandwidthKbps -> -30
-                else -> -100
+                requiredKbps <= bandwidthKbps -> 0
+                requiredKbps <= bandwidthKbps * 125 / 100 -> -15
+                else -> -60
             }
         }
 
@@ -169,11 +170,12 @@ object SmartStreamSelector {
 
     private fun resolutionHeight(value: String): Int {
         val normalized = value.lowercase()
-        val match = Regex("(?:^|\\D)(2160|1440|1080|720|576|540|480|360)p?(?:\\D|$)").find(normalized)
+        val match = Regex("(?:^|\\D)(4320|2160|1440|1080|720|576|540|480|360)p?(?:\\D|$)").find(normalized)
         if (match != null) return match.groupValues[1].toInt()
         return when {
+            "8k" in normalized -> 4320
             "4k" in normalized || "uhd" in normalized -> 2160
-            "2k" in normalized -> 1440
+            "2k" in normalized || "qhd" in normalized -> 1440
             else -> 0
         }
     }
