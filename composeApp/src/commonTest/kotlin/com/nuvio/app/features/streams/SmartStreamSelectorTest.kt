@@ -69,7 +69,7 @@ class SmartStreamSelectorTest {
     }
 
     @Test
-    fun `allows a slightly oversized stream to compete`() {
+    fun `keeps a stream at the bandwidth limit eligible`() {
         fun stream(name: String, resolution: String, size: Long) = StreamItem(
             name = name,
             url = "https://cdn.example.com/$name.mkv",
@@ -84,12 +84,12 @@ class SmartStreamSelectorTest {
                 )
             )
         )
-        val oversized = stream("1080p", "1080p", 75_000_000)
-        val lower = stream("720p", "720p", 45_000_000)
+        val higherQuality = stream("2160p", "2160p", 75_000_000)
+        val lowerQuality = stream("1080p", "1080p", 67_500_000)
         assertEquals(
-            oversized,
+            higherQuality,
             SmartStreamSelector.rank(
-                listOf(lower, oversized),
+                listOf(lowerQuality, higherQuality),
                 SmartStreamSelector.Context(estimatedBandwidthKbps = 1_000)
             ).first()
         )
