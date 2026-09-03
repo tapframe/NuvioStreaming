@@ -207,12 +207,12 @@ object StreamAutoPlaySelector {
     }
 
     /**
-     * Preserves the common Regex preference form `(DV|HDR)` by treating the
-     * alternatives from left to right as explicit priority. More complex
-     * regexes remain filters; they are not guessed as preferences.
+     * Preserves common Regex preference forms such as `(DV|HDR|ATMOS)` by
+     * treating alternatives from left to right as explicit priority.
+     * More complex regexes remain filters; they are not guessed as preferences.
      */
     private fun extractOrderedRegexPreferences(pattern: String): List<String> {
-        val groups = Regex("\\((?:\\?:)?([^()]+\\|[^()]+)\\)")
+        val groups = Regex("\\((?:\\?:)?([^()]+(?:\\|[^()]+)+)\\)")
             .findAll(pattern)
             .flatMap { it.groupValues[1].split("|").asSequence() }
             .map { it.trim() }
