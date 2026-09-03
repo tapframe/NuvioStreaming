@@ -45,7 +45,7 @@ object StreamAutoPlaySelector {
         bingeGroupOnly: Boolean = false,
         debridEnabled: Boolean = true,
         activeResolverProviderId: String? = null,
-        smartSelectionContext: SmartStreamSelector.Context = SmartStreamSelector.Context(),
+        smartSelectionContext: SmartStreamSelector.Context? = null,
     ): StreamItem? =
         evaluateAutoPlayStream(
             streams = streams,
@@ -76,9 +76,11 @@ object StreamAutoPlaySelector {
         bingeGroupOnly: Boolean = false,
         debridEnabled: Boolean = true,
         activeResolverProviderId: String? = null,
-        smartSelectionContext: SmartStreamSelector.Context = SmartStreamSelector.Context(),
+        smartSelectionContext: SmartStreamSelector.Context? = null,
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
+
+        val selectionContext = smartSelectionContext ?: SmartStreamSelector.currentContext()
 
         val sourceScopedStreams = when (source) {
             StreamAutoPlaySource.ALL_SOURCES -> streams
@@ -108,7 +110,7 @@ object StreamAutoPlaySelector {
             bingeGroupCandidates.filter { stream ->
                 stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
             },
-            smartSelectionContext,
+            selectionContext,
         ).firstOrNull()
         if (bingeGroupOnly) {
             val readyStreams = preferredReadyStream?.let(::listOf).orEmpty()
@@ -172,11 +174,11 @@ object StreamAutoPlaySelector {
         if (matchingStreams.isEmpty() && preferredReadyStream == null) return StreamAutoPlayEvaluation()
 
         val rankingContext = if (mode == StreamAutoPlayMode.REGEX_MATCH) {
-            smartSelectionContext.copy(
+            selectionContext.copy(
                 preferredStreamTerms = extractOrderedRegexPreferences(regexPattern)
             )
         } else {
-            smartSelectionContext
+            selectionContext
         }
         val rankedReadyStreams = SmartStreamSelector.rank(
             matchingStreams.filter { stream ->
