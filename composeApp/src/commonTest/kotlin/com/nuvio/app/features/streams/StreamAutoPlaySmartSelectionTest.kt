@@ -36,6 +36,38 @@ class StreamAutoPlaySmartSelectionTest {
     }
 
     @Test
+    fun `regex ordered alternatives support more than two preferences`() {
+        fun stream(name: String, resolution: String) = StreamItem(
+            name = name,
+            url = "https://cdn.example.com/$name.mkv",
+            addonName = "Test",
+            addonId = "addon.test",
+            clientResolve = StreamClientResolve(
+                stream = StreamClientResolveStream(
+                    raw = StreamClientResolveRaw(
+                        parsed = StreamClientResolveParsed(resolution = resolution)
+                    )
+                )
+            )
+        )
+        val atmos = stream("ATMOS 2160p", "2160p")
+        val hdr = stream("HDR 1080p", "1080p")
+        val dv = stream("DV 720p", "720p")
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(atmos, hdr, dv),
+            mode = StreamAutoPlayMode.REGEX_MATCH,
+            regexPattern = "(DV|HDR|ATMOS)",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = emptySet(),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertEquals(dv, selected)
+    }
+
+    @Test
     fun `manual mode remains unselected`() {
         val stream = StreamItem(
             name = "1080p",
