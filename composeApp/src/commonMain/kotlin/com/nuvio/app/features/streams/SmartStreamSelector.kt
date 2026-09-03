@@ -13,15 +13,23 @@ object SmartStreamSelector {
         val displayWidth: Int? = null,
         val displayHeight: Int? = null,
         val supportsHdr: Boolean = false,
+        val supportedHdrTypes: Set<String> = emptySet(),
         val dataSaver: Boolean = false,
         val preferredVideoCodec: String? = null,
         val preferredAudioLanguage: String? = null,
         val preferredStreamTerms: List<String> = emptyList(),
     )
 
+    private var platformContextProvider: (() -> Context)? = null
+
+    @Synchronized
+    fun setPlatformContextProvider(provider: (() -> Context)?) {
+        platformContextProvider = provider
+    }
+
     fun rank(
         streams: List<StreamItem>,
-        context: Context = Context(),
+        context: Context = platformContextProvider?.invoke() ?: Context(),
     ): List<StreamItem> = streams
         .withIndex()
         .sortedWith(
@@ -109,10 +117,16 @@ object SmartStreamSelector {
             }
         }
 
-        val hdr = parsed?.hdr.orEmpty().any { it.isNotBlank() } ||
+        val hdrTypes = hdrTypes(parsed?.hdr.orEmpty(), text)
+        val hdr = hdrTypes.isNotEmpty() ||
             listOf("dolby vision", "dolbyvision", "hdr10", "hdr10+", "hlg").any { it in text }
         score += if (hdr) {
-            if (context.supportsHdr) 20 else -25
+            when {
+                context.supportedHdrTypes.isNotEmpty() &&
+                    hdrTypes.any { it in context.supportedHdrTypes } -> 20
+                context.supportsHdr -> 20
+                else -> -25
+            }
         } else 5
 
         val codec = parsed?.codec?.lowercase() ?: when {
@@ -139,6 +153,18 @@ object SmartStreamSelector {
         if (stream.behaviorHints.notWebReady) score -= 15
 
         return score
+    }
+
+    private fun hdrTypes(parsedHdr: List<String>, text: String): Set<String> = buildSet {
+        (parsedHdr + text).forEach { value ->
+            val normalized = value.lowercase()
+            when {
+                "dolby vision" in normalized || "dolbyvision" in normalized || " dv" in " $normalized" -> add("dolbyvision")
+                "hdr10+" in normalized || "hdr10plus" in normalized -> add("hdr10+")
+                "hdr10" in normalized -> add("hdr10")
+                "hlg" in normalized -> add("hlg")
+            }
+        }
     }
 
     private fun resolutionHeight(value: String): Int {
