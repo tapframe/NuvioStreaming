@@ -408,6 +408,7 @@
     <string name="settings_homescreen_display_name">Εμφανιζόμενο όνομα</string>
     <string name="settings_homescreen_empty_message">Εγκαταστήστε ένα πρόσθετο με καταλόγους συμβατούς με πίνακα για να διαμορφώσετε τις γραμμές αρχικής οθόνης.</string>
     <string name="settings_homescreen_empty_title">Δεν υπάρχουν κατάλογοι αρχικής</string>
+    <string name="settings_homescreen_load_failed_title">Αδυναμία φόρτωσης καταλόγων αρχικής</string>
     <string name="settings_homescreen_hero_source">Πηγή hero</string>
     <string name="settings_homescreen_hidden">Κρυφό</string>
     <string name="settings_homescreen_keep_home_focused">Διατήρηση εστίασης στην Αρχική</string>
@@ -955,6 +956,7 @@
     <string name="app_exit_title">Έξοδος από εφαρμογή</string>
     <string name="catalog_empty_message">Αυτός ο κατάλογος δεν επέστρεψε κανένα στοιχείο.</string>
     <string name="catalog_empty_title">Δεν βρέθηκαν τίτλοι</string>
+    <string name="catalog_load_failed_title">Αδυναμία φόρτωσης αυτού του καταλόγου</string>
     <string name="details_check_connection">Ελέγξτε τη σύνδεση Wi-Fi ή κινητών δεδομένων και δοκιμάστε ξανά.</string>
     <string name="details_director">Σκηνοθέτης</string>
     <string name="details_failed_to_load">Αποτυχία φόρτωσης</string>
@@ -992,6 +994,7 @@
     <string name="home_empty_no_active_addons_message">Εγκαταστήστε και επικυρώστε τουλάχιστον ένα πρόσθετο πριν φορτώσετε γραμμές καταλόγου στην Αρχική.</string>
     <string name="home_empty_no_rows_message">Τα εγκατεστημένα πρόσθετα δεν παρέχουν αυτή τη στιγμή καταλόγους συμβατούς με πίνακα χωρίς απαιτούμενα extras.</string>
     <string name="home_empty_no_rows_title">Δεν υπάρχουν διαθέσιμες γραμμές αρχικής</string>
+    <string name="home_load_failed_title">Αδυναμία φόρτωσης αρχικής</string>
     <string name="home_view_details">Προβολή λεπτομερειών</string>
     <string name="meta_section_actions_description">Έλεγχοι αναπαραγωγής και αποθήκευσης.</string>
     <string name="meta_section_actions_title">Ενέργειες</string>
@@ -1326,6 +1329,8 @@
     <string name="cloud_library_load_failed">Δεν ήταν δυνατή η φόρτωση της βιβλιοθήκης Cloud %1$s</string>
     <string name="cloud_library_no_files_message">Αυτό το στοιχείο δεν εκθέτει ένα αναπαίξιμο αρχείο βίντεο.</string>
     <string name="cloud_library_no_files_title">Δεν υπάρχουν αναπαίξιμα αρχεία</string>
+    <string name="cloud_library_no_matches_message">Κανένα αναπαίξιμο αρχείο Cloud δεν ταιριάζει με τα τρέχοντα φίλτρα.</string>
+    <string name="cloud_library_no_matches_title">Δεν υπάρχουν αντίστοιχα αρχεία</string>
     <string name="cloud_library_no_playable_files">Δεν υπάρχουν αναπαίξιμα αρχεία</string>
     <string name="cloud_library_play_disabled">Η βιβλιοθήκη Cloud είναι απενεργοποιημένη.</string>
     <string name="cloud_library_play_failed">Δεν ήταν δυνατή η αναπαραγωγή αυτού του αρχείου Cloud.</string>
