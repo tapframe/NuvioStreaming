@@ -25,6 +25,23 @@ class SmartStreamSelectorTest {
     }
 
     @Test
+    fun `recognizes common resolution variants`() {
+        fun stream(name: String) = StreamItem(
+            name = name,
+            url = "https://cdn.example.com/$name.mkv",
+            addonName = "Test",
+            addonId = "addon.test",
+        )
+        val qhd = stream("QHD")
+        val uhd = stream("4K UHD")
+        val eightK = stream("8K")
+        assertEquals(
+            listOf(eightK, uhd, qhd),
+            SmartStreamSelector.rank(listOf(qhd, eightK, uhd)),
+        )
+    }
+
+    @Test
     fun `uses bandwidth to avoid an oversized stream`() {
         fun stream(name: String, resolution: String, size: Long) = StreamItem(
             name = name,
@@ -46,6 +63,33 @@ class SmartStreamSelectorTest {
             low,
             SmartStreamSelector.rank(
                 listOf(high, low),
+                SmartStreamSelector.Context(estimatedBandwidthKbps = 1_000)
+            ).first()
+        )
+    }
+
+    @Test
+    fun `allows a slightly oversized stream to compete`() {
+        fun stream(name: String, resolution: String, size: Long) = StreamItem(
+            name = name,
+            url = "https://cdn.example.com/$name.mkv",
+            addonName = "Test",
+            addonId = "addon.test",
+            behaviorHints = StreamBehaviorHints(videoSize = size),
+            clientResolve = StreamClientResolve(
+                stream = StreamClientResolveStream(
+                    raw = StreamClientResolveRaw(
+                        parsed = StreamClientResolveParsed(resolution = resolution, duration = 600)
+                    )
+                )
+            )
+        )
+        val oversized = stream("1080p", "1080p", 75_000_000)
+        val lower = stream("720p", "720p", 45_000_000)
+        assertEquals(
+            oversized,
+            SmartStreamSelector.rank(
+                listOf(lower, oversized),
                 SmartStreamSelector.Context(estimatedBandwidthKbps = 1_000)
             ).first()
         )
