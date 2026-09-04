@@ -11,7 +11,9 @@ import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.streams.StreamItem
+import com.nuvio.app.features.streams.StreamLaunchStore
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
+import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import kotlinx.coroutines.launch
@@ -203,6 +205,7 @@ internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
         pendingP2pSwitch = PendingPlayerP2pSwitch(stream = stream, episode = episode, isAutoPlay = isAutoPlay)
         return
     }
+    val episodeStreamsSnapshot = PlayerStreamsRepository.episodeStreamsState.value
     resetEpisodePanelAndNextEpisodeState()
     flushWatchProgress()
     stopActiveP2pStream()
@@ -223,7 +226,7 @@ internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
     activeTorrentFileIdx = stream.p2pFileIdx
     activeTorrentFilename = stream.behaviorHints.filename
     activeTorrentTrackers = stream.p2pTrackers
-    applyEpisodeStreamMetadata(stream, episode, resume)
+    applyEpisodeStreamMetadata(stream, episode, resume, episodeStreamsSnapshot)
 }
 
 internal fun PlayerScreenRuntime.switchToSource(stream: StreamItem) {
@@ -306,6 +309,7 @@ internal fun PlayerScreenRuntime.switchToEpisodeStream(stream: StreamItem, episo
     }
     if (openExternalSourceUrl(stream)) return
     val url = stream.playableDirectUrl ?: return
+    val episodeStreamsSnapshot = PlayerStreamsRepository.episodeStreamsState.value
     resetEpisodePanelAndNextEpisodeState()
     flushWatchProgress()
     stopActiveP2pStream()
@@ -319,7 +323,7 @@ internal fun PlayerScreenRuntime.switchToEpisodeStream(stream: StreamItem, episo
     activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
     activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
     activeStreamType = stream.streamType
-    applyEpisodeStreamMetadata(stream, episode, resume)
+    applyEpisodeStreamMetadata(stream, episode, resume, episodeStreamsSnapshot)
 }
 
 internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: DownloadItem, episode: MetaVideo) {
@@ -369,6 +373,7 @@ internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: Downloa
     activeInitialPositionMs = epResumePositionMs
     activeInitialProgressFraction = epResumeFraction
     controlsVisible = true
+    updateStreamReturnEpisode(episode = episode, videoId = resolvedVideoId)
 }
 
 internal fun PlayerScreenRuntime.playNextEpisode() {
@@ -461,6 +466,7 @@ private fun PlayerScreenRuntime.applyEpisodeStreamMetadata(
     stream: StreamItem,
     episode: MetaVideo,
     resume: EpisodeResume,
+    episodeStreamsSnapshot: StreamsUiState,
 ) {
     activeSourceIdentityKey = stream.playerSourceIdentityKey()
     activeStreamTitle = stream.streamLabel
@@ -477,6 +483,29 @@ private fun PlayerScreenRuntime.applyEpisodeStreamMetadata(
     activeInitialPositionMs = resume.positionMs
     activeInitialProgressFraction = resume.fraction
     controlsVisible = true
+    updateStreamReturnEpisode(
+        episode = episode,
+        videoId = episode.id,
+        streamsSnapshot = episodeStreamsSnapshot,
+    )
+}
+
+private fun PlayerScreenRuntime.updateStreamReturnEpisode(
+    episode: MetaVideo,
+    videoId: String,
+    streamsSnapshot: StreamsUiState? = null,
+) {
+    val streamLaunchId = args.streamLaunchId ?: return
+    StreamLaunchStore.updateEpisode(
+        launchId = streamLaunchId,
+        videoId = videoId,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
+        episodeTitle = episode.title,
+        episodeThumbnail = episode.thumbnail,
+        pauseDescription = episode.overview,
+        streamsSnapshot = streamsSnapshot,
+    )
 }
 
 private fun PlayerScreenRuntime.saveDirectStreamForReuse(
