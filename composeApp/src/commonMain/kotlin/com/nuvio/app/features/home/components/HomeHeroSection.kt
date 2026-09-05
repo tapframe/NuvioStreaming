@@ -142,8 +142,6 @@ fun HomeHeroSection(
                 }
             }
         }
-        val heroScrollScale = heroBackgroundScrollScale(scrollOffsetPx)
-        val heroScrollTranslationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
         val currentPage = pagerState.currentPage.coerceIn(items.indices)
         val visiblePages = listOf(
             currentPage,
@@ -201,11 +199,13 @@ fun HomeHeroSection(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
+                                    val offset = scrollOffsetPx
+                                    val scrollScale = heroBackgroundScrollScale(offset)
                                     alpha = layer.visibility
                                     translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                    translationY = heroScrollTranslationY
-                                    scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
-                                    scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
+                                    translationY = heroBackgroundScrollTranslationY(offset)
+                                    scaleX = HERO_BACKGROUND_SCALE * scrollScale
+                                    scaleY = HERO_BACKGROUND_SCALE * scrollScale
                                 },
                             alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
                             contentScale = ContentScale.Crop,

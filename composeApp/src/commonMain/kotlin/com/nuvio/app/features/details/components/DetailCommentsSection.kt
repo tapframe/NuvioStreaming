@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -275,6 +276,7 @@ private fun CommentChip(text: String) {
 
 @Composable
 private fun LoadingCommentCard() {
+    val color = MaterialTheme.colorScheme.onSurface
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.15f,
@@ -296,7 +298,7 @@ private fun LoadingCommentCard() {
                 .width(cardWidth)
                 .height(cardHeight)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)),
+                .drawBehind { drawRect(color.copy(alpha = alpha)) },
         )
     }
 }
