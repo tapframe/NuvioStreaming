@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.addons.AddonsUiState
+import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsUiState
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.features.details.MetaVideo
@@ -162,6 +163,7 @@ internal class PlayerScreenRuntime(
     var submitIntroEndTimeStr by mutableStateOf("00:00")
     var episodeStreamsPanelState by mutableStateOf(EpisodeStreamsPanelState())
     var playerMetaVideos by mutableStateOf<List<MetaVideo>>(emptyList())
+    var playerMeta by mutableStateOf<MetaDetails?>(null)
     var skipIntervals by mutableStateOf<List<SkipInterval>>(emptyList())
     var activeSkipInterval by mutableStateOf<SkipInterval?>(null)
     var skipIntervalDismissed by mutableStateOf(false)
@@ -190,7 +192,9 @@ internal class PlayerScreenRuntime(
     var selectedAddonSubtitleId by mutableStateOf<String?>(null)
     var useCustomSubtitles by mutableStateOf(false)
     var preferredAudioSelectionApplied by mutableStateOf(false)
+    var appliedAudioPreferences: AppliedAudioPreferences? = null
     var preferredSubtitleSelectionApplied by mutableStateOf(false)
+    var isUserExplicitAudioSelection by mutableStateOf(false)
     var isUserExplicitSubtitleSelection by mutableStateOf(false)
     var hasScannedTextTracksOnce by mutableStateOf(false)
     var autoFetchedAddonSubtitlesForKey by mutableStateOf<String?>(null)

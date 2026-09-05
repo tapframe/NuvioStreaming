@@ -63,7 +63,9 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
         autoFetchedAddonSubtitlesForKey = null
         trackPreferenceRestoreApplied = false
         preferredAudioSelectionApplied = false
+        appliedAudioPreferences = null
         preferredSubtitleSelectionApplied = false
+        isUserExplicitAudioSelection = false
         isUserExplicitSubtitleSelection = false
         hasScannedTextTracksOnce = false
     }

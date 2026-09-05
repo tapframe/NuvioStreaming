@@ -163,6 +163,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 },
                 onSnapshot = { snapshot ->
                     playbackSnapshot = snapshot
+                    refreshAudioTracksIfChanged()
                     if (!snapshot.isLoading) initialLoadCompleted = true
                     if (snapshot.isEnded) {
                         shouldPlay = false
