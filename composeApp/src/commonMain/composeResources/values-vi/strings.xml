@@ -52,13 +52,13 @@
     <string name="addons_appstore_install_button">Thêm tiện ích</string>
     <string name="store_empty_unavailable_title">Chưa có gì ở đây</string>
     <string name="store_empty_unavailable_message">Các tiện ích hiện tại của bạn không có gì để hiển thị ở đây.</string>
-    <string name="addons_empty_subtitle">Thêm URL bản khai dữ liệu của tiện ích để Nuvio bắt đầu tải danh mục, siêu dữ liệu, luồng phát hoặc phụ đề.</string>
+    <string name="addons_empty_subtitle">Thêm URL tệp kê khai của tiện ích để Nuvio bắt đầu tải danh mục, siêu dữ liệu, luồng phát hoặc phụ đề.</string>
     <string name="addons_empty_title">Chưa cài đặt tiện ích nào</string>
     <string name="addons_error_enter_url">Nhập URL tiện ích</string>
     <string name="addons_input_placeholder">URL tiện ích</string>
     <string name="addons_install_button">Cài đặt tiện ích</string>
-    <string name="addons_loading_manifest_details">Đang tải bản khai dữ liệu…</string>
-    <string name="addons_modal_checking_message">Đang xác minh bản khai dữ liệu và tải chi tiết tiện ích trước khi cài đặt</string>
+    <string name="addons_loading_manifest_details">Đang tải tệp kê khai…</string>
+    <string name="addons_modal_checking_message">Đang xác minh tệp kê khai và tải chi tiết tiện ích trước khi cài đặt</string>
     <string name="addons_modal_checking_title">Đang kiểm tra tiện ích</string>
     <string name="addons_modal_failure_title">Cài đặt thất bại</string>
     <string name="addons_modal_success_message">%1$s đã được xác minh và cài đặt thành công</string>
@@ -1231,7 +1231,7 @@
     <string name="settings_trakt_save_actions_description">Đồng bộ danh sách muốn xem, tiến độ xem, tiếp tục xem, nhật ký phát lại và danh sách cá nhân với Trakt.</string>
     <string name="settings_trakt_sign_in_description">Đồng bộ danh sách muốn xem, tiến độ xem, tiếp tục xem, nhật ký phát lại và danh sách cá nhân với Trakt.</string>
     <string name="settings_tracking_data_sources">Nguồn</string>
-    <string name="settings_tracking_features">SOURCE PREFERENCES</string>
+    <string name="settings_tracking_features">TÙY CHỌN NGUỒN</string>
     <string name="settings_tracking_viewing_discovery">Tính năng Trakt</string>
     <string name="settings_tracking_services">Tài khoản</string>
     <string name="settings_tracking_approval_redirect">Sau khi được phê duyệt, bạn sẽ được tự động chuyển hướng trở lại.</string>
@@ -1621,7 +1621,7 @@
     <string name="updates_title_status">Trạng thái cập nhật</string>
     <string name="addon_already_installed">Tiện ích này đã được cài đặt</string>
     <string name="addon_invalid_url">Nhập URL tiện ích hợp lệ</string>
-    <string name="addon_load_manifest_failed">Không thể tải bản khai dữ liệu</string>
+    <string name="addon_load_manifest_failed">Không thể tải tệp kê khai</string>
     <string name="app_brand_name">Nuvio</string>
     <string name="auth_account_deletion_failed">Xóa tài khoản thất bại</string>
     <string name="auth_sign_in_failed">Đăng nhập thất bại</string>
@@ -2050,7 +2050,7 @@
     <string name="cloud_library_playback_disabled">Thư viện đám mây đang tắt</string>
     <!-- IntroDB settings -->
     <string name="settings_playback_introdb_invalid_api_key">Khóa API không hợp lệ hoặc không thể kết nối</string>
-    <string name="addons_manifest_missing_field">Bản khai dữ liệu thiếu \"%1$s\"</string>
+    <string name="addons_manifest_missing_field">Tệp kê khai thiếu \"%1$s\"</string>
     <string name="collections_editor_tmdb_collection_title_format">Bộ sưu tập TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">Đạo diễn TMDB %1$s</string>
     <string name="collections_editor_tmdb_discover_title">Khám phá TMDB</string>
@@ -2126,13 +2126,13 @@
     <string name="plugins_error_unavailable_build">Phiên bản này không hỗ trợ trình mở rộng</string>
     <string name="plugins_group_by_repo_desc">Trong danh sách nguồn phát, hiển thị một nhà cung cấp cho mỗi kho lưu trữ thay vì từng nguồn</string>
     <string name="plugins_group_by_repo_title">Nhóm các nhà cung cấp theo kho lưu trữ</string>
-    <string name="plugins_input_manifest_placeholder">URL bản khai dữ liệu của trình mở rộng</string>
-    <string name="plugins_manifest_error_name_missing">Tên bản khai dữ liệu bị thiếu</string>
-    <string name="plugins_manifest_error_no_providers">Bản khai dữ liệu chưa có nhà cung cấp</string>
-    <string name="plugins_manifest_error_version_missing">Bản khai dữ liệu bị thiếu phiên bản</string>
-    <string name="plugins_manifest_name_missing">Tên bản khai dữ liệu bị thiếu</string>
-    <string name="plugins_manifest_no_providers">Bản khai dữ liệu chưa có nhà cung cấp</string>
-    <string name="plugins_manifest_version_missing">Bản khai dữ liệu bị thiếu phiên bản</string>
+    <string name="plugins_input_manifest_placeholder">URL tệp kê khai của trình mở rộng</string>
+    <string name="plugins_manifest_error_name_missing">Tên tệp kê khai bị thiếu</string>
+    <string name="plugins_manifest_error_no_providers">Tệp kê khai chưa có nhà cung cấp</string>
+    <string name="plugins_manifest_error_version_missing">Tệp kê khai bị thiếu phiên bản</string>
+    <string name="plugins_manifest_name_missing">Tên tệp kê khai bị thiếu</string>
+    <string name="plugins_manifest_no_providers">Tệp kê khai chưa có nhà cung cấp</string>
+    <string name="plugins_manifest_version_missing">Tệp kê khai bị thiếu phiên bản</string>
     <string name="plugins_message_installed">Đã cài đặt %1$s</string>
     <string name="plugins_provider_disabled_by_repo">Đã bị tắt bởi kho lưu trữ</string>
     <string name="plugins_provider_no_description">Không có mô tả</string>
