@@ -14,11 +14,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import io.github.alexzhirkevich.compottie.Compottie
-import io.github.alexzhirkevich.compottie.LottieCompositionSpec
 import io.github.alexzhirkevich.compottie.animateLottieCompositionAsState
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
-import nuvio.composeapp.generated.resources.Res
 
 @Composable
 fun NuvioLoadingIndicator(
@@ -31,9 +29,7 @@ fun NuvioLoadingIndicator(
         contentAlignment = Alignment.Center,
     ) {
         val composition by rememberLottieComposition {
-            LottieCompositionSpec.JsonString(
-                Res.readBytes("files/nuvio_loading_indicator.json").decodeToString()
-            )
+            ResourceLottieCompositionSpec("files/nuvio_loading_indicator.json")
         }
         val progress by animateLottieCompositionAsState(
             composition = composition,

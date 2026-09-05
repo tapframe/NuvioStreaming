@@ -1,11 +1,6 @@
 package com.nuvio.app.features.library
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -47,6 +42,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +72,8 @@ import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.ScopedDisintegrationTracker
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import com.nuvio.app.core.ui.rememberShimmerBrush
+import com.nuvio.app.core.ui.shimmerBackground
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryItemType
@@ -1141,31 +1138,15 @@ private fun CloudLibrarySkeletonRow(
 }
 
 @Composable
-private fun rememberCloudLibrarySkeletonBrush(): Brush {
-    val shimmerColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+private fun rememberCloudLibrarySkeletonBrush(): State<Brush> =
+    rememberShimmerBrush(
+        baseColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+        highlightColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
     )
-    val transition = rememberInfiniteTransition()
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-    )
-    return Brush.linearGradient(
-        colors = shimmerColors,
-        start = Offset(translateAnim - 200f, 0f),
-        end = Offset(translateAnim, 0f),
-    )
-}
 
 @Composable
 private fun CloudSkeletonBlock(
-    brush: Brush,
+    brush: State<Brush>,
     modifier: Modifier = Modifier,
     width: Dp? = null,
     height: Dp,
@@ -1179,7 +1160,7 @@ private fun CloudSkeletonBlock(
     Box(
         modifier = sizeModifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(brush),
+            .shimmerBackground(brush),
     )
 }
 
