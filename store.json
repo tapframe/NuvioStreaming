@@ -20,6 +20,16 @@
       "category": "entertainment",
       "versions": [
         {
+          "version": "0.4.14",
+          "buildVersion": "118",
+          "date": "2026-09-05T10:55:58Z",
+          "localizedDescription": "- 4f79bfe0 fix(player): original audio language preference @tapframe  \r\n- 9b09045f fix(player): allow minimum device brightness @tapframe  \r\n- [use Android User-Agent so IPTV DASH streams do not 403 (#1863)](https://github.com/NuvioMedia/NuvioMobile/pull/1863) @halibiram  \r\n- [feat: updated Spanish string resource file for application localization (#1861)](https://github.com/NuvioMedia/NuvioMobile/pull/1861) @IberianSoldierPC  \r\n- 92466c4e fix(player): align mobile control icons with tv @tapframe  \r\n- [i18n(el): translate delayed addon content state strings (#1851)](https://github.com/NuvioMedia/NuvioMobile/pull/1851) @nosvasedis  \r\n- 58864ec1 fix(streams): honor autoplay source loading scope @tapframe  \r\n- [Updated BG translation and fixes with later versiond (#1838)](https://github.com/NuvioMedia/NuvioMobile/pull/1838) @viiktr  \r\n- 4026ec92 fix(player): persist next episode dismissal @tapframe  \r\n- [Use Simkl for anime ID resolution in skip-intro (replaces ARM) (#1836)](https://github.com/NuvioMedia/NuvioMobile/pull/1836) @skoruppa  \r\n- 22096a1e fix(details): map addon specials season posters @tapframe  \r\n- [fix(details): optimize large vertical episode lists (#1835)](https://github.com/NuvioMedia/NuvioMobile/pull/1835) @ThePunpun  \r\n- 802db48d fix(updater): apply theme gradient to download progress @tapframe  \r\n- [fix(player): keep subtitle picker stable for duplicate tracks (#1800)](https://github.com/NuvioMedia/NuvioMobile/pull/1800) @halibiram  \r\n",
+          "downloadURL": "https://github.com/NuvioMedia/NuvioMobile/releases/download/0.4.14/nuvio-0.4.14-full-release.ipa",
+          "size": 51787331,
+          "sha256": "969974f82a0a2ebe84354bccda98b364701d4651c97cbccbb737e86c5280cea9",
+          "minOSVersion": "16.1"
+        },
+        {
           "version": "0.4.13",
           "buildVersion": "117",
           "date": "2026-08-30T19:02:51Z",
