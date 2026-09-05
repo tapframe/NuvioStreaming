@@ -316,7 +316,7 @@ kotlin {
         }
         minSdk = libs.versions.android.minSdk.get().toInt()
         androidResources.enable = true
-        withHostTest {}
+        withHostTest { isIncludeAndroidResources = true }
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
@@ -432,6 +432,10 @@ kotlin {
             }
         }
         val androidHostTest by getting {
+            dependencies {
+                implementation("org.robolectric:robolectric:4.16")
+                implementation("com.squareup.okhttp3:mockwebserver:5.3.2")
+            }
             if (androidDistribution == "full") {
                 kotlin.srcDir(project.file("src/androidFullHostTest/kotlin"))
             }
