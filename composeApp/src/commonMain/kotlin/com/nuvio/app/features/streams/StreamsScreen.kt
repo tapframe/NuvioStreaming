@@ -91,6 +91,7 @@ import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.watchedItemKeys
 import com.nuvio.app.navigation.LocalUseNativeNavigation
@@ -176,28 +177,14 @@ fun StreamsScreen(
     } else {
         episodeProgress
     }
-    val storedProgressFraction = storedProgress
-        ?.takeIf { it.isResumable }
-        ?.progressPercent
-        ?.takeIf { it > 0f }
-        ?.let { explicitPercent -> (explicitPercent / 100f).coerceIn(0f, 1f) }
-    val effectiveResumeProgressFraction = if (startFromBeginning) {
-        null
-    } else {
-        resumeProgressFraction
-        ?.takeIf { it > 0f }
-        ?.coerceIn(0f, 1f)
-        ?: storedProgressFraction
-    }
-    val effectiveResumePositionMs = if (effectiveResumeProgressFraction != null) {
-        null
-    } else {
-        if (startFromBeginning) {
-            null
-        } else {
-            (resumePositionMs ?: storedProgress?.takeIf { it.isResumable }?.lastPositionMs)?.takeIf { it > 0L }
-        }
-    }
+    val resumeState = resolveStreamResumeState(
+        progress = episodeProgress,
+        initialPositionMs = resumePositionMs,
+        initialProgressFraction = resumeProgressFraction,
+        startFromBeginning = startFromBeginning,
+    )
+    val effectiveResumePositionMs = resumeState.positionMs
+    val effectiveResumeProgressFraction = resumeState.progressFraction
 
     LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection) {
         StreamsRepository.load(
@@ -575,6 +562,25 @@ private fun MobileStreamsLayout(
             }
         }
     }
+}
+
+internal data class StreamResumeState(
+    val positionMs: Long? = null,
+    val progressFraction: Float? = null,
+)
+
+internal fun resolveStreamResumeState(
+    progress: WatchProgressEntry?,
+    initialPositionMs: Long?,
+    initialProgressFraction: Float?,
+    startFromBeginning: Boolean,
+): StreamResumeState {
+    if (startFromBeginning || progress?.isResumable == false) return StreamResumeState()
+    val fraction = (if (progress != null) progress.progressPercent?.div(100f) else initialProgressFraction)
+        ?.takeIf { it > 0f }?.coerceIn(0f, 1f)
+    val position = if (fraction != null) null
+        else (progress?.lastPositionMs ?: initialPositionMs)?.takeIf { it > 0L }
+    return StreamResumeState(positionMs = position, progressFraction = fraction)
 }
 
 @Composable
