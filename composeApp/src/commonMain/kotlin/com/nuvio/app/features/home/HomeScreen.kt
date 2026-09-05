@@ -1,5 +1,7 @@
 package com.nuvio.app.features.home
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -903,28 +905,34 @@ fun HomeScreen(
         ) {
             if (showHeroSlot) {
                 item(key = "home_hero", contentType = "hero") {
-                    when {
-                        showHeroSkeleton -> HomeSkeletonHero(
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                        )
+                    Crossfade(
+                        targetState = showHeroSkeleton,
+                        animationSpec = tween(320),
+                        label = "HomeHeroLoading",
+                    ) { isLoading ->
+                        when {
+                            isLoading -> HomeSkeletonHero(
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                            )
 
-                        homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                            items = homeUiState.heroItems,
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                            listState = homeListState,
-                            stretchPx = { heroStretchState.stretchPx },
-                            onItemClick = onPosterClick,
-                        )
+                            homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
+                                items = homeUiState.heroItems,
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                listState = homeListState,
+                                stretchPx = { heroStretchState.stretchPx },
+                                onItemClick = onPosterClick,
+                            )
 
-                        else -> HomeHeroReservedSpace(
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                        )
+                            else -> HomeHeroReservedSpace(
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                            )
+                        }
                     }
                 }
             }
@@ -950,7 +958,7 @@ fun HomeScreen(
                         contentType = { "skeleton" },
                     ) {
                         HomeSkeletonRow(
-                            modifier = Modifier.padding(horizontal = 16.dp),
+                            horizontalPadding = homeSectionPadding,
                         )
                     }
                 }

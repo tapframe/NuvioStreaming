@@ -210,7 +210,8 @@ fun NuvioTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = NuvioTypography,
-            content = content,
-        )
+        ) {
+            SkeletonAnimationProvider(content = content)
+        }
     }
 }

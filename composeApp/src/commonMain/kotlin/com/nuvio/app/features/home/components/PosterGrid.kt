@@ -27,6 +27,7 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
+import com.nuvio.app.core.ui.SkeletonPoster
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -93,12 +94,10 @@ internal fun PosterGridSkeletonRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         repeat(columns) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(0.68f)
-                    .clip(RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp))
-                    .background(MaterialTheme.colorScheme.surface),
+            SkeletonPoster(
+                modifier = Modifier.weight(1f),
+                cornerRadius = posterCardStyle.cornerRadiusDp.dp,
+                showLabels = !posterCardStyle.hideLabelsEnabled,
             )
         }
     }

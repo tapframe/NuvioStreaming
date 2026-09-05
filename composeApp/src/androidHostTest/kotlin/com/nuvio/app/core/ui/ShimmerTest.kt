@@ -8,9 +8,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
@@ -20,18 +17,22 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ShimmerTest {
     @Test
-    fun `animation changes the brush without recomposing its consumer and follows theme changes`() = runBlocking {
+    fun `skeletons share continuous progress without recomposition and stop when removed`() = runBlocking {
         val frameClock = BroadcastFrameClock()
         val recomposer = Recomposer(coroutineContext + frameClock)
         val composition = Composition(EmptyApplier(), recomposer)
         val runner = launch(frameClock) { recomposer.runRecomposeAndApplyChanges() }
-        val baseColor = mutableStateOf(Color.DarkGray)
-        lateinit var brush: State<Brush>
+        val showLoading = mutableStateOf(true)
+        val showSecond = mutableStateOf(false)
+        lateinit var progress: State<Float>
+        lateinit var secondProgress: State<Float>
         var compositions = 0
 
         suspend fun frame(millis: Long) {
@@ -45,31 +46,53 @@ class ShimmerTest {
 
         try {
             composition.setContent {
-                brush = rememberShimmerBrush(baseColor.value, Color.LightGray)
-                SideEffect { compositions++ }
+                SkeletonAnimationProvider {
+                    if (showLoading.value) {
+                        progress = rememberSkeletonProgress()
+                        SideEffect { compositions++ }
+                        if (showSecond.value) {
+                            secondProgress = rememberSkeletonProgress()
+                        }
+                    }
+                }
             }
             frame(0)
-            val initialBrush = brush.value
+            frame(16)
+            frame(32)
+            val initialProgress = progress.value
             val initialCompositions = compositions
 
             frame(300)
             frame(600)
 
-            assertNotEquals(initialBrush, brush.value)
+            assertNotEquals(initialProgress, progress.value)
             assertEquals(initialCompositions, compositions)
 
-            baseColor.value = Color.Blue
-            frame(600)
+            showSecond.value = true
+            frame(700)
+            frame(716)
 
-            assertEquals(initialCompositions + 1, compositions)
-            assertEquals(
-                Brush.linearGradient(
-                    colors = listOf(Color.Blue, Color.LightGray, Color.Blue),
-                    start = Offset(300f, 0f),
-                    end = Offset(500f, 0f),
-                ),
-                brush.value,
-            )
+            assertSame(progress, secondProgress)
+            assertTrue(secondProgress.value > 0f)
+
+            showLoading.value = false
+            frame(800)
+            frame(816)
+            val stoppedProgress = progress.value
+            frame(1200)
+            frame(1600)
+
+            assertEquals(stoppedProgress, progress.value)
+
+            showLoading.value = true
+            frame(1700)
+            frame(1716)
+            frame(1732)
+            val restartedProgress = progress.value
+            frame(2000)
+
+            assertNotEquals(restartedProgress, progress.value)
+            assertSame(progress, secondProgress)
         } finally {
             composition.dispose()
             recomposer.cancel()
