@@ -704,7 +704,7 @@ private fun ExoPlayerSurface(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             playerViewRef?.releaseLibassOverlay()
-            exoPlayer.release()
+            exoPlayer.releaseWithAssSupportCompat()
         }
     }
 
