@@ -20,7 +20,7 @@ internal actual object PlatformMdbListAuthPersistence : MdbListAuthPersistence {
             val result = alloc<CFTypeRefVar>()
             val status = SecItemCopyMatching(query, result.ptr)
             if (status == errSecItemNotFound) return@memScoped null
-            check(status == errSecSuccess) { "Unable to read protected credentials" }
+            check(status == errSecSuccess) { "Unable to read protected credentials (OSStatus $status)" }
             val data: CFDataRef = result.value?.reinterpret() ?: return@memScoped null
             try {
                 val bytes = CFDataGetBytePtr(data) ?: return@memScoped null
@@ -46,9 +46,10 @@ internal actual object PlatformMdbListAuthPersistence : MdbListAuthPersistence {
                 if (update == errSecItemNotFound) {
                     CFDictionarySetValue(query, kSecValueData, data)
                     CFDictionarySetValue(query, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
-                    check(SecItemAdd(query, null) == errSecSuccess) { "Unable to save protected credentials" }
+                    val added = SecItemAdd(query, null)
+                    check(added == errSecSuccess) { "Unable to save protected credentials (OSStatus $added)" }
                 } else {
-                    check(update == errSecSuccess) { "Unable to update protected credentials" }
+                    check(update == errSecSuccess) { "Unable to update protected credentials (OSStatus $update)" }
                 }
             } finally {
                 CFRelease(attributes)
@@ -60,11 +61,11 @@ internal actual object PlatformMdbListAuthPersistence : MdbListAuthPersistence {
     actual override fun clear() = query(null) { checkDelete(SecItemDelete(it)) }
 
     private fun checkDelete(status: Int) {
-        check(status == errSecSuccess || status == errSecItemNotFound) { "Unable to clear protected credentials" }
+        check(status == errSecSuccess || status == errSecItemNotFound) { "Unable to clear protected credentials (OSStatus $status)" }
     }
 
     private fun dictionary(): CFMutableDictionaryRef =
-        CFDictionaryCreateMutable(null, 0L, null, null) ?: error("Unable to create credential query")
+        CFDictionaryCreateMutable(null, 0L, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr) ?: error("Unable to create credential query")
 
     private inline fun <T> query(profileId: Int?, block: (CFMutableDictionaryRef) -> T): T {
         val service = CFStringCreateWithCString(null, "com.nuvio.media.mdblist", kCFStringEncodingUTF8)

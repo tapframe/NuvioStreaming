@@ -8,6 +8,7 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import java.util.Properties
 
@@ -397,6 +398,14 @@ kotlin {
                     "-framework", "SystemConfiguration",
                     "-framework", "CoreFoundation",
                 )
+            }
+        }
+
+        if (iosTarget.name == "iosSimulatorArm64") {
+            val testEntitlements = project.file("src/iosTest/resources/keychain-test.entitlements")
+            iosTarget.binaries.withType<TestExecutable>().configureEach {
+                linkerOpts("-sectcreate", "__TEXT", "__entitlements", testEntitlements.absolutePath)
+                linkTaskProvider.configure { inputs.file(testEntitlements) }
             }
         }
     }
