@@ -107,6 +107,19 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
             )
         }
 
+        outDir.resolve("com/nuvio/app/features/mdblist").apply {
+            mkdirs()
+            resolve("MdbListConfig.kt").writeText(
+                """
+                |package com.nuvio.app.features.mdblist
+                |
+                |object MdbListConfig {
+                |    const val CLIENT_ID = "${props.getProperty("MDBLIST_CLIENT_ID", "kMMZyv8qithmUSF5102U6HTAPEDqfHtNbn1W4gkz")}"
+                |}
+                """.trimMargin()
+            )
+        }
+
         outDir.resolve("com/nuvio/app/features/player/skip").apply {
             mkdirs()
             resolve("IntroDbConfig.kt").writeText(
@@ -481,6 +494,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.kotlinx.coroutines.get()}")
         }
     }
 }
