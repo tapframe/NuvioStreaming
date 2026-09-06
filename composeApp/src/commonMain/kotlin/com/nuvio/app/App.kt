@@ -92,7 +92,9 @@ internal fun AppEnvironment(content: @Composable () -> Unit) {
         ThemeSettingsRepository.amoledEnabled
     }.collectAsStateWithLifecycle()
 
-    NuvioTheme(appTheme = selectedTheme, amoled = amoledEnabled) {
+    val customThemeColors by ThemeSettingsRepository.customThemeColors.collectAsStateWithLifecycle()
+
+    NuvioTheme(appTheme = selectedTheme, amoled = amoledEnabled, customThemeColors = customThemeColors) {
         content()
     }
 }

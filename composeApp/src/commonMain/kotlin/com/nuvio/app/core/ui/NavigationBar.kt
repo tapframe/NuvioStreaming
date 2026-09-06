@@ -221,7 +221,7 @@ private class NuvioNavigationBarScopeImpl(
         label: String?,
     ) {
         val tokens = MaterialTheme.nuvio
-        val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+        val palette = MaterialTheme.themePalette
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
@@ -271,7 +271,7 @@ private class NuvioNavigationBarScopeImpl(
         label: String?,
     ) {
         val tokens = MaterialTheme.nuvio
-        val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+        val palette = MaterialTheme.themePalette
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
@@ -421,7 +421,7 @@ private class NuvioClassicNavigationBarScopeImpl(
         label: String?,
     ) {
         val tokens = MaterialTheme.nuvio
-        val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+        val palette = MaterialTheme.themePalette
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "classic_nav_icon_color",
@@ -459,7 +459,7 @@ private class NuvioClassicNavigationBarScopeImpl(
         label: String?,
     ) {
         val tokens = MaterialTheme.nuvio
-        val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+        val palette = MaterialTheme.themePalette
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "classic_nav_icon_color",

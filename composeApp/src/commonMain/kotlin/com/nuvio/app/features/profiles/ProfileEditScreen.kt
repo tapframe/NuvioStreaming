@@ -52,9 +52,8 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
-import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.core.ui.accentBrush
-import com.nuvio.app.core.ui.appTheme
 import com.nuvio.app.features.membership.CosmeticEntitlement
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.ProfileBackgroundRepository
@@ -547,7 +546,7 @@ private fun AvatarChoiceItem(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+    val palette = MaterialTheme.themePalette
     Box(
         modifier = Modifier
             .size(size)

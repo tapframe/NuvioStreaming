@@ -173,6 +173,7 @@ object ProfileSettingsSync {
     private fun observeLocalChangesAndPush() {
         val signatureFlows = listOf(
             ThemeSettingsRepository.selectedThemePreference.map { "theme" },
+            ThemeSettingsRepository.customThemeColors.map { "custom_theme_colors" },
             ThemeSettingsRepository.amoledEnabled.map { "amoled" },
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.map { "liquid_glass_tab_bar" },
             ThemeSettingsRepository.navBarStyle.map { "nav_bar_style" },

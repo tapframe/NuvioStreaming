@@ -56,9 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.AppIconResource
 import com.nuvio.app.core.ui.NuvioBackButton
-import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.core.ui.accentBrush
-import com.nuvio.app.core.ui.appTheme
 import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.gradientMask
 import com.nuvio.app.core.ui.nuvioTypeScale
@@ -591,7 +590,7 @@ private fun ProgressControls(
 
 @Composable
 private fun PlayerProgressTrack(sliderState: SliderState) {
-    val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+    val palette = MaterialTheme.themePalette
     val inactiveTrackColors = SliderDefaults.colors(
         activeTrackColor = Color.Transparent,
         disabledActiveTrackColor = Color.Transparent,
