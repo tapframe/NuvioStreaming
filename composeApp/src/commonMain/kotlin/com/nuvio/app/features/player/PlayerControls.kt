@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Lock
@@ -92,6 +93,7 @@ internal fun PlayerControlsShell(
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
     onOpenInExternalPlayer: (() -> Unit)? = null,
+    onCastClick: (() -> Unit)? = null,
     onSubmitIntroClick: (() -> Unit)? = null,
     parentalWarnings: List<ParentalWarning> = emptyList(),
     showParentalGuide: Boolean = false,
@@ -154,6 +156,7 @@ internal fun PlayerControlsShell(
                 onLockToggle = onLockToggle,
                 onVideoSettingsClick = onVideoSettingsClick,
                 onOpenInExternalPlayer = onOpenInExternalPlayer,
+                onCastClick = onCastClick,
                 onBack = onBack,
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -222,6 +225,7 @@ private fun PlayerHeader(
     onLockToggle: () -> Unit,
     onVideoSettingsClick: (() -> Unit)?,
     onOpenInExternalPlayer: (() -> Unit)?,
+    onCastClick: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -328,6 +332,15 @@ private fun PlayerHeader(
                             buttonSize = metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onOpenInExternalPlayer,
+                        )
+                    }
+                    if (onCastClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.Cast,
+                            contentDescription = stringResource(Res.string.cast_action),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onCastClick,
                         )
                     }
                     PlayerHeaderIconButton(

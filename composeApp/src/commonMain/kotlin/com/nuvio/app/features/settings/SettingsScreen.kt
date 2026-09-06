@@ -688,6 +688,7 @@ private fun MobileSettingsScreen(
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
                             onContentDiscoveryClick = { onPageChange(SettingsPage.ContentDiscovery) },
                             onIntegrationsClick = { onPageChange(SettingsPage.Integrations) },
+                            onCastClick = { onPageChange(SettingsPage.Cast) },
                             onTrackingClick = { onPageChange(SettingsPage.TraktAuthentication) },
                             onSupportersContributorsClick = onSupportersContributorsClick,
                             onLicensesAttributionsClick = onLicensesAttributionsClick,
@@ -828,6 +829,9 @@ private fun MobileSettingsScreen(
                     settingsUiState = trackingSettingsUiState,
                     commentsEnabled = traktCommentsEnabled,
                     onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                )
+                SettingsPage.Cast -> castSettingsContent(
+                    isTablet = false,
                 )
             }
         }
@@ -1108,6 +1112,7 @@ private fun TabletSettingsScreen(
                                 onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
                                 onContentDiscoveryClick = { openInlinePage(SettingsPage.ContentDiscovery) },
                                 onIntegrationsClick = { openInlinePage(SettingsPage.Integrations) },
+                                onCastClick = { openInlinePage(SettingsPage.Cast) },
                                 onTrackingClick = { openInlinePage(SettingsPage.TraktAuthentication) },
                                 onSupportersContributorsClick = { openInlinePage(SettingsPage.SupportersContributors) },
                                 onLicensesAttributionsClick = { openInlinePage(SettingsPage.LicensesAttributions) },
@@ -1252,6 +1257,9 @@ private fun TabletSettingsScreen(
                         settingsUiState = trackingSettingsUiState,
                         commentsEnabled = traktCommentsEnabled,
                         onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                    )
+                    SettingsPage.Cast -> castSettingsContent(
+                        isTablet = true,
                     )
                 }
             }
