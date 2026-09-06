@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import com.nuvio.app.core.build.AppFeaturePolicy
 import kotlinx.coroutines.CancellationException
 
 class DownloadsTransferWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
@@ -17,11 +18,13 @@ class DownloadsTransferWorker(context: Context, parameters: WorkerParameters) : 
         if (!scheduler.isActive(transfer)) return Result.success()
         DownloadsLiveStatusPlatform.initialize(applicationContext)
         try {
-            setForeground(ForegroundInfo(
-                DownloadsLiveStatusPlatform.notificationId(transfer.item.id),
-                DownloadsLiveStatusPlatform.buildNotification(applicationContext, transfer.item),
-                if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
-            ))
+            if (AppFeaturePolicy.downloadForegroundServiceEnabled) {
+                setForeground(ForegroundInfo(
+                    DownloadsLiveStatusPlatform.notificationId(transfer.item.id),
+                    DownloadsLiveStatusPlatform.buildNotification(applicationContext, transfer.item),
+                    if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
+                ))
+            }
             val retry = scheduler.execute(transfer) { DownloadsLiveStatusPlatform.notifyTransfer(it.item) }
             scheduler.notifyCurrent(fileName)
             return if (retry) Result.retry() else Result.success()
