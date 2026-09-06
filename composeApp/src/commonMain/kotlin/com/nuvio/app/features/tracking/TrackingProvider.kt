@@ -17,7 +17,8 @@ enum class TrackingProviderId(
     val storageId: String,
 ) {
     TRAKT("trakt"),
-    SIMKL("simkl");
+    SIMKL("simkl"),
+    MDBLIST("mdblist");
 
     companion object {
         fun fromStorage(value: String?): TrackingProviderId? =

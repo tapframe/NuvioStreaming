@@ -21,6 +21,8 @@ data class TrackingLibraryTab(
     val selectionGroup: String? = null,
     val supportedContentTypes: Set<String>? = null,
     val isMembershipDestination: Boolean = true,
+    val description: String? = null,
+    val privacy: LibraryListPrivacy? = null,
 )
 
 fun TrackingLibraryTab.supportsContentType(contentType: String): Boolean =
@@ -78,6 +80,8 @@ enum class TrackingRefreshIntent {
  */
 interface TrackingLibraryProvider {
     val providerId: TrackingProviderId
+    val listManager: TrackingListManager?
+        get() = null
     val changes: Flow<Unit>
     val connectionRefreshIntent: TrackingRefreshIntent
 

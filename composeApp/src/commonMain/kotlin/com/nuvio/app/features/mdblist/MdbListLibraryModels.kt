@@ -1,5 +1,9 @@
 package com.nuvio.app.features.mdblist
 
+import com.nuvio.app.features.tracking.LibraryListPrivacy
+import com.nuvio.app.features.tracking.TrackingLibraryTab
+import com.nuvio.app.features.tracking.TrackingLibraryTabKind
+import com.nuvio.app.features.tracking.TrackingProviderId
 import kotlinx.serialization.Serializable
 
 internal const val MDBLIST_WATCHLIST_KEY = "mdblist:watchlist"
@@ -16,6 +20,19 @@ data class MdbListLibraryList(
 ) {
     val key: String get() = "$MDBLIST_LIST_KEY_PREFIX$id"
 
+    fun tab() = TrackingLibraryTab(
+        key = key,
+        title = name,
+        kind = TrackingLibraryTabKind.PERSONAL,
+        privacy = if (private) LibraryListPrivacy.PRIVATE else LibraryListPrivacy.PUBLIC,
+        description = description,
+        providerId = TrackingProviderId.MDBLIST,
+        supportedContentTypes = when (mediaType) {
+            MdbListItemType.MOVIE -> setOf("movie")
+            MdbListItemType.SHOW -> setOf("series")
+            else -> setOf("movie", "series")
+        }
+    )
 }
 
 @Serializable
@@ -37,4 +54,10 @@ data class MdbListLibrarySnapshot(
     val itemsByList: Map<String, List<MdbListLibraryItem>> = emptyMap(),
     val checkedAtEpochMs: Long? = null,
     val invalidated: Boolean = false
-)
+) {
+    fun tabs(): List<TrackingLibraryTab> = listOf(
+        TrackingLibraryTab(
+            MDBLIST_WATCHLIST_KEY, "Watchlist", TrackingProviderId.MDBLIST, TrackingLibraryTabKind.WATCHLIST, supportedContentTypes = setOf("movie", "series")
+        )
+    ) + lists.map(MdbListLibraryList::tab)
+}
