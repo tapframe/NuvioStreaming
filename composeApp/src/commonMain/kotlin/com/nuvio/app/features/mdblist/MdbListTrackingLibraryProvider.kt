@@ -21,15 +21,8 @@ class MdbListTrackingLibraryProvider(
     override fun prepare() = library.prepare()
     override suspend fun refresh(intent: TrackingRefreshIntent) = library.refresh(intent)
     override fun snapshot() = library.snapshot()
-    override fun contains(contentId: String, contentType: String?): Boolean =
-        snapshot().items.any { item ->
-            (contentId == item.id || contentId == item.imdbId || contentId == item.tmdbId?.let { "tmdb:$it" }) &&
-                (contentType == null || mdbListLibraryType(item.type) == mdbListLibraryType(contentType))
-        }
-
-    override fun find(contentId: String): LibraryItem? = snapshot().items.firstOrNull { item ->
-        contentId == item.id || contentId == item.imdbId || contentId == item.tmdbId?.let { "tmdb:$it" }
-    }
+    override fun contains(contentId: String, contentType: String?): Boolean = library.find(contentId, contentType) != null
+    override fun find(contentId: String): LibraryItem? = library.find(contentId)
 
     override suspend fun membership(item: LibraryItem) = library.getMembershipSnapshot(item)
 

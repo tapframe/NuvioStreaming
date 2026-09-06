@@ -6,6 +6,9 @@ import com.nuvio.app.features.tracking.TrackingLibraryTabKind
 import com.nuvio.app.features.tracking.TrackingProviderId
 import kotlinx.serialization.Serializable
 
+private val movieContentTypes = setOf("movie")
+private val showContentTypes = setOf("series", "show", "tv", "anime")
+
 internal const val MDBLIST_WATCHLIST_KEY = "mdblist:watchlist"
 internal const val MDBLIST_LIST_KEY_PREFIX = "mdblist:list:"
 
@@ -28,9 +31,9 @@ data class MdbListLibraryList(
         description = description,
         providerId = TrackingProviderId.MDBLIST,
         supportedContentTypes = when (mediaType) {
-            MdbListItemType.MOVIE -> setOf("movie")
-            MdbListItemType.SHOW -> setOf("series")
-            else -> setOf("movie", "series")
+            MdbListItemType.MOVIE -> movieContentTypes
+            MdbListItemType.SHOW -> showContentTypes
+            else -> movieContentTypes + showContentTypes
         }
     )
 }
@@ -57,7 +60,7 @@ data class MdbListLibrarySnapshot(
 ) {
     fun tabs(): List<TrackingLibraryTab> = listOf(
         TrackingLibraryTab(
-            MDBLIST_WATCHLIST_KEY, "Watchlist", TrackingProviderId.MDBLIST, TrackingLibraryTabKind.WATCHLIST, supportedContentTypes = setOf("movie", "series")
+            MDBLIST_WATCHLIST_KEY, "Watchlist", TrackingProviderId.MDBLIST, TrackingLibraryTabKind.WATCHLIST, supportedContentTypes = movieContentTypes + showContentTypes
         )
     ) + lists.map(MdbListLibraryList::tab)
 }

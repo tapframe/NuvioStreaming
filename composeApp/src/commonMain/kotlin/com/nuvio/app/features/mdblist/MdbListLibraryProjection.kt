@@ -4,6 +4,8 @@ import com.nuvio.app.features.library.LibraryItem
 
 internal class MdbListLibraryProjection(snapshot: MdbListLibrarySnapshot) {
     val entries: List<LibraryItem>
+    private val identities = mutableMapOf<Pair<MdbListItemType, String>, String>()
+    private val entriesByIdentity: Map<String, LibraryItem>
     private val memberships = mutableMapOf<Pair<MdbListItemType, String>, Set<String>>()
 
     init {
@@ -39,10 +41,20 @@ internal class MdbListLibraryProjection(snapshot: MdbListLibrarySnapshot) {
                     trackingProviderItemId = media.ids.mdblist,
                     trackingSourceUrl = media.sourceUrl(item.type)
                 )
-                media.ids.aliases().forEach { alias -> memberships[item.type to alias] = listKeys }
+                media.ids.aliases().forEach { alias ->
+                    memberships[item.type to alias] = listKeys
+                    identities[item.type to alias] = key
+                }
             }
         }
+        entriesByIdentity = combined
         entries = combined.values.toList()
+    }
+
+    fun find(id: String, type: String? = null): LibraryItem? {
+        val types = if (type == null) listOf(MdbListItemType.MOVIE, MdbListItemType.SHOW)
+            else listOfNotNull(mdbListLibraryType(type))
+        return types.firstNotNullOfOrNull { mediaType -> identities[mediaType to id]?.let(entriesByIdentity::get) }
     }
 
     fun membership(id: String, type: String): Set<String> = memberships[mdbListLibraryType(type) to id].orEmpty()

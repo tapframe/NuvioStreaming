@@ -5,8 +5,6 @@ import com.nuvio.app.features.tracking.TrackingProgressSnapshot
 import com.nuvio.app.features.tracking.TrackingProviderId
 import com.nuvio.app.features.tracking.TrackingRefreshIntent
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
-import kotlinx.coroutines.runBlocking
-import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 
@@ -36,7 +34,7 @@ class MdbListTrackingProgressProvider(
             entries = projection.progress + projection.nextUpSeeds,
             hiddenContentIds = projection.hiddenContentIds,
             hasLoadedRemoteProgress = state?.hasLoaded == true,
-            errorMessage = state?.error?.let { runBlocking { getString(it.messageResource()) } },
+            errorMessage = state?.error?.localizedMdbListMessage(),
         )
     }
 

@@ -98,7 +98,7 @@ fun LibraryListManagementDialog(
                     }
                     if (state.mode != LibraryListDialogMode.MANAGE) Button(onClick = onSubmit,
                         enabled = !state.isPending && (state.mode == LibraryListDialogMode.DELETE || state.name.isNotBlank())) {
-                        Text(stringResource(when { state.isPending -> Res.string.action_saving; state.mode == LibraryListDialogMode.DELETE -> Res.string.library_list_delete_action; else -> Res.string.action_save }))
+                        Text(stringResource(when { state.isPending && state.mode == LibraryListDialogMode.EDIT -> Res.string.action_saving; state.mode == LibraryListDialogMode.DELETE -> Res.string.library_list_delete_action; else -> Res.string.action_save }))
                     }
                 }
             }

@@ -16,8 +16,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import org.jetbrains.compose.resources.getString
 
 class MdbListLibraryService(
     private val api: MdbListApiClient,
@@ -60,8 +58,14 @@ class MdbListLibraryService(
             },
             hasLoaded = library != null || status?.error != null,
             isLoading = status?.refreshing == true,
-            errorMessage = status?.error?.let { runBlocking { getString(it.mdbListMessageResource()) } },
+            errorMessage = status?.error?.localizedMdbListMessage(),
         )
+    }
+
+    fun find(contentId: String, contentType: String? = null): LibraryItem? {
+        if (runCatching { sync.currentScope() }.isFailure) return null
+        val snapshot = sync.currentSnapshot()?.library ?: return null
+        return MdbListLibraryProjection(snapshot).find(contentId, contentType)
     }
 
     fun observeMembership(id: String, type: String) = projection.map { it.membership(id, type) }.distinctUntilChanged()

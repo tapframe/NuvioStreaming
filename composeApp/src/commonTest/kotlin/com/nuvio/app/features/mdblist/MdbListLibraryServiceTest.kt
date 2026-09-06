@@ -34,8 +34,10 @@ class MdbListLibraryServiceTest {
         h.storage.failLoad = true
         val service = h.libraryService(backgroundScope)
         service.refresh(TrackingRefreshIntent.AUTOMATIC)
-        expectMdbListFailure<java.io.IOException> { service.refresh(TrackingRefreshIntent.USER_INITIATED) }
+        expectMdbListFailure<kotlinx.io.IOException> { service.refresh(TrackingRefreshIntent.USER_INITIATED) }
         assertFalse(service.isRefreshing.first())
+        assertTrue(service.snapshot().hasLoaded)
+        assertEquals("Could not sync with MDBList. Please try again.", service.snapshot().errorMessage)
         assertTrue(h.http.engine.requests.isEmpty())
     }
 

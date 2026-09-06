@@ -1,6 +1,7 @@
 package com.nuvio.app.features.mdblist
 
 import com.nuvio.app.features.tracking.LibraryListPrivacy
+import com.nuvio.app.features.tracking.supportsContentType
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,7 +26,9 @@ class MdbListLibraryDecoderTest {
         val lists = decodeMdbListLibraryLists(rows.joinToString(",", "[", "]"), 42)
         assertEquals(listOf(1L, 2L), lists.map { it.id })
         assertEquals(setOf("movie"), lists[0].tab().supportedContentTypes)
-        assertEquals(setOf("movie", "series"), lists[1].tab().supportedContentTypes)
+        assertTrue(listOf("movie", "series", "show", "anime", "tv").all(lists[1].tab()::supportsContentType))
+        assertFalse(lists[0].tab().supportsContentType("anime"))
+        assertFalse(lists[1].tab().supportsContentType("episode"))
         assertEquals(LibraryListPrivacy.PUBLIC, lists[0].tab().privacy)
         assertEquals(LibraryListPrivacy.PRIVATE, lists[1].tab().privacy)
     }
@@ -90,7 +93,7 @@ class MdbListLibraryDecoderTest {
     @Test
     fun `projection merges aliases across lists while preserving per-list order and movie show identity`() {
         val movie = MdbListLibraryItem(MdbListItemType.MOVIE, MdbListMedia(MdbListIds(tmdb = 1), "Movie"), rank = 4)
-        val aliased = movie.copy(media = movie.media.copy(ids = MdbListIds("tt1", 1, mdblist = "a1")), rank = 8)
+        val aliased = movie.copy(media = movie.media.copy(ids = MdbListIds("tt1", 1, tvdb = 3, trakt = 4, mdblist = "a1")), rank = 8)
         val show = movie.copy(type = MdbListItemType.SHOW, media = movie.media.copy(title = "Show"))
         val projection = MdbListLibraryProjection(MdbListLibrarySnapshot(itemsByList = mapOf(
             MDBLIST_WATCHLIST_KEY to listOf(movie, show), MDBLIST_TEST_LIST_KEY to listOf(aliased)
@@ -100,10 +103,13 @@ class MdbListLibraryDecoderTest {
         assertEquals("tt1", entry.id)
         assertEquals("a1", entry.trackingProviderItemId)
         assertEquals(mapOf(MDBLIST_WATCHLIST_KEY to 4, MDBLIST_TEST_LIST_KEY to 8), entry.listRanks)
-        for (alias in listOf("tt1", "imdb:tt1", "tmdb:1", "mdblist:a1")) {
+        for (alias in listOf("tt1", "imdb:tt1", "tmdb:1", "tvdb:3", "trakt:4", "mdblist:a1")) {
             assertEquals(setOf(MDBLIST_WATCHLIST_KEY, MDBLIST_TEST_LIST_KEY), projection.membership(alias, "movie"))
+            assertEquals(entry, projection.find(alias, "movie"))
+            assertEquals(null, projection.find(alias, "episode"))
         }
         assertEquals(setOf(MDBLIST_WATCHLIST_KEY), projection.membership("tmdb:1", "anime"))
         assertTrue(projection.membership("tt1", "series").isEmpty())
+        assertEquals("Show", projection.find("tmdb:1", "anime")?.name)
     }
 }
