@@ -123,6 +123,7 @@ data class TrackingProgressSnapshot(
 interface TrackingProgressProvider {
     val providerId: TrackingProviderId
     val changes: Flow<Unit>
+    fun showIdSiblings(): Map<String, Set<String>> = emptyMap()
 
     /** True when the provider projection already contains display-ready metadata. */
     val providesCompleteMetadata: Boolean

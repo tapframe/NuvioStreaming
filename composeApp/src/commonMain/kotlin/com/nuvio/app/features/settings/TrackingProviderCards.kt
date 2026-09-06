@@ -114,6 +114,7 @@ internal enum class TrackingBrand(val displayName: String) {
     NUVIO("Nuvio"),
     TRAKT("Trakt"),
     SIMKL("Simkl"),
+    MDBLIST("MDBList"),
     TMDB("TMDB"),
 }
 
@@ -127,12 +128,14 @@ internal fun isTrackingBrandAvailable(
     brand: TrackingBrand,
     traktConnected: Boolean,
     simklConnected: Boolean,
+    mdblistConnected: Boolean = false,
 ): Boolean = when (brand) {
     TrackingBrand.NUVIO,
     TrackingBrand.TMDB,
     -> true
     TrackingBrand.TRAKT -> traktConnected
     TrackingBrand.SIMKL -> simklConnected
+    TrackingBrand.MDBLIST -> mdblistConnected
 }
 
 internal fun TraktConnectionMode.toTrackingConnectionCardMode(): TrackingConnectionCardMode = when (this) {
@@ -217,6 +220,9 @@ internal fun TrackingProviderCards(
             }
         }
     }
+
+    Spacer(Modifier.height(if (isTablet) 16.dp else 12.dp))
+    MdbListProviderCard(Modifier.fillMaxWidth())
 
     if (showSyncInfo) {
         SimklSyncInfoDialog(onDismiss = { showSyncInfo = false })
@@ -306,7 +312,7 @@ private fun SimklProviderCard(
 }
 
 @Composable
-private fun TrackingProviderCard(
+internal fun TrackingProviderCard(
     brand: TrackingBrand,
     mode: TrackingConnectionCardMode,
     credentialsConfigured: Boolean,
@@ -328,8 +334,8 @@ private fun TrackingProviderCard(
     errorMessage: String? = null,
     websiteLabel: String? = null,
     websiteUrl: String? = null,
-    onConnectRequested: () -> String?,
-    onResumeAuthorization: () -> String?,
+    onConnectRequested: suspend () -> String?,
+    onResumeAuthorization: suspend () -> String?,
     onCancelAuthorization: () -> Unit,
     onSyncRequested: (() -> Unit)? = null,
     onInfoRequested: (() -> Unit)? = null,
@@ -337,6 +343,7 @@ private fun TrackingProviderCard(
 ) {
     val tokens = MaterialTheme.nuvio
     val uriHandler = LocalUriHandler.current
+    val actionScope = rememberCoroutineScope()
     val failedOpenBrowserMessage = stringResource(Res.string.settings_trakt_failed_open_browser)
     var browserError by rememberSaveable { mutableStateOf(false) }
     var showDisconnectDialog by rememberSaveable { mutableStateOf(false) }
@@ -412,7 +419,7 @@ private fun TrackingProviderCard(
                         label = openLoginLabel,
                         loading = isLoading,
                         enabled = !isLoading,
-                        onClick = { openUrl(onResumeAuthorization()) },
+                        onClick = { actionScope.launch { openUrl(onResumeAuthorization()) } },
                     )
                     OutlinedButton(
                         onClick = onCancelAuthorization,
@@ -440,7 +447,7 @@ private fun TrackingProviderCard(
                         label = connectLabel,
                         loading = isLoading,
                         enabled = credentialsConfigured && !isLoading,
-                        onClick = { openUrl(onConnectRequested()) },
+                        onClick = { actionScope.launch { openUrl(onConnectRequested()) } },
                     )
                     if (!credentialsConfigured) {
                         TrackingBrandMessage(
@@ -655,6 +662,7 @@ private fun TrackingDisconnectDialog(
                             stringResource(Res.string.settings_trakt_disconnect_description)
                         TrackingBrand.SIMKL ->
                             stringResource(Res.string.settings_simkl_disconnect_description)
+                        TrackingBrand.MDBLIST,
                         TrackingBrand.NUVIO,
                         TrackingBrand.TMDB,
                         -> stringResource(
@@ -707,6 +715,12 @@ internal fun TrackingBrandGlyph(
             modifier = modifier,
             contentScale = ContentScale.Fit,
         )
+        TrackingBrand.MDBLIST -> Image(
+            painter = integrationLogoPainter(IntegrationLogo.MdbList),
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
         TrackingBrand.TMDB -> Image(
             painter = integrationLogoPainter(IntegrationLogo.Tmdb),
             contentDescription = contentDescription,
@@ -730,6 +744,7 @@ private fun TrackingBrandWordmark(
     val painter: Painter = when (brand) {
         TrackingBrand.TRAKT -> traktBrandPainter(TraktBrandAsset.Wordmark)
         TrackingBrand.SIMKL -> simklBrandPainter(SimklBrandAsset.Wordmark)
+        TrackingBrand.MDBLIST -> integrationLogoPainter(IntegrationLogo.MdbList)
         TrackingBrand.NUVIO,
         TrackingBrand.TMDB,
         -> return
@@ -744,6 +759,7 @@ private fun TrackingBrandWordmark(
             TrackingBrand.SIMKL -> Modifier
                 .width(124.dp)
                 .height(30.dp)
+            TrackingBrand.MDBLIST -> Modifier.width(130.dp).height(32.dp)
             TrackingBrand.NUVIO,
             TrackingBrand.TMDB,
             -> Modifier
@@ -756,6 +772,9 @@ private fun TrackingBrandWordmark(
 private fun TrackingBrand.cardBrush(): Brush = when (this) {
     TrackingBrand.TRAKT -> Brush.linearGradient(
         colors = listOf(Color(0xFF7D279B), Color(0xFFD61F56), Color(0xFFF22125)),
+    )
+    TrackingBrand.MDBLIST -> Brush.linearGradient(
+        colors = listOf(Color(0xFF173D2D), Color(0xFF245F43), Color(0xFF193A2B)),
     )
     TrackingBrand.SIMKL -> Brush.linearGradient(
         colors = listOf(Color(0xFF050505), Color(0xFF292929), Color(0xFF111111)),

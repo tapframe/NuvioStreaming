@@ -34,6 +34,9 @@ internal class MdbListProgressProjection(snapshot: MdbListSyncSnapshot) {
         }
     }
     val hiddenContentIds = droppedById.filterValues { null in it }.keys
+    val showIdSiblings = (snapshot.watched.filter { it.type != MdbListItemType.MOVIE }.map { it.media.ids.aliases() } +
+        snapshot.playback.filter { it.type != MdbListItemType.MOVIE }.map { it.media.ids.aliases() })
+        .flatMap { aliases -> aliases.map { it to aliases } }.toMap()
     val progress = snapshot.playback.filter { session ->
         val watched = historyByKey["${session.type}:${session.media.ids.key}:${session.season ?: -1}:${session.episode ?: -1}"]
         session.progress < COMPLETION_PERCENT && !isHidden(session.media.ids.contentId, session.season) &&
@@ -93,6 +96,7 @@ internal class MdbListProgressProjection(snapshot: MdbListSyncSnapshot) {
             trackingProviderId = "mdblist",
             trackingProviderItemId = media.ids.mdblist?.let { "mdblist:$it" },
             trackingSourceUrl = media.sourceUrl(type),
+            excludedNextUpSeasons = droppedById[media.ids.contentId].orEmpty().filterNotNull().toSet(),
         )
     }
 

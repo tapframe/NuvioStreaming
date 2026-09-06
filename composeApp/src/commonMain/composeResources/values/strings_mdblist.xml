@@ -1,0 +1,27 @@
+<resources>
+    <string name="tracking_source_mdblist">MDBList</string>
+    <string name="settings_mdblist_library_description">Watchlist and your static movie and show lists.</string>
+    <string name="settings_mdblist_progress_description">Watched history, resume progress and Next Up from MDBList.</string>
+    <string name="library_mdblist_title">MDBList Library</string>
+    <string name="library_mdblist_load_failed">Could not load your MDBList library</string>
+    <string name="library_mdblist_empty_title">Your MDBList library is empty</string>
+    <string name="library_mdblist_empty_message">Add movies and shows to your watchlist or create a static list.</string>
+    <string name="settings_mdblist_connect">Connect MDBList</string>
+    <string name="settings_mdblist_connected_as">Connected as %1$s</string>
+    <string name="settings_mdblist_connected_description">Playback and watched actions sync with your MDBList account.</string>
+    <string name="settings_mdblist_sign_in_description">Connect your account to sync playback, watched history and lists.</string>
+    <string name="settings_mdblist_finish_sign_in">Finish connecting MDBList</string>
+    <string name="settings_mdblist_approval_description">Approve code %1$s in your browser. You can return here after approval.</string>
+    <string name="settings_mdblist_open_login">Open sign-in page</string>
+    <string name="settings_mdblist_disconnect">Disconnect MDBList</string>
+    <string name="settings_mdblist_missing_credentials">MDBList sign-in is not configured in this build.</string>
+    <string name="settings_mdblist_sync_now">Sync now</string>
+    <string name="settings_mdblist_visit">Visit MDBList</string>
+    <string name="settings_mdblist_unavailable">MDBList is unavailable. Please try again.</string>
+    <string name="settings_mdblist_rate_limited">MDBList’s request allowance is currently used up. Sync will resume when it resets.</string>
+    <string name="settings_mdblist_auth_expired">Your sign-in code expired. Connect again to get a new code.</string>
+    <string name="settings_mdblist_auth_denied">Sign-in was declined. Connect again when you are ready.</string>
+    <string name="settings_mdblist_auth_revoked">Reconnect MDBList to renew account access.</string>
+    <string name="settings_mdblist_invalid_response">MDBList returned an unexpected response. Please try again.</string>
+    <string name="settings_mdblist_write_required">MDBList needs write access to sync playback and watched history. Connect again and approve access.</string>
+</resources>

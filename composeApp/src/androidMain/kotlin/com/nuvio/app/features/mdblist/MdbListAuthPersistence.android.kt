@@ -22,6 +22,7 @@ internal actual object PlatformMdbListAuthPersistence : MdbListAuthPersistence {
     private val lock = Any()
 
     actual override fun read(profileId: Int): String? = synchronized(lock) {
+        if (!::preferences.isInitialized) return@synchronized null
         val key = "profile.$profileId"
         val value = preferences.getString(key, null) ?: return@synchronized null
         try {
@@ -53,6 +54,7 @@ internal actual object PlatformMdbListAuthPersistence : MdbListAuthPersistence {
     }
 
     actual override fun clear() = synchronized(lock) {
+        if (!::preferences.isInitialized) return@synchronized
         if (!preferences.edit().clear().commit()) throw IOException("Unable to clear protected credentials")
     }
 

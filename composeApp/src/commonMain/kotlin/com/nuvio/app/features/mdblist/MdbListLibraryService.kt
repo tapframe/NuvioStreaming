@@ -64,6 +64,8 @@ class MdbListLibraryService(
 
     fun observeMembership(id: String, type: String) = projection.map { it.membership(id, type) }.distinctUntilChanged()
 
+    fun prepare() = refreshAsync()
+
     suspend fun getMembershipSnapshot(input: LibraryItem): Map<String, Boolean> {
         val scope = sync.currentScope()
         refresh(TrackingRefreshIntent.AUTOMATIC)
