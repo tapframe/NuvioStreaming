@@ -74,6 +74,7 @@ import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.traktBrandPainter
 import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.settings_mdblist_disconnect_description
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.settings_simkl_authorization_expired
@@ -330,6 +331,7 @@ internal fun TrackingProviderCard(
     syncLabel: String? = null,
     infoLabel: String? = null,
     isSyncing: Boolean = false,
+    authorizationCode: String? = null,
     statusMessage: String? = null,
     errorMessage: String? = null,
     websiteLabel: String? = null,
@@ -415,6 +417,9 @@ internal fun TrackingProviderCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.78f),
                     )
+                    authorizationCode?.let { code ->
+                        Text(code, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                    }
                     TrackingBrandPrimaryButton(
                         label = openLoginLabel,
                         loading = isLoading,
@@ -662,7 +667,7 @@ private fun TrackingDisconnectDialog(
                             stringResource(Res.string.settings_trakt_disconnect_description)
                         TrackingBrand.SIMKL ->
                             stringResource(Res.string.settings_simkl_disconnect_description)
-                        TrackingBrand.MDBLIST,
+                        TrackingBrand.MDBLIST -> stringResource(Res.string.settings_mdblist_disconnect_description)
                         TrackingBrand.NUVIO,
                         TrackingBrand.TMDB,
                         -> stringResource(

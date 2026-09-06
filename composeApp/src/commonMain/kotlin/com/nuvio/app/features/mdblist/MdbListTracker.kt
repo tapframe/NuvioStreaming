@@ -30,6 +30,7 @@ object MdbListTracker : TrackingAuthProvider {
     val account = MdbListAccountController(auth, store, coroutineScope, { api.refreshUser(it) })
     private val authenticated = MutableStateFlow(store.state.value.isAuthenticated)
     override val isAuthenticated = authenticated.asStateFlow()
+    override val accountGeneration: Long get() = store.scope().generation
     override val descriptor = TrackingProviderDescriptor(
         TrackingProviderId.MDBLIST, "MDBList", setOf(
             TrackingCapability.AUTHENTICATION, TrackingCapability.WATCHED_READ, TrackingCapability.WATCHED_WRITE,

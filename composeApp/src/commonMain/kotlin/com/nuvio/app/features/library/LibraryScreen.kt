@@ -262,6 +262,7 @@ fun LibraryScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             actions = {
                                 if (sourceMode == LibraryViewMode.Saved) {
+                                    LibraryListManagementButton()
                                     val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
                                         LibraryLayoutMode.VERTICAL
                                     } else {
@@ -368,7 +369,7 @@ fun LibraryScreen(
                                         LibrarySourceMode.LOCAL -> stringResource(Res.string.library_load_failed)
                                         LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_load_failed)
                                         LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_load_failed)
-                                    LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_load_failed)
+                                        LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_load_failed)
                                     },
                                     message = uiState.errorMessage.orEmpty(),
                                     actionLabel = stringResource(Res.string.action_retry),

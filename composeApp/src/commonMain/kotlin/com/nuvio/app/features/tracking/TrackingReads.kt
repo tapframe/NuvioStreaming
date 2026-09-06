@@ -30,6 +30,9 @@ fun TrackingLibraryTab.supportsContentType(contentType: String): Boolean =
         supported.equals(contentType, ignoreCase = true)
     }
 
+fun TrackingLibraryTab.membershipTitle(): String =
+    providerId?.let { "${it.displayName} · $title" } ?: title
+
 internal fun trackingMembershipDestinations(
     tabs: List<TrackingLibraryTab>,
 ): List<TrackingLibraryTab> = tabs.filter(TrackingLibraryTab::isMembershipDestination)

@@ -15,6 +15,7 @@ data class MdbListAccountStatus(
     val isBusy: Boolean = false,
     val error: MdbListSyncError? = null,
     val authError: MdbListAuthError? = null,
+    val revokeFailed: Boolean = false,
 )
 
 class MdbListAccountController(
@@ -88,16 +89,23 @@ class MdbListAccountController(
         mutableStatus.value = MdbListAccountStatus(store.scope())
     }
 
-    suspend fun disconnect(scope: MdbListAuthScope = store.scope()) {
+    suspend fun disconnect(scope: MdbListAuthScope = store.scope()) = actions.withLock {
         store.checkScope(scope)
         stopPolling()
         mutableStatus.value = MdbListAccountStatus(scope, isBusy = true)
+        val disconnectedScope = scope.copy(generation = scope.generation + 1)
         try {
-            auth.disconnect(scope)
+            val revoked = auth.disconnect(scope)
+            if (store.isCurrent(disconnectedScope)) {
+                mutableStatus.value = MdbListAccountStatus(disconnectedScope, revokeFailed = !revoked)
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            if (store.isCurrent(scope)) mutableStatus.value = MdbListAccountStatus(scope, error = error.toMdbListSyncError())
+            when {
+                store.isCurrent(disconnectedScope) -> mutableStatus.value = MdbListAccountStatus(disconnectedScope, revokeFailed = true)
+                store.isCurrent(scope) -> mutableStatus.value = MdbListAccountStatus(scope, error = error.toMdbListSyncError())
+            }
         } finally {
             if (mutableStatus.value.scope == scope) mutableStatus.value = mutableStatus.value.copy(isBusy = false)
         }

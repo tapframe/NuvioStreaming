@@ -12,6 +12,39 @@ import kotlin.test.assertTrue
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class MdbListAccountControllerTest {
     @Test
+    fun failedRemoteRevocationKeepsLocalDisconnectAndExplainsRemainingAccess() = runTest {
+        val h = MdbListTestHarness()
+        h.connected()
+        val controller = MdbListAccountController(h.auth, h.store, backgroundScope, {}, { h.now })
+        h.reply(503)
+        controller.disconnect()
+        assertFalse(h.auth.state.value.isAuthenticated)
+        assertTrue(controller.status.value.revokeFailed)
+        assertEquals(h.store.scope(), controller.status.value.scope)
+        h.reply(body = MdbListTestHarness.DEVICE_RESPONSE)
+        controller.connect()
+        assertFalse(controller.status.value.revokeFailed)
+    }
+
+    @Test
+    fun successfulRevocationClearsBusyStateAndStaleDisconnectCannotAffectNewProfile() = runTest {
+        val h = MdbListTestHarness()
+        h.connected()
+        val controller = MdbListAccountController(h.auth, h.store, backgroundScope, {}, { h.now })
+        h.reply(204)
+        controller.disconnect()
+        assertFalse(controller.status.value.isBusy)
+        assertFalse(controller.status.value.revokeFailed)
+        assertEquals(h.store.scope(), controller.status.value.scope)
+        val stale = h.store.scope()
+        h.store.selectProfile(2)
+        h.connected()
+        expectMdbListFailure<CancellationException> { controller.disconnect(stale) }
+        assertTrue(h.auth.state.value.isAuthenticated)
+        assertEquals(1, h.engine.requests.size)
+    }
+
+    @Test
     fun connectionPollsAfterIntervalAndPublishesApprovedScope() = runTest {
         val h = MdbListTestHarness()
         var approved: MdbListAuthScope? = null

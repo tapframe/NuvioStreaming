@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.jetbrains.compose.resources.getString
 
 class MdbListLibraryService(
     private val api: MdbListApiClient,
@@ -56,9 +58,9 @@ class MdbListLibraryService(
                 entries.filter { tab.key in it.listKeys }.takeIf { it.isNotEmpty() }
                     ?.let { LibrarySection(tab.key, tab.title, it) }
             },
-            hasLoaded = library != null,
+            hasLoaded = library != null || status?.error != null,
             isLoading = status?.refreshing == true,
-            errorMessage = status?.error?.toMdbListSyncError()?.name,
+            errorMessage = status?.error?.let { runBlocking { getString(it.mdbListMessageResource()) } },
         )
     }
 

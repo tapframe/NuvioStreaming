@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.format.formatLocalDateTime
+import com.nuvio.app.features.mdblist.messageResource
 import com.nuvio.app.features.mdblist.MdbListAuthError
 import com.nuvio.app.features.mdblist.MdbListSyncError
 import com.nuvio.app.features.mdblist.MdbListTracker
@@ -37,18 +39,26 @@ internal fun MdbListProviderCard(modifier: Modifier = Modifier) {
         },
         credentialsConfigured = MdbListTracker.auth.hasRequiredCredentials(),
         isLoading = status?.isBusy == true,
-        connectedLabel = stringResource(Res.string.settings_mdblist_connected_as, auth.user?.username ?: "MDBList"),
+        connectedLabel = stringResource(Res.string.settings_mdblist_connected_as, auth.user?.username ?: stringResource(Res.string.settings_mdblist_account_fallback)),
         connectedDescription = stringResource(Res.string.settings_mdblist_connected_description),
         signInDescription = stringResource(Res.string.settings_mdblist_sign_in_description),
         finishSignInLabel = stringResource(Res.string.settings_mdblist_finish_sign_in),
-        approvalDescription = stringResource(Res.string.settings_mdblist_approval_description, auth.session?.userCode.orEmpty()),
+        approvalDescription = stringResource(Res.string.settings_mdblist_approval_description),
+        authorizationCode = auth.session?.userCode,
         connectLabel = stringResource(Res.string.settings_mdblist_connect),
         openLoginLabel = stringResource(Res.string.settings_mdblist_open_login),
         disconnectLabel = stringResource(Res.string.settings_mdblist_disconnect),
         missingCredentialsMessage = stringResource(Res.string.settings_mdblist_missing_credentials),
         syncLabel = stringResource(Res.string.settings_mdblist_sync_now),
         isSyncing = syncStatus?.isLoading == true,
-        errorMessage = mdbListAccountError(auth.error ?: status?.authError, status?.error ?: syncStatus?.error),
+        statusMessage = when {
+            syncStatus?.isLoading == true -> stringResource(Res.string.settings_mdblist_syncing)
+            auth.isAuthenticated && syncStatus?.snapshot?.checkedAtEpochMs != null -> stringResource(
+                Res.string.settings_mdblist_last_synced, formatLocalDateTime(syncStatus.snapshot.checkedAtEpochMs))
+            else -> null
+        },
+        errorMessage = if (status?.revokeFailed == true) stringResource(Res.string.settings_mdblist_revoke_failed)
+            else mdbListAccountError(auth.error ?: status?.authError, status?.error ?: syncStatus?.error),
         websiteLabel = stringResource(Res.string.settings_mdblist_visit),
         websiteUrl = "https://mdblist.com",
         onConnectRequested = { MdbListTracker.account.connect(auth.scope) },
@@ -73,21 +83,5 @@ internal fun MdbListProviderCard(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun mdbListAccountError(auth: MdbListAuthError?, sync: MdbListSyncError?): String? {
-    val message = when (auth) {
-        MdbListAuthError.MISSING_CLIENT_ID -> Res.string.settings_mdblist_missing_credentials
-        MdbListAuthError.INVALID_RESPONSE -> Res.string.settings_mdblist_invalid_response
-        MdbListAuthError.INSUFFICIENT_SCOPE -> Res.string.settings_mdblist_write_required
-        MdbListAuthError.CODE_EXPIRED -> Res.string.settings_mdblist_auth_expired
-        MdbListAuthError.ACCESS_DENIED -> Res.string.settings_mdblist_auth_denied
-        MdbListAuthError.AUTHORIZATION_REVOKED -> Res.string.settings_mdblist_auth_revoked
-        null -> when (sync) {
-            MdbListSyncError.RATE_LIMIT -> Res.string.settings_mdblist_rate_limited
-            MdbListSyncError.AUTHORIZATION_REVOKED -> Res.string.settings_mdblist_auth_revoked
-            MdbListSyncError.INVALID_RESPONSE -> Res.string.settings_mdblist_invalid_response
-            MdbListSyncError.UNAVAILABLE -> Res.string.settings_mdblist_unavailable
-            null -> return null
-        }
-    }
-    return stringResource(message)
-}
+private fun mdbListAccountError(auth: MdbListAuthError?, sync: MdbListSyncError?): String? =
+    (auth?.messageResource() ?: sync?.messageResource())?.let { stringResource(it) }
