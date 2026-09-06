@@ -754,6 +754,13 @@ private fun TrackingBrandWordmark(
         TrackingBrand.TMDB,
         -> return
     }
+    if (brand == TrackingBrand.MDBLIST) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Image(painter, contentDescription = null, modifier = Modifier.size(32.dp))
+            Text(contentDescription, style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        return
+    }
     Image(
         painter = painter,
         contentDescription = contentDescription,
