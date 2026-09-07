@@ -76,10 +76,10 @@ private class IOSPlayerGestureController : PlayerGestureController {
     private var brightnessRestored = false
 
     override fun currentBrightness(): Float =
-        UIScreen.mainScreen.brightness.toFloat().coerceIn(0.02f, 1f)
+        UIScreen.mainScreen.brightness.toFloat().coerceIn(0f, 1f)
 
     override fun setBrightness(level: Float): Float {
-        val target = level.coerceIn(0.02f, 1f)
+        val target = level.coerceIn(0f, 1f)
         UIScreen.mainScreen.brightness = target.toDouble()
         return target
     }

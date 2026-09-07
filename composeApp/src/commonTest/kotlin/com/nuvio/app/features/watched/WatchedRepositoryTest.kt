@@ -15,6 +15,12 @@ import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
     @Test
+    fun oversizedLegacyPayload_isNotRestored() {
+        assertTrue(shouldRestoreWatchedPayload(4 * 1024 * 1024))
+        assertFalse(shouldRestoreWatchedPayload(4 * 1024 * 1024 + 1))
+    }
+
+    @Test
     fun emptyProviderExtraKeys_doNotTriggerInitialRefresh() {
         assertFalse(extraWatchedKeysChanged(previous = null, current = emptySet()))
     }
@@ -276,10 +282,29 @@ class WatchedRepositoryTest {
     }
 
     @Test
-    fun onlyNuvioWatchedStateIsPersisted() {
-        assertTrue(shouldPersistWatchedSource(WatchProgressSource.NUVIO_SYNC))
-        assertFalse(shouldPersistWatchedSource(WatchProgressSource.TRAKT))
-        assertFalse(shouldPersistWatchedSource(WatchProgressSource.SIMKL))
+    fun successfulTrackerPush_waitsForRemoteSnapshotAcknowledgement() {
+        val outcome = WatchedPushOutcome(
+            succeededTrackerProviderIds = setOf(TrackingProviderId.TRAKT),
+        )
+
+        assertFalse(shouldAcknowledgeNuvioWatchedPush(WatchProgressSource.TRAKT, outcome))
+    }
+
+    @Test
+    fun providerSnapshot_acknowledgesPendingMarkByPresence() {
+        val localItem = watchedItem(id = "pending", markedAtEpochMs = 1_999L)
+        val remoteItem = localItem.copy(markedAtEpochMs = 1_000L)
+        val key = watchedItemKey(localItem.type, localItem.id)
+
+        val merged = mergeWatchedSnapshot(
+            serverItems = listOf(remoteItem),
+            localItems = listOf(localItem),
+            dirtyKeys = setOf(key),
+            acknowledgeDirtyByPresence = true,
+        )
+
+        assertEquals(mapOf(key to remoteItem), merged.items)
+        assertTrue(merged.dirtyKeys.isEmpty())
     }
 
     @Test

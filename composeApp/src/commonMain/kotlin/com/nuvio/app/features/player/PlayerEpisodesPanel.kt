@@ -336,7 +336,7 @@ private fun EpisodeRow(
 ) {
     val tokens = MaterialTheme.nuvio
     val cardShape = RoundedCornerShape(16.dp)
-    val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched && !isCurrent
+    val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
     val playingDescription = stringResource(Res.string.compose_player_playing)
     val episodeCode = when {
         episode.season != null && episode.episode != null -> stringResource(

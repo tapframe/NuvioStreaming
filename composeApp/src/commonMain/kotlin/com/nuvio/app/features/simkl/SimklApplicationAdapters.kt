@@ -42,19 +42,9 @@ object SimklWatchedSyncAdapter : TrackingWatchedProvider {
     }
 
     override suspend fun pullFullyWatchedSeriesKeys(profileId: Int): Set<String>? {
-        if (profileId != ProfileRepository.activeProfileId) return null
-        SimklSyncRepository.refresh(
-            intent = TrackingRefreshIntent.AUTOMATIC,
-            origin = SimklRefreshOrigin.WATCHED_SERIES,
-        )
-        val snapshot = SimklSyncRepository.state.value.snapshot
-        val projection = snapshot.toSimklWatchedProjection()
-        SimklWatchDiagnostics.logProjection(
-            stage = "fully-watched-pull",
-            snapshot = snapshot,
-            projection = projection,
-        )
-        return projection.fullyWatchedSeriesKeys
+        // Simkl "completed" = all episodes watched; Nuvio "completed" = all
+        // *available* episodes watched. Let local revalidation decide.
+        return null
     }
 
     override suspend fun pullExtraWatchedKeys(profileId: Int): Set<String> {

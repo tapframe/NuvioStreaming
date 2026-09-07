@@ -147,14 +147,14 @@ private class AndroidPlayerGestureController(
     override fun currentBrightness(): Float {
         val windowValue = activity.window.attributes.screenBrightness
         return if (windowValue in 0f..1f) {
-            windowValue.coerceIn(0.02f, 1f)
+            windowValue.coerceIn(0f, 1f)
         } else {
             readSystemBrightness()
         }
     }
 
     override fun setBrightness(level: Float): Float {
-        val target = level.coerceIn(0.02f, 1f)
+        val target = level.coerceIn(0f, 1f)
         val attributes = activity.window.attributes
         attributes.screenBrightness = target
         activity.window.attributes = attributes
@@ -203,6 +203,6 @@ private class AndroidPlayerGestureController(
                 Settings.System.SCREEN_BRIGHTNESS,
             )
         }.getOrDefault(127)
-            .coerceIn(1, 255)
+            .coerceIn(0, 255)
             .toFloat() / 255f
 }

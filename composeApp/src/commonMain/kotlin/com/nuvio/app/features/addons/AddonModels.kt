@@ -85,6 +85,22 @@ internal fun List<ManagedAddon>.toOverview(): AddonOverview =
 internal fun List<ManagedAddon>.enabledAddons(): List<ManagedAddon> =
     filter { it.enabled }
 
+internal fun List<ManagedAddon>.hasPendingEnabledManifests(): Boolean =
+    any { addon -> addon.enabled && addon.isRefreshing }
+
+internal fun List<ManagedAddon>.isWaitingForFirstEnabledManifest(): Boolean {
+    val enabledAddons = enabledAddons()
+    return enabledAddons.isNotEmpty() &&
+        enabledAddons.none { addon -> addon.manifest != null } &&
+        enabledAddons.any { addon -> addon.isRefreshing }
+}
+
+internal fun List<ManagedAddon>.firstEnabledManifestError(): String? =
+    asSequence()
+        .filter { addon -> addon.enabled && addon.manifest == null }
+        .mapNotNull { addon -> addon.errorMessage?.takeIf(String::isNotBlank) }
+        .firstOrNull()
+
 sealed interface AddAddonResult {
     data class Success(val manifest: AddonManifest) : AddAddonResult
     data class Error(val message: String) : AddAddonResult

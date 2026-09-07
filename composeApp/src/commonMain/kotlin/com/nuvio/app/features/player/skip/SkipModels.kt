@@ -19,6 +19,7 @@ data class NextEpisodeInfo(
     val overview: String?,
     val released: String?,
     val hasAired: Boolean,
+    val isWatched: Boolean,
     val unairedMessage: String?,
 )
 
@@ -81,16 +82,6 @@ data class AniSkipResult(
 data class AniSkipInterval(
     @SerialName("startTime") val startTime: Double,
     @SerialName("endTime") val endTime: Double,
-)
-
-// --- ARM API response models ---
-
-@Serializable
-data class ArmEntry(
-    @SerialName("myanimelist") val myanimelist: Int? = null,
-    @SerialName("anilist") val anilist: Int? = null,
-    @SerialName("kitsu") val kitsu: Int? = null,
-    @SerialName("imdb") val imdb: String? = null,
 )
 
 // --- Anime-Skip GraphQL API response models ---

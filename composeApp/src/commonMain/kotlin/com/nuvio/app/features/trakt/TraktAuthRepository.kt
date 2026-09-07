@@ -96,6 +96,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     override fun clearLocalState() {
+        TraktWatchedShowSnapshotRepository.clear()
         hasLoaded = false
         currentProfileId = 1
         profileGeneration += 1L

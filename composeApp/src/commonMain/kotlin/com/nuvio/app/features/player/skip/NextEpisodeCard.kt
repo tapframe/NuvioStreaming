@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.PlatformBackHandler
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_episode_title_format
 import nuvio.composeapp.generated.resources.detail_btn_play
@@ -55,12 +57,14 @@ fun NextEpisodeCard(
     isAutoPlaySearching: Boolean,
     autoPlaySourceName: String?,
     autoPlayCountdownSec: Int?,
+    blurred: Boolean,
     onPlayNext: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (nextEpisode == null) return
 
+    PlatformBackHandler(enabled = visible, onBack = onDismiss)
     val isPlayable = nextEpisode.hasAired
 
     AnimatedVisibility(
@@ -91,7 +95,9 @@ fun NextEpisodeCard(
                 AsyncImage(
                     model = nextEpisode.thumbnail,
                     contentDescription = stringResource(Res.string.player_next_episode_thumbnail),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(if (blurred) Modifier.blur(18.dp) else Modifier),
                     contentScale = ContentScale.Crop,
                 )
                 Box(

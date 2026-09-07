@@ -37,6 +37,8 @@ internal data class SimklResolvedListMutation(
     val request: TrackingMediaReference,
     val status: SimklListStatus,
     val responseMedia: SimklMedia,
+    val resolvedMediaType: SimklMediaType? = null,
+    val animeType: String? = null,
 )
 
 internal data class SimklResolvedHistoryMutation(
@@ -68,6 +70,12 @@ internal fun SimklApiResponse.toListMutationReceipt(
                 val status = response.stringValue("to")?.toSimklListStatus()
                     ?: return@forEach
                 val responseMedia = response.toResponseMedia()
+                val animeType = response.stringValue("anime_type")
+                val resolvedMediaType = if (animeType != null) {
+                    SimklMediaType.ANIME
+                } else {
+                    response.stringValue("type")?.toSimklMediaType()
+                }
                 val index = unmatched.indexOfFirst { candidate ->
                     (candidate.kind == TrackingMediaKind.MOVIE) == expectedMovie &&
                         responseMedia.matchesTarget(candidate.toSimklMedia())
@@ -78,6 +86,8 @@ internal fun SimklApiResponse.toListMutationReceipt(
                             request = unmatched.removeAt(index),
                             status = status,
                             responseMedia = responseMedia,
+                            resolvedMediaType = resolvedMediaType,
+                            animeType = animeType,
                         ),
                     )
                 }
@@ -253,8 +263,10 @@ private fun JsonObject.objectValue(key: String): JsonObject? =
     runCatching { get(key)?.jsonObject }.getOrNull()
 
 private fun JsonObject.stringValue(key: String): String? =
-    runCatching { get(key)?.jsonPrimitive?.content }
+    runCatching { get(key)?.jsonPrimitive }
         .getOrNull()
+        ?.takeIf { primitive -> primitive !is kotlinx.serialization.json.JsonNull }
+        ?.content
         ?.trim()
         ?.takeIf(String::isNotEmpty)
 

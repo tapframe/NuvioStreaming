@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.IntentCompat
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.concurrent.ConflatedTaskDispatcher
 import java.util.concurrent.Executors
@@ -17,6 +18,7 @@ internal const val NOW_PLAYING_TAG = "NuvioNowPlaying"
 internal const val NOW_PLAYING_CHANNEL_ID = "nuvio_playback"
 internal const val NOW_PLAYING_NOTIFICATION_ID = 0x4E55
 private const val ACTION_START_FOREGROUND = "com.nuvio.app.nowplaying.START_FOREGROUND"
+private const val EXTRA_START_NOTIFICATION = "com.nuvio.app.nowplaying.START_NOTIFICATION"
 
 class PlayerNowPlayingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -27,13 +29,30 @@ class PlayerNowPlayingService : Service() {
             return START_NOT_STICKY
         }
 
-        val notification = PlayerNowPlayingServiceState.notification
-        if (notification == null) {
+        val startNotification = IntentCompat.getParcelableExtra(intent, EXTRA_START_NOTIFICATION, Notification::class.java)
+            ?: PlayerNowPlayingServiceState.notification
+        if (startNotification == null) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
-        startForeground(NOW_PLAYING_NOTIFICATION_ID, notification)
+        val started = runCatching {
+            startForeground(NOW_PLAYING_NOTIFICATION_ID, startNotification)
+        }.onFailure { error ->
+            Log.w(NOW_PLAYING_TAG, "Unable to promote playback service", error)
+        }.isSuccess
+        if (!started) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        val currentNotification = PlayerNowPlayingServiceState.notification
+        if (currentNotification == null) {
+            stopSelf(startId)
+        } else if (currentNotification !== startNotification) {
+            getSystemService(NotificationManager::class.java)
+                ?.notify(NOW_PLAYING_NOTIFICATION_ID, currentNotification)
+        }
         return START_NOT_STICKY
     }
 
@@ -108,6 +127,7 @@ private object PlayerNowPlayingServiceController {
         if (startRequested.compareAndSet(false, true)) {
             val intent = Intent(command.context, PlayerNowPlayingService::class.java)
                 .setAction(ACTION_START_FOREGROUND)
+                .putExtra(EXTRA_START_NOTIFICATION, command.notification)
             val started = runCatching {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     command.context.startForegroundService(intent)

@@ -41,6 +41,7 @@ suspend fun resolveWatchedBadgesBulk(
                 add(entry.parentMetaId)
             }
         }
+        WatchedRepository.baseFullyWatchedSeriesKeys().mapNotNullTo(this, ::extractContentIdFromWatchedKey)
     }
     if (touchedSeriesIds.isEmpty()) return
 
@@ -54,23 +55,24 @@ suspend fun resolveWatchedBadgesBulk(
     withContext(Dispatchers.Default) {
         val semaphore = Semaphore(BADGE_RESOLUTION_CONCURRENCY)
         val resolvedIds = mutableSetOf<String>()
+        val resolvedStates = linkedMapOf<String, Boolean>()
 
         for (contentId in touchedSeriesIds) {
             semaphore.withPermit {
                 val meta = try {
-                    MetaDetailsRepository.fetch(type = "series", id = contentId)
+                    MetaDetailsRepository.fetch(type = "series", id = contentId, cacheResult = false)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Throwable) {
                     null
                 }
                 if (meta != null) {
-                    WatchedRepository.reconcileFullyWatchedSeriesState(
+                    val isFullyWatched = WatchedRepository.calculateFullyWatchedSeriesState(
                         meta = meta,
                         todayIsoDate = todayIsoDate,
                         isEpisodeWatched = { episode ->
-                            val key = watchedItemKey(meta.type, meta.id, episode.season, episode.episode)
-                            if (key in watchedKeys) {
+                            val keys = watchedItemKeys(meta.type, meta.id, episode.season, episode.episode)
+                            if (keys.any(watchedKeys::contains)) {
                                 true
                             } else {
                                 val episodeNumber = episode.episode
@@ -88,12 +90,14 @@ suspend fun resolveWatchedBadgesBulk(
                             }
                         },
                     )
+                    resolvedStates[watchedItemKey(meta.type, meta.id)] = isFullyWatched
                     resolvedIds.add(contentId)
                 }
             }
             yield()
         }
 
+        WatchedRepository.updateFullyWatchedSeriesStates(resolvedStates)
         log.i { "Bulk badge resolution complete: resolved ${resolvedIds.size}/${touchedSeriesIds.size}" }
 
         // Sibling expansion
