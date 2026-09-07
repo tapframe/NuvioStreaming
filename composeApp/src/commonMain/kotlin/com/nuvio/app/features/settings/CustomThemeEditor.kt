@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,8 +15,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.nuvio.app.core.ui.CustomThemeColors
@@ -49,7 +54,11 @@ import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.custom_theme_color_number
 import nuvio.composeapp.generated.resources.custom_theme_hex_error
 import nuvio.composeapp.generated.resources.custom_theme_hex_title
+import nuvio.composeapp.generated.resources.custom_theme_mode_gradient
+import nuvio.composeapp.generated.resources.custom_theme_mode_solid
 import nuvio.composeapp.generated.resources.custom_theme_save
+import nuvio.composeapp.generated.resources.custom_theme_solid_subtitle
+import nuvio.composeapp.generated.resources.custom_theme_solid_title
 import nuvio.composeapp.generated.resources.custom_theme_subtitle
 import nuvio.composeapp.generated.resources.custom_theme_title
 import org.jetbrains.compose.resources.stringResource
@@ -57,11 +66,12 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun CustomThemeEditor(
     initialColors: CustomThemeColors,
+    allowGradient: Boolean,
     onSave: (CustomThemeColors) -> Unit,
     onDismiss: () -> Unit,
 ) {
     NuvioTheme {
-        CustomThemeEditorSheet(initialColors, onSave, onDismiss)
+        CustomThemeEditorSheet(initialColors, allowGradient, onSave, onDismiss)
     }
 }
 
@@ -69,17 +79,27 @@ internal fun CustomThemeEditor(
 @Composable
 private fun CustomThemeEditorSheet(
     initialColors: CustomThemeColors,
+    allowGradient: Boolean,
     onSave: (CustomThemeColors) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    var encodedColors by rememberSaveable { mutableStateOf(initialColors.encode()) }
-    var selectedIndex by rememberSaveable { mutableStateOf(0) }
-    val colors = CustomThemeColors.decode(encodedColors)
-    var hexCode by rememberSaveable(selectedIndex) { mutableStateOf(formatHexColor(colors.colors[selectedIndex])) }
+    var encodedColors by rememberSaveable(allowGradient) { mutableStateOf(initialColors.encode()) }
+    var gradientEnabled by rememberSaveable(allowGradient) {
+        mutableStateOf(allowGradient && !initialColors.isSolid)
+    }
+    var selectedIndex by rememberSaveable(gradientEnabled) { mutableStateOf(0) }
+    val draftColors = CustomThemeColors.decode(encodedColors)
+    val colors = if (gradientEnabled) draftColors else CustomThemeColors.solid(draftColors.second)
+    var hexCode by rememberSaveable(selectedIndex, gradientEnabled) {
+        mutableStateOf(formatHexColor(colors.colors[selectedIndex]))
+    }
     val validHex = parseHexColor(hexCode) != null
+    fun updateColor(color: Int) {
+        encodedColors = draftColors.withColor(if (gradientEnabled) selectedIndex else 1, color).encode()
+    }
     fun dismiss() {
         scope.launch { dismissNuvioBottomSheet(sheetState, onDismiss) }
     }
@@ -96,7 +116,9 @@ private fun CustomThemeEditorSheet(
             verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
         ) {
             Text(
-                text = stringResource(Res.string.custom_theme_title),
+                text = stringResource(
+                    if (gradientEnabled) Res.string.custom_theme_title else Res.string.custom_theme_solid_title,
+                ),
                 style = MaterialTheme.typography.titleLarge,
                 color = tokens.colors.textPrimary,
             )
@@ -104,28 +126,55 @@ private fun CustomThemeEditorSheet(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s16),
             ) {
+                if (allowGradient) {
+                    FlowRow(
+                        modifier = Modifier.selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
+                    ) {
+                        listOf(true, false).forEach { gradient ->
+                            FilterChip(
+                                selected = gradientEnabled == gradient,
+                                onClick = { gradientEnabled = gradient },
+                                label = {
+                                    Text(stringResource(
+                                        if (gradient) Res.string.custom_theme_mode_gradient else Res.string.custom_theme_mode_solid,
+                                    ))
+                                },
+                                modifier = Modifier.semantics { role = Role.RadioButton },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                            )
+                        }
+                    }
+                }
                 Text(
-                    text = stringResource(Res.string.custom_theme_subtitle),
+                    text = stringResource(
+                        if (gradientEnabled) Res.string.custom_theme_subtitle else Res.string.custom_theme_solid_subtitle,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = tokens.colors.textSecondary,
                 )
                 CustomThemePreview(colors)
-                Row(horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
-                    colors.colors.forEachIndexed { index, color ->
-                        ThemeColorSlot(
-                            index = index,
-                            color = color,
-                            selected = selectedIndex == index,
-                            onClick = { selectedIndex = index },
-                            modifier = Modifier.weight(1f),
-                        )
+                if (gradientEnabled) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8)) {
+                        colors.colors.forEachIndexed { index, color ->
+                            ThemeColorSlot(
+                                index = index,
+                                color = color,
+                                selected = selectedIndex == index,
+                                onClick = { selectedIndex = index },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
                 ThemeColorPicker(
                     color = colors.colors[selectedIndex],
                     colorIndex = selectedIndex,
                     onColorChanged = {
-                        encodedColors = colors.withColor(selectedIndex, it).encode()
+                        updateColor(it)
                         hexCode = formatHexColor(it)
                     },
                 )
@@ -140,7 +189,7 @@ private fun CustomThemeEditorSheet(
                         value = hexCode,
                         onValueChange = { value ->
                             hexCode = value
-                            parseHexColor(value)?.let { encodedColors = colors.withColor(selectedIndex, it).encode() }
+                            parseHexColor(value)?.let(::updateColor)
                         },
                         placeholder = "#B75AFF",
                         modifier = Modifier.semantics { contentDescription = hexLabel },

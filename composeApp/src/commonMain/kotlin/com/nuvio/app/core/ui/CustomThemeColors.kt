@@ -10,6 +10,7 @@ data class CustomThemeColors(
     }
 
     val colors: List<Int> get() = listOf(first, second, third)
+    val isSolid: Boolean get() = first == second && second == third
 
     fun withColor(index: Int, color: Int): CustomThemeColors = when (index) {
         0 -> copy(first = color)
@@ -22,6 +23,8 @@ data class CustomThemeColors(
 
     companion object {
         val Default = CustomThemeColors()
+
+        fun solid(color: Int): CustomThemeColors = CustomThemeColors(color, color, color)
 
         fun decode(value: String?): CustomThemeColors {
             val colors = value?.split(",")?.map { parseHexColor(it) ?: return Default }

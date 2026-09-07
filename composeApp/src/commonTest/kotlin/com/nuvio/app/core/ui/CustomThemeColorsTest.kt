@@ -1,10 +1,12 @@
 package com.nuvio.app.core.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -56,6 +58,29 @@ class CustomThemeColorsTest {
         assertEquals("#FFFFFF", palette.nativeAccentHex)
         assertTrue(palette.background.luminance() < 0.02f)
         assertEquals(ThemeColors.White, ThemeColors.getColorPalette(AppTheme.WHITE, CustomThemeColors(0, 0, 0)))
+    }
+
+    @Test
+    fun solidColorsUseOneBrushColorAndKeepTheExistingStorageFormat() {
+        val colors = CustomThemeColors.solid(0x123456)
+        val color = Color(0xFF123456)
+        val palette = colors.toColorPalette()
+
+        assertTrue(colors.isSolid)
+        assertEquals("#123456,#123456,#123456", colors.encode())
+        assertEquals(colors, CustomThemeColors.decode(colors.encode()))
+        assertEquals(listOf(color), palette.accentGradient)
+        assertEquals(color, assertIs<SolidColor>(palette.accentBrush()).value)
+        assertEquals(color, palette.secondary)
+        assertEquals(color, palette.secondaryVariant)
+        assertEquals("#123456", palette.nativeAccentHex)
+    }
+
+    @Test
+    fun gradientsWithMatchingEndColorsKeepAllThreeStops() {
+        val palette = CustomThemeColors(0xFF0000, 0x0000FF, 0xFF0000).toColorPalette()
+
+        assertEquals(listOf(Color.Red, Color.Blue, Color.Red), palette.accentGradient)
     }
 
     @Test

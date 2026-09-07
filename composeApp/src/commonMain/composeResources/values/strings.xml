@@ -1334,7 +1334,11 @@
     <string name="theme_custom">Custom</string>
     <string name="custom_theme_title">Your custom gradient</string>
     <string name="custom_theme_subtitle">Choose three colors for your theme. Select a color to edit it.</string>
-    <string name="custom_theme_edit">Edit custom gradient</string>
+    <string name="custom_theme_edit">Edit custom theme</string>
+    <string name="custom_theme_solid_title">Your custom color</string>
+    <string name="custom_theme_solid_subtitle">Choose a color for your theme.</string>
+    <string name="custom_theme_mode_gradient">Gradient</string>
+    <string name="custom_theme_mode_solid">Single color</string>
     <string name="custom_theme_color_number">Color %1$d</string>
     <string name="custom_theme_hue">Hue</string>
     <string name="custom_theme_saturation">Saturation</string>

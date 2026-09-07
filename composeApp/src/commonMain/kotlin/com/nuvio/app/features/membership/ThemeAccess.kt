@@ -1,6 +1,7 @@
 package com.nuvio.app.features.membership
 
 import com.nuvio.app.core.ui.AppTheme
+import com.nuvio.app.core.ui.CustomThemeColors
 
 private val supporterThemes = linkedMapOf(
     AppTheme.GOLD to CosmeticEntitlement.GOLD_THEME,
@@ -14,19 +15,17 @@ private val standardThemes = listOf(AppTheme.WHITE) + AppTheme.entries.filterNot
     it == AppTheme.WHITE || it == AppTheme.CUSTOM || it in supporterThemes
 }
 
-fun availableAppThemes(entitlements: CosmeticEntitlements, memberTier: MemberTier? = null): List<AppTheme> {
+fun availableAppThemes(entitlements: CosmeticEntitlements): List<AppTheme> {
     val supporter = supporterThemes
         .filterValues(entitlements::includes)
         .keys
         .toList()
-    val customThemes = if (memberTier != null) listOf(AppTheme.CUSTOM) else emptyList()
-    return supporter + customThemes + standardThemes
+    return supporter + AppTheme.CUSTOM + standardThemes
 }
 
 fun resolveAppTheme(
     selectedTheme: AppTheme?,
     entitlements: CosmeticEntitlements,
-    memberTier: MemberTier? = null,
 ): AppTheme {
     if (selectedTheme == null) {
         return supporterThemes
@@ -35,5 +34,8 @@ fun resolveAppTheme(
             .firstOrNull()
             ?: AppTheme.WHITE
     }
-    return selectedTheme.takeIf { it in availableAppThemes(entitlements, memberTier) } ?: AppTheme.WHITE
+    return selectedTheme.takeIf { it in availableAppThemes(entitlements) } ?: AppTheme.WHITE
 }
+
+fun resolveCustomThemeColors(colors: CustomThemeColors, memberTier: MemberTier?): CustomThemeColors =
+    if (memberTier == null) CustomThemeColors.solid(colors.second) else colors
