@@ -1,5 +1,8 @@
 package com.nuvio.android
 
+import android.graphics.Bitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7,6 +10,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTextInput
@@ -60,21 +64,26 @@ class LibraryTrackingUiTest {
             }
         }
         compose.onNodeWithText("Manage Lists").assertIsDisplayed()
-        compose.onNodeWithText("Create").performClick()
+        screenshot("library-manage.png")
+        compose.onNodeWithText("Create List").performClick()
         compose.onNodeWithText("Create List").assertIsDisplayed()
         compose.onNodeWithText("Description").assertDoesNotExist()
         compose.onNodeWithText("Move Up").assertDoesNotExist()
-        compose.onNodeWithText("Save").assertIsNotEnabled()
+        compose.onNodeWithText("Create").assertIsNotEnabled()
+        screenshot("library-create.png")
         compose.onNodeWithText("Name").performTextInput("Weekend")
         compose.onNodeWithText("Public").performClick()
-        compose.onNodeWithText("Save").performClick()
+        compose.onNodeWithText("Create").performClick()
         compose.onNodeWithText("Movies").performClick()
         compose.onNodeWithText("Edit List").assertIsDisplayed()
+        screenshot("library-edit.png")
         compose.onNodeWithText("Name").performTextReplacement("Movies renamed")
         compose.onNodeWithText("Save").performClick()
+        compose.onNodeWithText("Movies").performClick()
         compose.onNodeWithText("Delete").performClick()
         compose.onNodeWithText("Delete this list?").assertIsDisplayed()
         compose.onNodeWithText("This removes “Movies” and all its list items from MDBList.").assertIsDisplayed()
+        screenshot("library-delete.png")
         compose.onNodeWithText("Delete").performClick()
         compose.runOnIdle {
             assertEquals(listOf("create:Weekend:PUBLIC", "update:mdblist:list:42:Movies renamed:PRIVATE", "delete:mdblist:list:42"), calls)
@@ -91,7 +100,8 @@ class LibraryTrackingUiTest {
         }
         compose.onNodeWithText("Saving…").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("Name").assertIsNotEnabled()
-        compose.onNodeWithText("Cancel").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Close").assertIsNotEnabled()
+        compose.onNodeWithText("Manage Lists").assertIsNotEnabled()
         compose.onNodeWithText("Description").assertDoesNotExist()
     }
 
@@ -128,4 +138,14 @@ class LibraryTrackingUiTest {
         compose.onNodeWithText("internal backend body").assertDoesNotExist()
         compose.onNodeWithText("Weekend").assertIsDisplayed()
     }
+
+    private fun screenshot(name: String) {
+        if (InstrumentationRegistry.getArguments().getString("libraryScreenshots") != "true") return
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val bitmap = instrumentation.uiAutomation.takeScreenshot()
+        File(instrumentation.targetContext.cacheDir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
 }

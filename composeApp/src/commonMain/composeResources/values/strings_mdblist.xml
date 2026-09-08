@@ -46,4 +46,6 @@
     <string name="library_list_delete_failed">Failed to delete list</string>
     <string name="library_list_link">Link</string>
     <string name="library_list_friends">Friends</string>
+    <string name="library_list_private_description">Only you can see this list.</string>
+    <string name="library_list_public_description">Anyone can see this list.</string>
 </resources>

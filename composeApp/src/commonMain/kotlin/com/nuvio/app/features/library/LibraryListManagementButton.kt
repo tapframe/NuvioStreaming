@@ -1,7 +1,10 @@
 package com.nuvio.app.features.library
 
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,7 +18,7 @@ import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import com.nuvio.app.features.tracking.providerId
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.library_manage_lists
+import nuvio.composeapp.generated.resources.library_create_list
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -31,7 +34,13 @@ internal fun LibraryListManagementButton() {
     if (context == null) return
     val provider = context.source.providerId?.let(TrackingProviderRegistry::libraryProvider) ?: return
     val manager = provider.listManager ?: return
-    TextButton(onClick = controller::open) { Text(stringResource(Res.string.library_manage_lists)) }
+    IconButton(onClick = controller::create) {
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = stringResource(Res.string.library_create_list),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     state?.let { dialog ->
         LibraryListManagementDialog(
             state = dialog,

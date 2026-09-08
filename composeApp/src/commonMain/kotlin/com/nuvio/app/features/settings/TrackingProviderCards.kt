@@ -786,7 +786,7 @@ private fun TrackingBrand.cardBrush(): Brush = when (this) {
         colors = listOf(Color(0xFF7D279B), Color(0xFFD61F56), Color(0xFFF22125)),
     )
     TrackingBrand.MDBLIST -> Brush.linearGradient(
-        colors = listOf(Color(0xFF173D2D), Color(0xFF245F43), Color(0xFF193A2B)),
+        colors = listOf(Color(0xFF173D69), Color(0xFF225C97), Color(0xFF16385D)),
     )
     TrackingBrand.SIMKL -> Brush.linearGradient(
         colors = listOf(Color(0xFF050505), Color(0xFF292929), Color(0xFF111111)),
