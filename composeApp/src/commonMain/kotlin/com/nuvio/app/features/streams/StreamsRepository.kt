@@ -177,13 +177,7 @@ object StreamsRepository {
         val streamAddons = installedAddons
             .mapNotNull { addon ->
                 val manifest = addon.manifest ?: return@mapNotNull null
-                val supportsRequestedStream = manifest.resources.any { resource ->
-                    resource.name == "stream" &&
-                        resource.types.contains(type) &&
-                        (resource.idPrefixes.isEmpty() ||
-                            resource.idPrefixes.any { videoId.startsWith(it) })
-                }
-                if (!supportsRequestedStream) return@mapNotNull null
+                if (!manifest.supportsStream(type, videoId)) return@mapNotNull null
 
                 InstalledStreamAddonTarget(
                     addonName = addon.displayTitle.ifBlank { manifest.name },

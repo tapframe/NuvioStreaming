@@ -116,6 +116,7 @@ import com.nuvio.app.features.library.executeTrackingMembershipOperation
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.streams.rememberPlaybackAvailability
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbService
@@ -168,6 +169,7 @@ fun MetaDetailsScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
 ) {
+    val playbackAvailability = rememberPlaybackAvailability()
     val uiState by MetaDetailsRepository.uiState.collectAsStateWithLifecycle()
     val displayedMeta = uiState.meta?.takeIf { it.type == type && it.id == id }
         ?: MetaDetailsRepository.peek(type, id)
@@ -724,6 +726,14 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
+                val primaryVideoId = seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id
+                val isPrimaryPlayEnabled = playbackAvailability.canPlay(
+                    type = meta.type,
+                    videoId = primaryVideoId,
+                    parentMetaId = meta.id,
+                    seasonNumber = seriesAction?.seasonNumber,
+                    episodeNumber = seriesAction?.episodeNumber,
+                )
                 val playText = stringResource(Res.string.action_play)
                 val resumeText = stringResource(Res.string.action_resume)
                 val playButtonLabel = remember(movieProgress, seriesAction, meta.type, hasEpisodes, playText, resumeText) {
@@ -779,7 +789,7 @@ fun MetaDetailsScreen(
                 val manualPlayHandler = onPlayManually
                 val showManualPlayOption = manualPlayHandler != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                 val onPrimaryPlayLongClick: (() -> Unit)? = manualPlayHandler
-                    ?.takeIf { showManualPlayOption }
+                    ?.takeIf { showManualPlayOption && playbackAvailability.canStream(meta.type, primaryVideoId) }
                     ?.let { manualPlay ->
                         {
                             when {
@@ -1068,6 +1078,7 @@ fun MetaDetailsScreen(
                                 contentHorizontalPadding = contentHorizontalPadding,
                                 contentMaxWidth = if (isTablet) contentMaxWidth else Dp.Unspecified,
                                 playButtonLabel = playButtonLabel,
+                                isPrimaryPlayEnabled = isPrimaryPlayEnabled,
                                 isSaved = isSaved,
                                 isWatched = isWatched,
                                 onPrimaryPlayClick = onPrimaryPlayClick,
@@ -1252,7 +1263,7 @@ fun MetaDetailsScreen(
                                         areCurrentlyWatched = isSeasonWatched,
                                     )
                                 },
-                                showPlayManually = showManualPlayOption,
+                                showPlayManually = showManualPlayOption && playbackAvailability.canStream(meta.type, selectedEpisode.id),
                                 onPlayManually = {
                                     onEpisodeManualPlayClick(selectedEpisode)
                                 },
@@ -1567,7 +1578,11 @@ fun MetaDetailsScreen(
                             },
                         ),
                     )
-                    if (onPlayManually != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)) {
+                    if (
+                        onPlayManually != null &&
+                        StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState) &&
+                        playbackAvailability.canStream(meta.type, selectedEpisode.id)
+                    ) {
                         add(
                             PosterZoomOverlayAction(
                                 icon = Icons.Default.PlayArrow,
@@ -1745,6 +1760,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     contentHorizontalPadding: Dp,
     contentMaxWidth: Dp,
     playButtonLabel: String,
+    isPrimaryPlayEnabled: Boolean,
     isSaved: Boolean,
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
@@ -1825,6 +1841,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     isTablet = isTablet,
                     horizontalScrollPadding = contentHorizontalPadding,
                     playButtonLabel = playButtonLabel,
+                    isPrimaryPlayEnabled = isPrimaryPlayEnabled,
                     isSaved = isSaved,
                     isWatched = isWatched,
                     onPrimaryPlayClick = onPrimaryPlayClick,
@@ -2048,6 +2065,7 @@ private fun ConfiguredMetaSections(
     isTablet: Boolean,
     horizontalScrollPadding: Dp,
     playButtonLabel: String,
+    isPrimaryPlayEnabled: Boolean,
     isSaved: Boolean,
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
@@ -2111,7 +2129,8 @@ private fun ConfiguredMetaSections(
         when (key) {
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
-                    playLabel = playButtonLabel,
+                    playLabel = if (isPrimaryPlayEnabled) playButtonLabel else stringResource(Res.string.playback_unavailable),
+                    playEnabled = isPrimaryPlayEnabled,
                     secondaryActions = buildList {
                         add(DetailSecondaryAction(
                             label = if (isWatched) {

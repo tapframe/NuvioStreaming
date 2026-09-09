@@ -1576,6 +1576,8 @@
     <string name="streams_open_internal_player">Open in internal player</string>
     <string name="streams_empty_load_failed_message">The installed stream addons failed to return a valid stream response.</string>
     <string name="streams_empty_load_failed_title">Could not load streams</string>
+    <string name="playback_unavailable">Playback unavailable</string>
+    <string name="playback_unavailable_message">Playback isn’t available for this title with your current setup.</string>
     <string name="streams_empty_no_addons_message">Install an addon first to load streams for this title.</string>
     <string name="streams_empty_no_stream_addon_message">Your installed addons do not provide streams for this type of title.</string>
     <string name="streams_empty_no_stream_addon_title">No stream addon available</string>

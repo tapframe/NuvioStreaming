@@ -138,6 +138,8 @@ import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.streams.StreamLaunch
+import com.nuvio.app.features.streams.PlaybackAvailability
+import com.nuvio.app.features.streams.rememberPlaybackAvailability
 import com.nuvio.app.features.streams.StreamLaunchStore
 import com.nuvio.app.features.streams.StreamsRepository
 import com.nuvio.app.features.tracking.TrackingLibraryTab
@@ -293,6 +295,8 @@ internal fun MainAppContent(
     val networkStatusUiState by remember {
         NetworkStatusRepository.uiState
     }.collectAsStateWithLifecycle()
+    val playbackAvailability = rememberPlaybackAvailability()
+    val playbackUnavailableMessage = stringResource(Res.string.playback_unavailable_message)
     val downloadedProviderLabel = stringResource(Res.string.provider_downloaded)
     val externalPlayerNotConfiguredText = stringResource(Res.string.external_player_not_configured)
     val externalPlayerUnavailableText = stringResource(Res.string.external_player_unavailable)
@@ -993,6 +997,11 @@ internal fun MainAppContent(
                 }
             }
 
+            if (!PlaybackAvailability.current().canStream(type, videoId)) {
+                NuvioToastController.show(playbackUnavailableMessage)
+                return
+            }
+
             val streamLaunchId = StreamLaunchStore.put(
                 StreamLaunch(
                     profileId = activePlaybackProfileId,
@@ -1109,6 +1118,19 @@ internal fun MainAppContent(
                 ),
             )
         }
+
+        fun canPlayContinueWatching(item: ContinueWatchingItem): Boolean =
+            item.isCloudLibraryContinueWatchingItem() || playbackAvailability.canPlay(
+                type = item.parentMetaType,
+                videoId = item.videoId,
+                parentMetaId = item.parentMetaId,
+                seasonNumber = item.seasonNumber,
+                episodeNumber = item.episodeNumber,
+            )
+
+        fun canSelectContinueWatchingStreams(item: ContinueWatchingItem): Boolean =
+            !item.isCloudLibraryContinueWatchingItem() &&
+                playbackAvailability.canStream(item.parentMetaType, item.videoId)
 
         val openContinueWatching: (ContinueWatchingItem, Boolean, Boolean) -> Unit = { item, manualSelection, startFromBeginning ->
             resumePromptItem = null
@@ -1761,7 +1783,7 @@ internal fun MainAppContent(
             selectedContinueWatchingForActions?.let { item ->
                 selectedContinueWatchingZoomAnchor?.let { anchor ->
                     key(item.videoId, anchor) {
-                        val showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
+                        val showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState) && canSelectContinueWatchingStreams(item)
                         val showDetailsOption = !item.isCloudLibraryContinueWatchingItem()
                         NuvioPosterZoomActionOverlay(
                             imageUrl = cloudLibraryDisplayArtworkUrl(anchor.imageUrl ?: item.poster ?: item.imageUrl),
@@ -1801,7 +1823,7 @@ internal fun MainAppContent(
                                         ),
                                     )
                                 }
-                                if (!item.isNextUp) {
+                                if (!item.isNextUp && canPlayContinueWatching(item)) {
                                     add(
                                         PosterZoomOverlayAction(
                                             icon = Icons.Default.Replay,
@@ -1831,7 +1853,8 @@ internal fun MainAppContent(
 
             NuvioContinueWatchingActionSheet(
                 item = selectedContinueWatchingForActions.takeIf { selectedContinueWatchingZoomAnchor == null },
-                showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState),
+                showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState) &&
+                    selectedContinueWatchingForActions?.let(::canSelectContinueWatchingStreams) == true,
                 showDetailsOption = selectedContinueWatchingForActions?.isCloudLibraryContinueWatchingItem() != true,
                 onDismiss = { selectedContinueWatchingForActions = null },
                 onOpenDetails = {
@@ -1846,7 +1869,7 @@ internal fun MainAppContent(
                     }
                 },
                 onStartFromBeginning = selectedContinueWatchingForActions
-                    ?.takeIf { !it.isNextUp }
+                    ?.takeIf { !it.isNextUp && canPlayContinueWatching(it) }
                     ?.let { item -> { onContinueWatchingStartFromBeginning(item) } },
                 onPlayManually = selectedContinueWatchingForActions
                     ?.let { item -> { onContinueWatchingPlayManually(item) } },

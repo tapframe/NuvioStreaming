@@ -1287,14 +1287,10 @@ private fun EmptyStateBlock(
     val message: String
 
     when (reason) {
-        StreamsEmptyStateReason.NoAddonsInstalled -> {
-            title = stringResource(Res.string.compose_search_empty_no_active_addons_title)
-            message = stringResource(Res.string.streams_empty_no_addons_message)
-        }
-
+        StreamsEmptyStateReason.NoAddonsInstalled,
         StreamsEmptyStateReason.NoCompatibleAddons -> {
-            title = stringResource(Res.string.streams_empty_no_stream_addon_title)
-            message = stringResource(Res.string.streams_empty_no_stream_addon_message)
+            title = stringResource(Res.string.playback_unavailable)
+            message = stringResource(Res.string.playback_unavailable_message)
         }
 
         StreamsEmptyStateReason.StreamFetchFailed -> {
