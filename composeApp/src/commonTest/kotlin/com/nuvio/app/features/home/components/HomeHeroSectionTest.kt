@@ -7,14 +7,14 @@ import kotlin.test.assertEquals
 class HomeHeroSectionTest {
 
     @Test
-    fun `mobile hero height follows viewport height when provided`() {
+    fun `mobile hero height stays compact without continue watching`() {
         val layout = homeHeroLayout(
             maxWidthDp = 390f,
             viewportHeightDp = 844f,
         )
 
         assertEquals(false, layout.isTablet)
-        assertEquals(692.08f, layout.heroHeight.value, 0.001f)
+        assertEquals(452.4f, layout.heroHeight.value, 0.001f)
     }
 
     @Test

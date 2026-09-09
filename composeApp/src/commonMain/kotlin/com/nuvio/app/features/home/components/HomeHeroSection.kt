@@ -514,7 +514,11 @@ private fun mobileHeroHeight(
 ): Dp {
     val viewportDrivenHeight = viewportHeightDp?.let { (it * MOBILE_HERO_VIEWPORT_RATIO).dp }
     val widthFallbackHeight = (maxWidthDp * 1.16f).dp
-    val baseHeight = viewportDrivenHeight ?: widthFallbackHeight
+    val baseHeight = if (mobileBelowSectionHeightHintDp == null) {
+        viewportDrivenHeight?.coerceAtMost(widthFallbackHeight) ?: widthFallbackHeight
+    } else {
+        viewportDrivenHeight ?: widthFallbackHeight
+    }
 
     val maxAllowedFromViewportDp = if (viewportHeightDp != null && mobileBelowSectionHeightHintDp != null) {
         viewportHeightDp - mobileBelowSectionHeightHintDp
