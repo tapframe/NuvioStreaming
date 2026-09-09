@@ -17,6 +17,7 @@ actual object ThemeSettingsStorage {
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val navBarStyleKey = "nav_bar_style"
+    private const val useSystemFontKey = "use_system_font"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
         customThemeColorsKey,
@@ -104,6 +105,19 @@ actual object ThemeSettingsStorage {
 
     actual fun saveNavBarStyle(styleKey: String) {
         NSUserDefaults.standardUserDefaults.setObject(styleKey, forKey = ProfileScopedKey.of(navBarStyleKey))
+    }
+
+    actual fun loadUseSystemFont(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        return if (defaults.objectForKey(useSystemFontKey) != null) {
+            defaults.boolForKey(useSystemFontKey)
+        } else {
+            null
+        }
+    }
+
+    actual fun saveUseSystemFont(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = useSystemFontKey)
     }
 
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {

@@ -498,6 +498,8 @@
     <string name="settings_account_status_signed_in">Innlogget</string>
     <string name="settings_appearance_amoled_black">AMOLED Svart</string>
     <string name="settings_appearance_amoled_description">Bruk ren svart bakgrunn for OLED-skjermer.</string>
+    <string name="settings_appearance_use_system_font">Bruk systemskrift</string>
+    <string name="settings_appearance_use_system_font_description">Bruk enhetens standard systemskrift i stedet for den medfølgende skriften.</string>
     <string name="settings_appearance_app_language">Appspråk</string>
     <string name="settings_appearance_app_language_sheet_title">Velg språk</string>
     <string name="settings_appearance_continue_watching_description">Innstillinger for Fortsett å se-seksjonen.</string>

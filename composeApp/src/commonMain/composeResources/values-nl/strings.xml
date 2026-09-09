@@ -577,6 +577,8 @@
     <string name="settings_account_status_signed_in">Ingelogd</string>
     <string name="settings_appearance_amoled_black">AMOLED-zwart</string>
     <string name="settings_appearance_amoled_description">Gebruik puur zwarte achtergronden voor OLED-schermen.</string>
+    <string name="settings_appearance_use_system_font">Systeemlettertype gebruiken</string>
+    <string name="settings_appearance_use_system_font_description">Gebruik het standaard systeemlettertype van het apparaat in plaats van het meegeleverde lettertype.</string>
     <string name="settings_appearance_app_icon">App-pictogram</string>
     <string name="settings_appearance_app_icon_arctic_blue">Arctic Blue</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">Als je overschakelt naar %1$s, wordt Nuvio gesloten. Tik op OK om door te gaan.</string>

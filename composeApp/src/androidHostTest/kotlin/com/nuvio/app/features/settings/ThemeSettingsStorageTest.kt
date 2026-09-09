@@ -71,4 +71,18 @@ class ThemeSettingsStorageTest {
         assertEquals("WHITE", ThemeSettingsStorage.loadSelectedTheme())
         assertEquals("#111111,#222222,#333333", preferences.getString(otherProfileKey, null))
     }
+
+    @Test
+    fun useSystemFontIsDeviceLocalAndExcludedFromSync() {
+        assertNull(ThemeSettingsStorage.loadUseSystemFont())
+
+        ThemeSettingsStorage.saveUseSystemFont(true)
+        assertEquals(true, ThemeSettingsStorage.loadUseSystemFont())
+
+        val payload = ThemeSettingsStorage.exportToSyncPayload()
+        assertNull(payload["use_system_font"])
+
+        ThemeSettingsStorage.saveUseSystemFont(false)
+        assertEquals(false, ThemeSettingsStorage.loadUseSystemFont())
+    }
 }

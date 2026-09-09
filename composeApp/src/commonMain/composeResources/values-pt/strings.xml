@@ -543,6 +543,8 @@
     <string name="settings_account_status_signed_in">Sessão iniciada</string>
     <string name="settings_appearance_amoled_black">Preto AMOLED</string>
     <string name="settings_appearance_amoled_description">Utiliza fundos pretos puros para ecrãs OLED.</string>
+    <string name="settings_appearance_use_system_font">Usar tipo de letra do sistema</string>
+    <string name="settings_appearance_use_system_font_description">Utiliza o tipo de letra predefinido do dispositivo em vez do tipo de letra incluído.</string>
     <string name="settings_appearance_app_language">Idioma da app</string>
     <string name="settings_appearance_app_language_sheet_title">Escolher idioma</string>
     <string name="settings_appearance_continue_watching_description">Definições para a secção Continuar a Ver.</string>

@@ -653,6 +653,8 @@
     <string name="settings_account_status_signed_in">Signed in</string>
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
+    <string name="settings_appearance_use_system_font">Use System Font</string>
+    <string name="settings_appearance_use_system_font_description">Use the device\'s default system font instead of the bundled font.</string>
     <string name="settings_appearance_app_icon">App Icon</string>
     <string name="settings_appearance_app_icon_arctic_blue">Arctic Blue</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">Changing to %1$s will close Nuvio. Tap OK to continue.</string>

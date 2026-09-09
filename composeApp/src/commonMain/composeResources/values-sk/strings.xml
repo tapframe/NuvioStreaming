@@ -538,6 +538,8 @@
     <string name="settings_account_status_signed_in">Prihlásený</string>
     <string name="settings_appearance_amoled_black">AMOLED čierna</string>
     <string name="settings_appearance_amoled_description">Použiť čisto čierne pozadie pre OLED obrazovky.</string>
+    <string name="settings_appearance_use_system_font">Použiť systémové písmo</string>
+    <string name="settings_appearance_use_system_font_description">Použiť predvolené systémové písmo zariadenia namiesto pribaleného písma.</string>
     <string name="settings_appearance_app_language">Jazyk aplikácie</string>
     <string name="settings_appearance_app_language_sheet_title">Vybrať jazyk</string>
     <string name="settings_appearance_continue_watching_description">Nastavenia sekcie Pokračovať v sledovaní.</string>

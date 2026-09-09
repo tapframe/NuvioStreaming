@@ -558,6 +558,8 @@
     <string name="settings_account_status_signed_in">Connecté</string>
     <string name="settings_appearance_amoled_black">Noir AMOLED</string>
     <string name="settings_appearance_amoled_description">Utilise des fonds noirs purs pour les écrans OLED.</string>
+    <string name="settings_appearance_use_system_font">Utiliser la police du système</string>
+    <string name="settings_appearance_use_system_font_description">Utiliser la police par défaut de l\'appareil au lieu de la police intégrée.</string>
     <string name="settings_appearance_app_language">Langue de l’application</string>
     <string name="settings_appearance_app_language_device">Langue de l’appareil</string>
     <string name="settings_appearance_app_language_sheet_title">Choisir la langue</string>

@@ -312,6 +312,8 @@
     <string name="settings_account_status_anonymous">אנונימי</string>
     <string name="settings_account_status_signed_in">מחובר</string>
     <string name="settings_appearance_amoled_description">השתמש ברקעים שחורים טהורים עבור מסכי OLED.</string>
+    <string name="settings_appearance_use_system_font">השתמש בגופן המערכת</string>
+    <string name="settings_appearance_use_system_font_description">השתמש בגופן ברירת המחדל של המכשיר במקום בגופן המובנה.</string>
     <string name="settings_appearance_app_language">שפת האפליקציה</string>
     <string name="settings_appearance_app_language_device">שפת המכשיר</string>
     <string name="settings_appearance_app_language_sheet_title">בחר שפה</string>

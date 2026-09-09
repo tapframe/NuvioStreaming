@@ -590,6 +590,8 @@
     <string name="settings_account_status_signed_in">تم تسجيل الدخول</string>
     <string name="settings_appearance_amoled_black">أسود AMOLED</string>
     <string name="settings_appearance_amoled_description">استخدام خلفيات سوداء خالصة لشاشات OLED.</string>
+    <string name="settings_appearance_use_system_font">استخدام خط النظام</string>
+    <string name="settings_appearance_use_system_font_description">استخدام خط النظام الافتراضي للجهاز بدلاً من الخط المدمج.</string>
     <string name="settings_appearance_app_icon">أيقونة التطبيق</string>
     <string name="settings_appearance_app_icon_arctic_blue">أزرق قطبي</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">سيؤدي التغيير إلى %1$s إلى إغلاق Nuvio. اضغط «موافق» للمتابعة.</string>

@@ -499,6 +499,8 @@
     <string name="settings_account_status_signed_in">Conectado</string>
     <string name="settings_appearance_amoled_black">Preto AMOLED</string>
     <string name="settings_appearance_amoled_description">Usar fundos pretos puros para telas OLED.</string>
+    <string name="settings_appearance_use_system_font">Usar fonte do sistema</string>
+    <string name="settings_appearance_use_system_font_description">Usar a fonte padrão do dispositivo em vez da fonte incluída.</string>
     <string name="settings_appearance_app_language">Idioma do App</string>
     <string name="settings_appearance_app_language_sheet_title">Escolher Idioma</string>
     <string name="settings_appearance_continue_watching_description">Configurações para a seção Continuar Assistindo.</string>

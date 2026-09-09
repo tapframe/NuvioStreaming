@@ -577,6 +577,8 @@
     <string name="settings_account_status_signed_in">Giriş yapıldı</string>
     <string name="settings_appearance_amoled_black">AMOLED siyah</string>
     <string name="settings_appearance_amoled_description">OLED ekranlar için saf siyah arka planlar kullan.</string>
+    <string name="settings_appearance_use_system_font">Sistem Yazı Tipini Kullan</string>
+    <string name="settings_appearance_use_system_font_description">Birlikte gelen yazı tipi yerine cihazın varsayılan sistem yazı tipini kullanın.</string>
     <string name="settings_appearance_app_icon">Uygulama Simgesi</string>
     <string name="settings_appearance_app_icon_arctic_blue">Kutup Mavisi</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">%1$s olarak değiştirmek Nuvio'yu kapatacaktır. Devam etmek için Tamam'a dokunun.</string>

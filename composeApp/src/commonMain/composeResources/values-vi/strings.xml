@@ -545,6 +545,8 @@
     <string name="settings_account_status_signed_in">Đã đăng nhập</string>
     <string name="settings_appearance_amoled_black">Đen AMOLED</string>
     <string name="settings_appearance_amoled_description">Dùng nền đen tuyệt đối cho màn hình OLED</string>
+    <string name="settings_appearance_use_system_font">Sử dụng phông chữ hệ thống</string>
+    <string name="settings_appearance_use_system_font_description">Sử dụng phông chữ hệ thống mặc định của thiết bị thay vì phông chữ đi kèm.</string>
     <string name="settings_appearance_app_language">Ngôn ngữ ứng dụng</string>
     <string name="settings_appearance_app_language_device">Theo ngôn ngữ thiết bị</string>
     <string name="settings_appearance_app_language_sheet_title">Chọn ngôn ngữ</string>

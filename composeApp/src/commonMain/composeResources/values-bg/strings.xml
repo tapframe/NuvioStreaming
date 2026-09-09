@@ -653,6 +653,8 @@
     <string name="settings_account_status_signed_in">Влезли сте</string>
     <string name="settings_appearance_amoled_black">AMOLED черно</string>
     <string name="settings_appearance_amoled_description">Използвай чисто черни фонове за OLED екрани.</string>
+    <string name="settings_appearance_use_system_font">Използване на системен шрифт</string>
+    <string name="settings_appearance_use_system_font_description">Използване на системния шрифт по подразбиране на устройството вместо вградения шрифт.</string>
     <string name="settings_appearance_app_icon">Икона на приложението</string>
     <string name="settings_appearance_app_icon_arctic_blue">Арктиеско синьо</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">Промяната към %1$s ще затвори Nuvio. Натиснете OK, за да продължите.</string>

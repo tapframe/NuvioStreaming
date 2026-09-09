@@ -548,6 +548,8 @@
     <string name="settings_account_status_signed_in">サインイン済み</string>
     <string name="settings_appearance_amoled_black">AMOLED ブラック</string>
     <string name="settings_appearance_amoled_description">OLEDスクリーン向けに純粋な黒背景を使用します。</string>
+    <string name="settings_appearance_use_system_font">システムフォントを使用</string>
+    <string name="settings_appearance_use_system_font_description">バンドルされたフォントの代わりにデバイスのデフォルトのシステムフォントを使用します。</string>
     <string name="settings_appearance_app_language">アプリの言語</string>
     <string name="settings_appearance_app_language_device">デバイスの言語</string>
     <string name="settings_appearance_app_language_sheet_title">言語を選択</string>
