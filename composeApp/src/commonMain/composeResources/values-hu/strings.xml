@@ -492,6 +492,8 @@
     <string name="settings_account_status_signed_in">Bejelentkezve</string>
     <string name="settings_appearance_amoled_black">AMOLED fekete</string>
     <string name="settings_appearance_amoled_description">Tiszta fekete háttér használata OLED képernyőkhöz.</string>
+    <string name="settings_appearance_use_system_font">Rendszer betűtípus használata</string>
+    <string name="settings_appearance_use_system_font_description">Az eszköz alapértelmezett rendszer betűtípusának használata a beépített betűtípus helyett.</string>
     <string name="settings_appearance_app_language">Alkalmazás nyelve</string>
     <string name="settings_appearance_app_language_sheet_title">Nyelv választása</string>
     <string name="settings_appearance_continue_watching_description">A Nézés folytatása sor beállításai.</string>

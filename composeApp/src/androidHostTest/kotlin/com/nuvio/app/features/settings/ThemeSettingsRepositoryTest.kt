@@ -73,4 +73,26 @@ class ThemeSettingsRepositoryTest {
         assertEquals(saved, ThemeSettingsRepository.customThemePreference.value)
         assertEquals(saved.encode(), ThemeSettingsStorage.exportToSyncPayload().decodeSyncString("custom_theme_colors"))
     }
+
+    @Test
+    fun useSystemFontDefaultsToFalseAndPersistsWhenChanged() {
+        assertEquals(false, ThemeSettingsRepository.useSystemFont.value)
+
+        ThemeSettingsRepository.setUseSystemFont(true)
+        assertEquals(true, ThemeSettingsRepository.useSystemFont.value)
+        assertEquals(true, ThemeSettingsStorage.loadUseSystemFont())
+
+        ThemeSettingsRepository.setUseSystemFont(false)
+        assertEquals(false, ThemeSettingsRepository.useSystemFont.value)
+        assertEquals(false, ThemeSettingsStorage.loadUseSystemFont())
+    }
+
+    @Test
+    fun clearLocalStateResetsUseSystemFont() {
+        ThemeSettingsRepository.setUseSystemFont(true)
+        assertEquals(true, ThemeSettingsRepository.useSystemFont.value)
+
+        ThemeSettingsRepository.clearLocalState()
+        assertEquals(false, ThemeSettingsRepository.useSystemFont.value)
+    }
 }

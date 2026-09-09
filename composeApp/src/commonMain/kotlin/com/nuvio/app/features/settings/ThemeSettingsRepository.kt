@@ -40,6 +40,9 @@ object ThemeSettingsRepository {
     private val _navBarStyle = MutableStateFlow(NavBarStyle.ADAPTIVE)
     val navBarStyle: StateFlow<NavBarStyle> = _navBarStyle.asStateFlow()
 
+    private val _useSystemFont = MutableStateFlow(false)
+    val useSystemFont: StateFlow<Boolean> = _useSystemFont.asStateFlow()
+
     private var hasLoaded = false
     private var observesMembership = false
 
@@ -65,6 +68,7 @@ object ThemeSettingsRepository {
         NativeTabBridge.publishLiquidGlassEnabled(false)
         _selectedAppLanguage.value = AppLanguage.DEVICE
         _navBarStyle.value = NavBarStyle.ADAPTIVE
+        _useSystemFont.value = false
     }
 
     private fun loadFromDisk() {
@@ -90,6 +94,7 @@ object ThemeSettingsRepository {
         ThemeSettingsStorage.applySelectedAppLanguage(appLanguage.code)
         _selectedAppLanguage.value = appLanguage
         _navBarStyle.value = NavBarStyle.fromKey(ThemeSettingsStorage.loadNavBarStyle())
+        _useSystemFont.value = ThemeSettingsStorage.loadUseSystemFont() ?: false
     }
 
     fun setTheme(theme: AppTheme) {
@@ -141,6 +146,13 @@ object ThemeSettingsRepository {
         if (_navBarStyle.value == style) return
         _navBarStyle.value = style
         ThemeSettingsStorage.saveNavBarStyle(style.key)
+    }
+
+    fun setUseSystemFont(enabled: Boolean) {
+        ensureLoaded()
+        if (_useSystemFont.value == enabled) return
+        _useSystemFont.value = enabled
+        ThemeSettingsStorage.saveUseSystemFont(enabled)
     }
 
     private fun observeMembership() {

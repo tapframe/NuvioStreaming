@@ -21,6 +21,7 @@ actual object ThemeSettingsStorage {
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val NAV_BAR_STYLE_KEY = "nav_bar_style"
+    private const val useSystemFontKey = "use_system_font"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
         customThemeColorsKey,
@@ -114,6 +115,18 @@ actual object ThemeSettingsStorage {
         preferences
             ?.edit()
             ?.putString(ProfileScopedKey.of(NAV_BAR_STYLE_KEY), styleKey)
+            ?.apply()
+    }
+
+    actual fun loadUseSystemFont(): Boolean? =
+        preferences?.let { prefs ->
+            if (prefs.contains(useSystemFontKey)) prefs.getBoolean(useSystemFontKey, false) else null
+        }
+
+    actual fun saveUseSystemFont(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(useSystemFontKey, enabled)
             ?.apply()
     }
 

@@ -653,6 +653,8 @@
     <string name="settings_account_status_signed_in">Sesión iniciada</string>
     <string name="settings_appearance_amoled_black">Negro AMOLED</string>
     <string name="settings_appearance_amoled_description">Usa fondos negros puros para pantallas OLED.</string>
+    <string name="settings_appearance_use_system_font">Usar fuente del sistema</string>
+    <string name="settings_appearance_use_system_font_description">Usa la fuente predeterminada del dispositivo en lugar de la fuente integrada.</string>
     <string name="settings_appearance_app_icon">Icono de la app</string>
     <string name="settings_appearance_app_icon_arctic_blue">Azul ártico</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">Cambiar a %1$s cerrará Nuvio. Pulsa Aceptar para continuar.</string>

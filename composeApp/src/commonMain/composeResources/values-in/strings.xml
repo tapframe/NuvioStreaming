@@ -514,6 +514,8 @@
     <string name="settings_account_status_signed_in">Sudah masuk</string>
     <string name="settings_appearance_amoled_black">Hitam AMOLED</string>
     <string name="settings_appearance_amoled_description">Gunakan latar belakang hitam pekat untuk layar OLED.</string>
+    <string name="settings_appearance_use_system_font">Gunakan Font Sistem</string>
+    <string name="settings_appearance_use_system_font_description">Gunakan font default perangkat alih-alih font bawaan.</string>
     <string name="settings_appearance_app_language">Bahasa Aplikasi</string>
     <string name="settings_appearance_app_language_sheet_title">Pilih Bahasa</string>
     <string name="settings_appearance_continue_watching_description">Pengaturan untuk bagian Lanjutkan Menonton.</string>

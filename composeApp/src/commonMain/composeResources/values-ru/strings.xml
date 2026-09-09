@@ -653,6 +653,8 @@
     <string name="settings_account_status_signed_in">Вошёл в систему</string>
     <string name="settings_appearance_amoled_black">AMOLED Черный</string>
     <string name="settings_appearance_amoled_description">Используйте чистый черный фон для экранов OLED.</string>
+    <string name="settings_appearance_use_system_font">Использовать системный шрифт</string>
+    <string name="settings_appearance_use_system_font_description">Использовать системный шрифт устройства по умолчанию вместо встроенного шрифта.</string>
     <string name="settings_appearance_app_icon">Значок приложения</string>
     <string name="settings_appearance_app_icon_arctic_blue">Арктический синий</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">Изменение на %1$s приведет к закрытию Nuvio. Нажмите «ОК», чтобы продолжить.</string>

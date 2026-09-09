@@ -319,6 +319,8 @@
   <string name="settings_account_status_signed_in">Connesso</string>
   <string name="settings_appearance_amoled_black">Nero AMOLED</string>
   <string name="settings_appearance_amoled_description">Usa sfondi neri assoluti per schermi OLED.</string>
+  <string name="settings_appearance_use_system_font">Usa carattere di sistema</string>
+  <string name="settings_appearance_use_system_font_description">Usa il carattere predefinito del dispositivo invece del carattere integrato.</string>
   <string name="settings_appearance_app_language">Lingua app</string>
   <string name="settings_appearance_app_language_sheet_title">Scegli lingua</string>
   <string name="settings_appearance_continue_watching_description">Mostra, nascondi e personalizza lo stile della riga "Continua a guardare".</string>

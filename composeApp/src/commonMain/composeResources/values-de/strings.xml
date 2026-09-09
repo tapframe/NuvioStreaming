@@ -456,6 +456,8 @@
     <string name="settings_account_status_signed_in">Angemeldet</string>
     <string name="settings_appearance_amoled_black">AMOLED-Schwarz</string>
     <string name="settings_appearance_amoled_description">Reines Schwarz für OLED-Bildschirme verwenden.</string>
+    <string name="settings_appearance_use_system_font">Systemschriftart verwenden</string>
+    <string name="settings_appearance_use_system_font_description">Die Standardschriftart des Geräts anstelle der integrierten Schriftart verwenden.</string>
     <string name="settings_appearance_app_language">App-Sprache</string>
     <string name="settings_appearance_app_language_sheet_title">Sprache wählen</string>
     <string name="settings_appearance_continue_watching_description">Anzeigen, ausblenden und gestalten der Weiterschauen-Reihe.</string>

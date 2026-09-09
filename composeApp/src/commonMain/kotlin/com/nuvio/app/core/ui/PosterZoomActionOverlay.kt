@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -47,10 +48,12 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
@@ -349,6 +352,7 @@ fun NuvioPosterZoomActionOverlay(
         // The travelling poster itself, drawn above the slot column.
         Box(
             modifier = Modifier
+                .align(AbsoluteAlignment.TopLeft)
                 .size(width = posterWidth, height = posterHeight)
                 .graphicsLayer {
                     val slot = slotBounds
@@ -426,6 +430,7 @@ fun NuvioPosterZoomActionOverlay(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
                     NuvioPosterWatchedOverlay(
                         isWatched = isWatched,
                         modifier = Modifier.graphicsLayer {
@@ -438,7 +443,7 @@ fun NuvioPosterZoomActionOverlay(
                                 ).coerceAtLeast(0.001f)
                                 scaleX = 1f / scale
                                 scaleY = 1f / scale
-                                transformOrigin = TransformOrigin(1f, 0f)
+                                transformOrigin = TransformOrigin(if (isRtl) 0f else 1f, 0f)
                             }
                         },
                     )

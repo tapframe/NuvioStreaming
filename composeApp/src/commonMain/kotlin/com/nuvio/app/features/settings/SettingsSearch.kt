@@ -392,6 +392,15 @@ internal fun settingsSearchEntries(
     }
     addRow(
         page = SettingsPage.Appearance,
+        key = "system-font",
+        title = stringResource(Res.string.settings_appearance_use_system_font),
+        description = stringResource(Res.string.settings_appearance_use_system_font_description),
+        pageLabel = layoutPage,
+        section = stringResource(Res.string.settings_appearance_section_display),
+        icon = Icons.Rounded.Palette,
+    )
+    addRow(
+        page = SettingsPage.Appearance,
         key = "app-language",
         title = stringResource(Res.string.settings_appearance_app_language),
         pageLabel = layoutPage,

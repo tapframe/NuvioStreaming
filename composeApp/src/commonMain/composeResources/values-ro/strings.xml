@@ -566,6 +566,8 @@
     <string name="settings_account_status_signed_in">Autentificat</string>
     <string name="settings_appearance_amoled_black">Negru AMOLED</string>
     <string name="settings_appearance_amoled_description">Folosește fundaluri complet negre pentru ecranele OLED.</string>
+    <string name="settings_appearance_use_system_font">Utilizează fontul de sistem</string>
+    <string name="settings_appearance_use_system_font_description">Utilizează fontul implicit al dispozitivului în locul fontului inclus.</string>
     <string name="settings_appearance_app_language">Limba aplicației</string>
     <string name="settings_appearance_app_language_device">Limba dispozitivului</string>
     <string name="settings_appearance_app_language_sheet_title">Alege limba</string>

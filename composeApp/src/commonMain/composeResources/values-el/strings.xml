@@ -380,6 +380,8 @@
     <string name="settings_advanced_sentry_reports_subtitle">Αποστολή αναφορών σφαλμάτων και ANR με ασφαλές πλαίσιο. Ενεργό από προεπιλογή.</string>
     <string name="settings_appearance_amoled_black">AMOLED Μαύρο</string>
     <string name="settings_appearance_amoled_description">Χρήση καθαρού μαύρου φόντου για οθόνες OLED.</string>
+    <string name="settings_appearance_use_system_font">Χρήση γραμματοσειράς συστήματος</string>
+    <string name="settings_appearance_use_system_font_description">Χρήση της προεπιλεγμένης γραμματοσειράς συστήματος της συσκευής αντί της ενσωματωμένης γραμματοσειράς.</string>
     <string name="settings_appearance_app_icon">Εικονίδιο εφαρμογής</string>
     <string name="settings_appearance_app_icon_arctic_blue">Παγωμένο μπλε</string>
     <string name="settings_appearance_app_icon_android_confirmation_message">Η αλλαγή σε %1$s θα κλείσει το Nuvio. Πατήστε ΟΚ για να συνεχίσετε.</string>
